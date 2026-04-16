@@ -6,7 +6,11 @@
 
 import type { ID, ScopeIds } from '../types/common.js';
 import type { Capsule } from '../types/capsule.js';
-import type { CapsuleManager as ICapsuleManager, OpenCapsuleOptions, CloseCapsuleSignals } from './types.js';
+import type {
+  CapsuleManager as ICapsuleManager,
+  OpenCapsuleOptions,
+  CloseCapsuleSignals,
+} from './types.js';
 import type { CapsuleStore } from './lifecycle.js';
 import { openCapsule, closeCapsule, getCapsule, getOpenCapsule } from './lifecycle.js';
 

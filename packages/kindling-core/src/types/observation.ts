@@ -11,15 +11,15 @@ import type { ID, Timestamp, ScopeIds } from './common.js';
  * Types of observations that can be captured
  */
 export type ObservationKind =
-  | 'tool_call'      // Tool invocation (e.g., grep, read file)
-  | 'command'        // Shell command execution
-  | 'file_diff'      // File change
-  | 'error'          // Error or exception
-  | 'message'        // User or agent message
-  | 'node_start'     // Workflow node started
-  | 'node_end'       // Workflow node ended
-  | 'node_output'    // Workflow node output
-  | 'node_error';    // Workflow node error
+  | 'tool_call' // Tool invocation (e.g., grep, read file)
+  | 'command' // Shell command execution
+  | 'file_diff' // File change
+  | 'error' // Error or exception
+  | 'message' // User or agent message
+  | 'node_start' // Workflow node started
+  | 'node_end' // Workflow node ended
+  | 'node_output' // Workflow node output
+  | 'node_error'; // Workflow node error
 
 /**
  * Observation entity

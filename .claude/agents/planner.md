@@ -23,6 +23,7 @@ ls plans/aps-rules.md
 ```
 
 If it exists:
+
 1. **Read it first** - it contains the planning conventions for this project
 2. **Follow APS format** - use Index, Module, Task, Step hierarchy
 3. **Write plans to `plans/`** - not inline or elsewhere
@@ -41,24 +42,28 @@ If APS rules exist, your output should be APS-formatted files, not the generic t
 ## Planning Methodology
 
 ### 1. Requirements Analysis
+
 - Understand the goal
 - Identify constraints
 - Map dependencies
 - Surface assumptions
 
 ### 2. Task Decomposition
+
 - Break into 2-5 minute tasks
 - Each task has clear deliverable
 - Dependencies explicit
 - Verification criteria defined
 
 ### 3. Sequencing
+
 - Order by dependencies
 - Identify parallelizable work
 - Find critical path
 - Add buffer for unknowns
 
 ### 4. Risk Assessment
+
 - Technical risks
 - Integration risks
 - Resource risks
@@ -70,9 +75,11 @@ If APS rules exist, your output should be APS-formatted files, not the generic t
 # Implementation Plan: [Feature Name]
 
 ## Overview
+
 Brief description of what we're building
 
 ## Prerequisites
+
 - [ ] Prerequisite 1
 - [ ] Prerequisite 2
 
@@ -81,29 +88,35 @@ Brief description of what we're building
 ### Phase 1: [Phase Name]
 
 #### Task 1.1: [Task Name]
+
 **File(s)**: path/to/file.ts
 **Description**: What to do
 **Verification**: How to confirm success
 **Dependencies**: None | Task X.Y
 
 ### Phase 2: [Phase Name]
+
 ...
 
 ## Risks
+
 | Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
+| ---- | ---------- | ------ | ---------- |
 
 ## Success Criteria
+
 - [ ] Criterion 1
 - [ ] Criterion 2
 
 ## Rollback Plan
+
 How to undo if needed
 ```
 
 ## Quality Criteria
 
 Good tasks are:
+
 - **Specific**: Clear what to do
 - **Measurable**: Know when done
 - **Achievable**: Can be done in one sitting
@@ -135,6 +148,7 @@ Respond with APPROVE, SUGGEST, or REWORK with specific feedback."
 ### Consultation Format
 
 Include in your plan:
+
 ```
 ## Plan Review
 
@@ -161,12 +175,12 @@ TRIGGER:agent-name:context
 
 ### When to Trigger
 
-| Finding | Trigger |
-|---------|---------|
+| Finding                 | Trigger                                                       |
+| ----------------------- | ------------------------------------------------------------- |
 | Security considerations | `TRIGGER:security-analyst:Review plan for [security concern]` |
-| Complex implementation | `TRIGGER:architect:Validate approach for [component]` |
-| Testing requirements | `TRIGGER:tdd-coach:Plan tests for [feature]` |
-| Known issues to address | `TRIGGER:debugger:Investigate [issue] before implementation` |
+| Complex implementation  | `TRIGGER:architect:Validate approach for [component]`         |
+| Testing requirements    | `TRIGGER:tdd-coach:Plan tests for [feature]`                  |
+| Known issues to address | `TRIGGER:debugger:Investigate [issue] before implementation`  |
 
 ### Example Output
 

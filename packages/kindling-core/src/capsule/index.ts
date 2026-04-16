@@ -11,19 +11,10 @@ export type {
   CapsuleManager as ICapsuleManager,
 } from './types.js';
 
-export type {
-  CapsuleStore,
-} from './lifecycle.js';
+export type { CapsuleStore } from './lifecycle.js';
 
 // Lifecycle functions
-export {
-  openCapsule,
-  closeCapsule,
-  getCapsule,
-  getOpenCapsule,
-} from './lifecycle.js';
+export { openCapsule, closeCapsule, getCapsule, getOpenCapsule } from './lifecycle.js';
 
 // Manager
-export {
-  CapsuleManager,
-} from './manager.js';
+export { CapsuleManager } from './manager.js';

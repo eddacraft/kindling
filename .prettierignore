@@ -1,6 +1,0 @@
-dist
-node_modules
-vendor
-pnpm-lock.yaml
-*.sqlite
-*.db

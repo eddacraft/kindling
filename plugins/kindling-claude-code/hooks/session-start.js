@@ -41,9 +41,11 @@ async function main() {
         }
 
         // Include recent observations (recency-based, no FTS query needed)
-        const recentObs = db.prepare(
-          "SELECT id, kind, content, ts FROM observations WHERE repo_id = ? AND redacted = 0 ORDER BY ts DESC LIMIT ?"
-        ).all(repoRoot, maxResults);
+        const recentObs = db
+          .prepare(
+            'SELECT id, kind, content, ts FROM observations WHERE repo_id = ? AND redacted = 0 ORDER BY ts DESC LIMIT ?',
+          )
+          .all(repoRoot, maxResults);
 
         if (recentObs.length > 0) {
           items.push('## Recent Activity');
@@ -80,8 +82,10 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error(`[kindling] SessionStart error: ${err.message}`);
-}).finally(() => {
-  process.exit(0);
-});
+main()
+  .catch((err) => {
+    console.error(`[kindling] SessionStart error: ${err.message}`);
+  })
+  .finally(() => {
+    process.exit(0);
+  });

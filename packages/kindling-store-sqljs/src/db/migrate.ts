@@ -66,7 +66,7 @@ export function runMigrations(db: Database, options: MigrationOptions = {}): num
         db.run(
           `INSERT OR IGNORE INTO schema_migrations (version, name, applied_at)
            VALUES (?, ?, ?)`,
-          [migration.version, migration.name + '_skipped', Date.now()]
+          [migration.version, migration.name + '_skipped', Date.now()],
         );
         continue;
       }
@@ -116,7 +116,7 @@ export function getMigrationStatus(db: Database): {
 } {
   const currentVersion = getCurrentVersion(db);
   const migrations = getMigrations();
-  const latestVersion = Math.max(...migrations.map(m => m.version));
+  const latestVersion = Math.max(...migrations.map((m) => m.version));
 
   const appliedMigrations: string[] = [];
   const pendingMigrations: string[] = [];

@@ -12,13 +12,17 @@ try {
     .get();
   const pinStats = db.prepare('SELECT COUNT(*) as count FROM pins').get();
   const recentCapsules = db
-    .prepare('SELECT id, intent, status, opened_at, closed_at FROM capsules ORDER BY opened_at DESC LIMIT 5')
+    .prepare(
+      'SELECT id, intent, status, opened_at, closed_at FROM capsules ORDER BY opened_at DESC LIMIT 5',
+    )
     .all();
 
   console.log('=== Kindling Memory Status ===');
   console.log('');
   console.log('Observations: ' + stats.count);
-  console.log('Sessions:     ' + capsuleStats.total + ' (' + (capsuleStats.open_count || 0) + ' open)');
+  console.log(
+    'Sessions:     ' + capsuleStats.total + ' (' + (capsuleStats.open_count || 0) + ' open)',
+  );
   console.log('Pins:         ' + pinStats.count);
   console.log('Database:     ' + dbPath);
   console.log('Project:      ' + cwd);

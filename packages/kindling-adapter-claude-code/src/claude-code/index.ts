@@ -25,11 +25,7 @@ export {
 } from './events.js';
 
 // Mapping
-export {
-  mapEvent,
-  mapEvents,
-  type MapEventResult,
-} from './mapping.js';
+export { mapEvent, mapEvents, type MapEventResult } from './mapping.js';
 
 // Provenance
 export {

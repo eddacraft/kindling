@@ -25,6 +25,7 @@ ls plans/aps-rules.md
 ```
 
 If it exists, read it and follow APS conventions:
+
 - Create modules in `plans/modules/` for bounded work areas
 - Use lean steps (checkpoints only, no implementation details)
 - Tasks describe outcomes, not how to implement
@@ -56,6 +57,7 @@ If it exists, read it and follow APS conventions:
 ## Deliverables
 
 Always provide:
+
 - Current state assessment
 - Identified issues
 - Recommended solutions with rationale
@@ -74,6 +76,7 @@ When `CLAUDE_AUTO_CONSULT` is enabled (default: true), automatically seek second
 ### How to Consult
 
 1. After forming your recommendation, spawn the relevant specialist:
+
    ```
    Task: security-analyst
    Prompt: "Review this architectural decision for security implications:
@@ -88,6 +91,7 @@ When `CLAUDE_AUTO_CONSULT` is enabled (default: true), automatically seek second
 ### Consultation Format
 
 Include in your output:
+
 ```
 ## Consulted Specialists
 
@@ -112,12 +116,12 @@ TRIGGER:agent-name:context
 
 ### When to Trigger
 
-| Condition | Trigger |
-|-----------|---------|
+| Condition                       | Trigger                                                     |
+| ------------------------------- | ----------------------------------------------------------- |
 | Security implications in design | `TRIGGER:security-analyst:Review [component] for [concern]` |
-| Performance concerns | `TRIGGER:debugger:Analyze [component] performance` |
-| Code quality issues | `TRIGGER:code-reviewer:Review [files] for [issue]` |
-| Testing gaps | `TRIGGER:tdd-coach:Add tests for [component]` |
+| Performance concerns            | `TRIGGER:debugger:Analyze [component] performance`          |
+| Code quality issues             | `TRIGGER:code-reviewer:Review [files] for [issue]`          |
+| Testing gaps                    | `TRIGGER:tdd-coach:Add tests for [component]`               |
 
 ### Priority Triggers
 

@@ -1,41 +1,41 @@
 {
-    "extends": "markdownlint/style/prettier",
-    "MD013": {
-        "line_length": 999,
-        "tables": false,
-        "code_blocks": false
-    },
-    "MD033": {
-        "allowed_elements": [
-            "img",
-            "br",
-            "h1",
-            "p",
-            "kbd",
-            "sup",
-            "sub",
-            "intent",
-            "plan",
-            "name",
-            "repo",
-            "typeof",
-            "filename"
-        ]
-    },
-    "MD060": false,
-    "MD040": false,
-    "MD036": false,
-    "MD024": false,
-    "MD029": false,
-    "MD041": false,
-    "MD014": false,
-    "MD045": false,
-    "MD010": false,
-    "MD022": false,
-    "MD031": false,
-    "MD032": false,
-    "MD026": false,
-    "MD001": false,
-    "MD051": false,
-    "MD034": false
+  "extends": "markdownlint/style/prettier",
+  "MD013": {
+    "line_length": 999,
+    "tables": false,
+    "code_blocks": false
+  },
+  "MD033": {
+    "allowed_elements": [
+      "img",
+      "br",
+      "h1",
+      "p",
+      "kbd",
+      "sup",
+      "sub",
+      "intent",
+      "plan",
+      "name",
+      "repo",
+      "typeof",
+      "filename"
+    ]
+  },
+  "MD060": false,
+  "MD040": false,
+  "MD036": false,
+  "MD024": false,
+  "MD029": false,
+  "MD041": false,
+  "MD014": false,
+  "MD045": false,
+  "MD010": false,
+  "MD022": false,
+  "MD031": false,
+  "MD032": false,
+  "MD026": false,
+  "MD001": false,
+  "MD051": false,
+  "MD034": false
 }

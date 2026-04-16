@@ -3,11 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  ConfidenceTracker,
-  calculateConfidence,
-  type ConfidenceState,
-} from '../src/pocketflow/confidence.js';
+import { ConfidenceTracker, calculateConfidence } from '../src/pocketflow/confidence.js';
 
 describe('calculateConfidence', () => {
   it('should return base confidence for new nodes', () => {
@@ -68,7 +64,7 @@ describe('calculateConfidence', () => {
     };
 
     expect(calculateConfidence(stateWithConsecutive)).toBeLessThan(
-      calculateConfidence(stateNoConsecutive)
+      calculateConfidence(stateNoConsecutive),
     );
   });
 
@@ -122,7 +118,7 @@ describe('calculateConfidence', () => {
     };
 
     expect(calculateConfidence(recentSuccesses)).toBeGreaterThan(
-      calculateConfidence(recentFailures)
+      calculateConfidence(recentFailures),
     );
   });
 });

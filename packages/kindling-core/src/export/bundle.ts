@@ -96,7 +96,7 @@ export interface ExportStats {
  */
 export function createExportBundle(
   store: ExportStore,
-  options: ExportBundleOptions = {}
+  options: ExportBundleOptions = {},
 ): ExportBundle {
   const { scope, includeRedacted = false, limit, metadata } = options;
 

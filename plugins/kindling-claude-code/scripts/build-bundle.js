@@ -40,7 +40,9 @@ for (const pkg of requiredPackages) {
       console.log('[kindling] Using existing bundle (monorepo packages not available).');
       process.exit(0);
     }
-    console.error(`[kindling] Package ${pkg} not built. Run 'pnpm build' from the monorepo root first.`);
+    console.error(
+      `[kindling] Package ${pkg} not built. Run 'pnpm build' from the monorepo root first.`,
+    );
     process.exit(1);
   }
 }

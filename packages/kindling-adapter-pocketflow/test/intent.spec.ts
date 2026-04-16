@@ -148,16 +148,12 @@ describe('inferIntent', () => {
 
   describe('custom patterns', () => {
     it('should use custom patterns when provided', () => {
-      const customPatterns = [
-        { keywords: ['custom', 'special'], intent: 'custom-intent' },
-      ];
+      const customPatterns = [{ keywords: ['custom', 'special'], intent: 'custom-intent' }];
       expect(inferIntent('customOperation', customPatterns)).toBe('custom-intent');
     });
 
     it('should return "general" if custom patterns do not match', () => {
-      const customPatterns = [
-        { keywords: ['xyz'], intent: 'xyz-intent' },
-      ];
+      const customPatterns = [{ keywords: ['xyz'], intent: 'xyz-intent' }];
       expect(inferIntent('normalOperation', customPatterns)).toBe('general');
     });
   });
@@ -182,7 +178,7 @@ describe('inferIntent', () => {
 
   describe('DEFAULT_INTENT_PATTERNS', () => {
     it('should have patterns for all major intents', () => {
-      const intents = DEFAULT_INTENT_PATTERNS.map(p => p.intent);
+      const intents = DEFAULT_INTENT_PATTERNS.map((p) => p.intent);
       expect(intents).toContain('test');
       expect(intents).toContain('build');
       expect(intents).toContain('deploy');

@@ -64,10 +64,7 @@ export interface PinInput {
 /**
  * All valid pin target types
  */
-export const PIN_TARGET_TYPES: readonly PinTargetType[] = [
-  'observation',
-  'summary',
-] as const;
+export const PIN_TARGET_TYPES: readonly PinTargetType[] = ['observation', 'summary'] as const;
 
 /**
  * Type guard to check if a string is a valid PinTargetType

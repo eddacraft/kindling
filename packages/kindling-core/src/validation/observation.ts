@@ -3,16 +3,8 @@
  */
 
 import { randomUUID } from 'crypto';
-import type {
-  Observation,
-  ValidationError,
-  Result,
-} from '../types/index.js';
-import {
-  ok,
-  err,
-  isObservationKind,
-} from '../types/index.js';
+import type { Observation, ValidationError, Result } from '../types/index.js';
+import { ok, err, isObservationKind } from '../types/index.js';
 
 /**
  * Validate and normalize an observation input
@@ -72,7 +64,11 @@ export function validateObservation(input: unknown): Result<Observation, Validat
 
   // Validate provenance (optional, must be object)
   if (data.provenance !== undefined) {
-    if (typeof data.provenance !== 'object' || data.provenance === null || Array.isArray(data.provenance)) {
+    if (
+      typeof data.provenance !== 'object' ||
+      data.provenance === null ||
+      Array.isArray(data.provenance)
+    ) {
       errors.push({
         field: 'provenance',
         message: 'provenance must be an object',

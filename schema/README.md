@@ -4,11 +4,11 @@ This directory contains the **cross-language SQLite schema contract** for Kindli
 
 ## Files
 
-| File             | Purpose                                                        |
-| ---------------- | -------------------------------------------------------------- |
-| `schema.sql`     | Canonical DDL — all tables, indexes, triggers, and FTS config  |
-| `version.json`   | Machine-readable version metadata for build/startup checks     |
-| `README.md`      | This document                                                  |
+| File           | Purpose                                                       |
+| -------------- | ------------------------------------------------------------- |
+| `schema.sql`   | Canonical DDL — all tables, indexes, triggers, and FTS config |
+| `version.json` | Machine-readable version metadata for build/startup checks    |
+| `README.md`    | This document                                                 |
 
 ## `PRAGMA user_version`
 

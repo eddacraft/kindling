@@ -101,16 +101,9 @@ function sanitizeArgs(args: Record<string, unknown>): Record<string, unknown> {
  */
 function isSensitiveField(fieldName: string): boolean {
   const lowerName = fieldName.toLowerCase();
-  const sensitivePatterns = [
-    'password',
-    'token',
-    'secret',
-    'key',
-    'auth',
-    'credential',
-  ];
+  const sensitivePatterns = ['password', 'token', 'secret', 'key', 'auth', 'credential'];
 
-  return sensitivePatterns.some(pattern => lowerName.includes(pattern));
+  return sensitivePatterns.some((pattern) => lowerName.includes(pattern));
 }
 
 /**

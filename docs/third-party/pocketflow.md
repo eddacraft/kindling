@@ -23,6 +23,7 @@ PocketFlow uses the MIT license, which is compatible with Kindling's Apache-2.0 
 **Decision**: Vendored (copied in)
 
 **Rationale**:
+
 - PocketFlow is designed for vendoring (their intended model)
 - No external dependency at runtime
 - Full control over version and modifications

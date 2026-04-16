@@ -25,7 +25,10 @@ service
         console.log(i + 1 + '. [' + ts + '] ' + (e.kind || '') + ': ' + preview);
       });
     }
-    if ((!results.pins || results.pins.length === 0) && (!results.candidates || results.candidates.length === 0)) {
+    if (
+      (!results.pins || results.pins.length === 0) &&
+      (!results.candidates || results.candidates.length === 0)
+    ) {
       console.log('No results found for: ' + query);
     }
   })

@@ -83,7 +83,9 @@ export async function listCommand(entity: string, options: ListOptions): Promise
       }
 
       default:
-        throw new Error(`Unknown entity type: ${entity}. Valid types: capsules, pins, observations`);
+        throw new Error(
+          `Unknown entity type: ${entity}. Valid types: capsules, pins, observations`,
+        );
     }
 
     if (options.json) {

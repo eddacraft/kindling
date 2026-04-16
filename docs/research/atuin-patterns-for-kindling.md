@@ -24,7 +24,7 @@ observations) and maturity of specific subsystems.
 ### 1. Workspace auto-detection
 
 **Atuin pattern:** A "workspace" filter mode auto-activates when the user is
-inside a git repo, filtering history to commands from *any* directory within that
+inside a git repo, filtering history to commands from _any_ directory within that
 repo's tree. No flags required.
 
 **Kindling opportunity:** Kindling has `repoId` as a scope dimension but it
@@ -56,6 +56,7 @@ distributions, configurable subcommand grouping (e.g. `kubectl get` not just
 `kubectl`).
 
 **Kindling opportunity:** `kindling stats` could show:
+
 - Observation counts by kind over time
 - Most-referenced capsules
 - Common error patterns (frequent error observation content)
@@ -74,6 +75,7 @@ combining content matching with structured metadata filters.
 
 **Kindling opportunity:** Current `kindling search` takes a query and optional
 `--session`/`--repo`. Adding filters:
+
 - `--kind error|command|file_diff|...`
 - `--after "yesterday"` / `--before "2 days ago"`
 - `--capsule-type session|pocketflow_node`
@@ -143,7 +145,7 @@ command automatically with zero friction.
 
 **Kindling opportunity:** Currently captures through AI-tool adapters only.
 Adding shell hooks would capture the full developer workflow — manual git,
-make, npm, docker commands that happen *between* AI interactions. This makes
+make, npm, docker commands that happen _between_ AI interactions. This makes
 memory much more complete and enables "what did I do to fix this last time"
 retrieval.
 
@@ -173,15 +175,15 @@ supports it.
 
 ## Design patterns to adopt (not features, but principles)
 
-| Atuin pattern | Kindling equivalent | Gap |
-|---|---|---|
-| Never modifies original data (shell history file untouched) | Observations are immutable, redaction replaces content | Already aligned |
-| Filter modes toggleable in real-time during search | Retrieval scopes fixed per query | Interactive TUI would close this |
-| Capture everything by default, filter at retrieval | Adapter-mediated capture (selective) | Shell integration would close this |
-| Zero-config works, power users tune via TOML | CLI requires explicit flags | Workspace auto-detection would help |
-| Progressive enhancement (local → sync → kv → aliases) | Local → GitHub sync | Natural extension path exists |
-| Per-host append-only chains (conflict-free sync) | Capsules scoped by session/repo | Good fit for future sync model |
-| Secrets filtering (regex patterns to exclude sensitive data) | Redaction API (explicit, after the fact) | Could add pre-capture filtering |
+| Atuin pattern                                                | Kindling equivalent                                    | Gap                                 |
+| ------------------------------------------------------------ | ------------------------------------------------------ | ----------------------------------- |
+| Never modifies original data (shell history file untouched)  | Observations are immutable, redaction replaces content | Already aligned                     |
+| Filter modes toggleable in real-time during search           | Retrieval scopes fixed per query                       | Interactive TUI would close this    |
+| Capture everything by default, filter at retrieval           | Adapter-mediated capture (selective)                   | Shell integration would close this  |
+| Zero-config works, power users tune via TOML                 | CLI requires explicit flags                            | Workspace auto-detection would help |
+| Progressive enhancement (local → sync → kv → aliases)        | Local → GitHub sync                                    | Natural extension path exists       |
+| Per-host append-only chains (conflict-free sync)             | Capsules scoped by session/repo                        | Good fit for future sync model      |
+| Secrets filtering (regex patterns to exclude sensitive data) | Redaction API (explicit, after the fact)               | Could add pre-capture filtering     |
 
 ---
 

@@ -31,12 +31,14 @@ async function main() {
     }
 
     // Include latest capsule summary if available
-    const latestSummary = db.prepare(
-      `SELECT s.content, s.confidence FROM summaries s
+    const latestSummary = db
+      .prepare(
+        `SELECT s.content, s.confidence FROM summaries s
        JOIN capsules c ON s.capsule_id = c.id
        WHERE c.repo_id = ?
-       ORDER BY s.created_at DESC LIMIT 1`
-    ).get(repoRoot);
+       ORDER BY s.created_at DESC LIMIT 1`,
+      )
+      .get(repoRoot);
 
     if (latestSummary && latestSummary.content) {
       items.push('## Session Summary');
@@ -63,8 +65,10 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error(`[kindling] PreCompact error: ${err.message}`);
-}).finally(() => {
-  process.exit(0);
-});
+main()
+  .catch((err) => {
+    console.error(`[kindling] PreCompact error: ${err.message}`);
+  })
+  .finally(() => {
+    process.exit(0);
+  });

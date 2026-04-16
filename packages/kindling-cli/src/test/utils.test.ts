@@ -5,13 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { homedir } from 'os';
 import { join } from 'path';
-import {
-  getDefaultDbPath,
-  formatTimestamp,
-  truncate,
-  formatJson,
-  formatError,
-} from '../utils.js';
+import { getDefaultDbPath, formatTimestamp, truncate, formatJson, formatError } from '../utils.js';
 
 describe('getDefaultDbPath', () => {
   it('should return path in home directory', () => {

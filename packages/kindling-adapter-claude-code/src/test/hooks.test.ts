@@ -88,7 +88,7 @@ describe('createHookHandlers', () => {
       handlers.onSessionStart(ctx);
 
       expect(store.createCapsule).toHaveBeenCalledWith(
-        expect.objectContaining({ intent: 'Claude Code session' })
+        expect.objectContaining({ intent: 'Claude Code session' }),
       );
     });
 
@@ -105,7 +105,7 @@ describe('createHookHandlers', () => {
       customHandlers.onSessionStart(ctx);
 
       expect(store.createCapsule).toHaveBeenCalledWith(
-        expect.objectContaining({ intent: 'Custom intent' })
+        expect.objectContaining({ intent: 'Custom intent' }),
       );
     });
   });
@@ -198,7 +198,7 @@ describe('createHookHandlers', () => {
       handlers.onStop(ctx);
 
       expect(store.insertSummary).toHaveBeenCalledWith(
-        expect.objectContaining({ content: 'Session completed successfully' })
+        expect.objectContaining({ content: 'Session completed successfully' }),
       );
     });
   });

@@ -48,7 +48,7 @@ describe('Observation Validation', () => {
       expect(result.error).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ field: 'kind', message: 'kind is required' }),
-        ])
+        ]),
       );
     }
   });
@@ -69,7 +69,7 @@ describe('Observation Validation', () => {
             field: 'kind',
             message: expect.stringContaining('Invalid observation kind'),
           }),
-        ])
+        ]),
       );
     }
   });
@@ -87,7 +87,7 @@ describe('Observation Validation', () => {
       expect(result.error).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ field: 'content', message: 'content cannot be empty' }),
-        ])
+        ]),
       );
     }
   });
@@ -104,7 +104,7 @@ describe('Observation Validation', () => {
       expect(result.error).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ field: 'scopeIds', message: 'scopeIds is required' }),
-        ])
+        ]),
       );
     }
   });
@@ -123,7 +123,7 @@ describe('Observation Validation', () => {
       expect(result.error).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ field: 'ts', message: 'ts must be non-negative' }),
-        ])
+        ]),
       );
     }
   });
@@ -161,7 +161,7 @@ describe('Capsule Validation', () => {
       expect(result.error).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ field: 'type', message: 'type is required' }),
-        ])
+        ]),
       );
     }
   });
@@ -182,7 +182,7 @@ describe('Capsule Validation', () => {
             field: 'type',
             message: expect.stringContaining('Invalid capsule type'),
           }),
-        ])
+        ]),
       );
     }
   });
@@ -200,7 +200,7 @@ describe('Capsule Validation', () => {
       expect(result.error).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ field: 'intent', message: 'intent cannot be empty' }),
-        ])
+        ]),
       );
     }
   });
@@ -240,7 +240,7 @@ describe('Summary Validation', () => {
       expect(result.error).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ field: 'capsuleId', message: 'capsuleId is required' }),
-        ])
+        ]),
       );
     }
   });
@@ -262,7 +262,7 @@ describe('Summary Validation', () => {
             field: 'confidence',
             message: 'confidence must be between 0.0 and 1.0',
           }),
-        ])
+        ]),
       );
     }
   });
@@ -284,7 +284,7 @@ describe('Summary Validation', () => {
             field: 'confidence',
             message: 'confidence must be between 0.0 and 1.0',
           }),
-        ])
+        ]),
       );
     }
   });
@@ -302,7 +302,7 @@ describe('Summary Validation', () => {
       expect(result.error).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ field: 'evidenceRefs', message: 'evidenceRefs is required' }),
-        ])
+        ]),
       );
     }
   });
@@ -340,7 +340,7 @@ describe('Pin Validation', () => {
       expect(result.error).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ field: 'targetType', message: 'targetType is required' }),
-        ])
+        ]),
       );
     }
   });
@@ -361,7 +361,7 @@ describe('Pin Validation', () => {
             field: 'targetType',
             message: expect.stringContaining('Invalid pin target type'),
           }),
-        ])
+        ]),
       );
     }
   });
