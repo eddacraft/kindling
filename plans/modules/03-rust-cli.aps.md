@@ -1,8 +1,14 @@
 # Rust CLI
 
-| ID  | Owner  | Status |
-| --- | ------ | ------ |
-| CLI | @aneki | Draft  |
+| ID  | Owner  | Status     |
+| --- | ------ | ---------- |
+| CLI | @aneki | Superseded |
+
+> **Superseded by [`05-rust-port`](./05-rust-port.aps.md) on 2026-04-15.**
+> CLI and server work is absorbed into Phase 3 of module 05 (PORT-011..PORT-014);
+> type sync moves to Phase 4 (PORT-015..PORT-016).
+> See `plans/specs/2026-04-15-rust-port-design.md` for rationale.
+> This file stays as historical reference; do not pick up CLI-\* tasks directly.
 
 ## Purpose
 

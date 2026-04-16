@@ -1,8 +1,13 @@
 # Rust Hook Binary
 
-| ID   | Owner  | Status |
-| ---- | ------ | ------ |
-| HOOK | @aneki | Ready  |
+| ID   | Owner  | Status     |
+| ---- | ------ | ---------- |
+| HOOK | @aneki | Superseded |
+
+> **Superseded by [`05-rust-port`](./05-rust-port.aps.md) on 2026-04-15.**
+> Hook work is absorbed into Phase 2 of module 05 (PORT-007..PORT-009).
+> See `plans/specs/2026-04-15-rust-port-design.md` for rationale.
+> This file stays as historical reference; do not pick up HOOK-\* tasks directly.
 
 ## Purpose
 
