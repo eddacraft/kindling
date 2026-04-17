@@ -3,16 +3,8 @@
  */
 
 import { randomUUID } from 'crypto';
-import type {
-  Pin,
-  ValidationError,
-  Result,
-} from '../types/index.js';
-import {
-  ok,
-  err,
-  isPinTargetType,
-} from '../types/index.js';
+import type { Pin, ValidationError, Result } from '../types/index.js';
+import { ok, err, isPinTargetType } from '../types/index.js';
 
 /**
  * Validate and normalize a pin input

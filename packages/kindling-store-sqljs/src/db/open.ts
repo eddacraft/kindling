@@ -101,9 +101,7 @@ export async function openDatabase(options: DatabaseOptions = {}): Promise<Datab
   }
 
   // Create database (from data or empty)
-  const db = options.data
-    ? new SQL.Database(options.data)
-    : new SQL.Database();
+  const db = options.data ? new SQL.Database(options.data) : new SQL.Database();
 
   if (options.verbose) {
     console.log(options.data ? 'Loaded database from data' : 'Created new database');

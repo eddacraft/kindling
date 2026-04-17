@@ -165,7 +165,7 @@ describe('Export/Import Coordination', () => {
       const result = validateBundle(bundle);
 
       expect(result.valid).toBe(false);
-      expect(result.errors.some(e => e.includes('bundleVersion'))).toBe(true);
+      expect(result.errors.some((e) => e.includes('bundleVersion'))).toBe(true);
     });
 
     it('should reject unsupported bundle version', () => {
@@ -185,9 +185,7 @@ describe('Export/Import Coordination', () => {
       const result = validateBundle(bundle);
 
       expect(result.valid).toBe(false);
-      expect(result.errors.some(e => e.includes('Unsupported bundle version'))).toBe(
-        true
-      );
+      expect(result.errors.some((e) => e.includes('Unsupported bundle version'))).toBe(true);
     });
 
     it('should reject invalid dataset arrays', () => {
@@ -207,7 +205,7 @@ describe('Export/Import Coordination', () => {
       const result = validateBundle(bundle);
 
       expect(result.valid).toBe(false);
-      expect(result.errors.some(e => e.includes('must be an array'))).toBe(true);
+      expect(result.errors.some((e) => e.includes('must be an array'))).toBe(true);
     });
   });
 
@@ -439,9 +437,7 @@ describe('Export/Import Coordination', () => {
     });
 
     it('should throw on empty array', () => {
-      expect(() => mergeBundles([])).toThrow(
-        'At least one bundle required for merge'
-      );
+      expect(() => mergeBundles([])).toThrow('At least one bundle required for merge');
     });
   });
 

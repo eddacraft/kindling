@@ -76,6 +76,7 @@ plans/
 ```
 
 **Rules for APS files:**
+
 - Never delete or archive `aps-rules.md` or `index.aps.md`
 - Never archive active modules (status: Draft, Ready, or In Progress)
 - Decision records (`decisions/`) are preserved indefinitely — never archive
@@ -111,6 +112,7 @@ docs/solutions/
 ### Non-APS Planning Artefacts
 
 Stray planning documents (notes, scratch files, TODO lists) that aren't in APS format:
+
 - Identify them and suggest either converting to APS work items or filing appropriately
 - Don't delete without user confirmation
 
@@ -154,6 +156,7 @@ When a module has all work items marked Complete:
 ### 3. Detect and Clean Orphaned Files
 
 Orphaned files include:
+
 - Action plans (`execution/*.actions.md`) referencing work items that no longer exist
 - Solution docs that reference deleted modules
 - Templates that were copied but never filled in (still contain placeholder brackets)
@@ -164,6 +167,7 @@ For each orphan, recommend: archive, delete, or re-link.
 ### 4. Maintain Cross-References
 
 Verify and fix:
+
 - **Index → Module** links: every module listed in `index.aps.md` has a corresponding file
 - **Module → Action Plan** links: execution references point to existing files
 - **Work Item → Dependency** references: dependency IDs (e.g., AUTH-001) exist in their source module
@@ -173,6 +177,7 @@ Verify and fix:
 ### 5. File Stray Documents
 
 When you find documents outside their logical home:
+
 - Planning docs not in `plans/` → suggest moving or converting to APS format
 - Solution-like docs not in `docs/solutions/` → suggest filing into correct category
 - Scratch notes → suggest converting to work items or archiving
@@ -180,6 +185,7 @@ When you find documents outside their logical home:
 ### 6. Suggest Organizational Improvements
 
 Based on patterns you observe:
+
 - Directories growing too large → suggest splitting
 - Repeated similar solutions → suggest extracting patterns
 - Modules with too many work items → flag for the APS agent to split

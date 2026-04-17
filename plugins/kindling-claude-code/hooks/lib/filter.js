@@ -10,8 +10,8 @@ const MAX_CONTENT_LENGTH = 10000;
 // Secret patterns to detect
 const SECRET_PATTERNS = [
   /['\"]?(?:api[-_]?key|apikey|token|secret|password|passwd|pwd)['\"]?\s*[:=]\s*['\"]?([^\s'\"]{8,})['\"]?/gi,
-  /sk-ant-[A-Za-z0-9\-_]{20,}/g,  // Anthropic keys
-  /sk-[A-Za-z0-9]{40,}/g,          // OpenAI keys
+  /sk-ant-[A-Za-z0-9\-_]{20,}/g, // Anthropic keys
+  /sk-[A-Za-z0-9]{40,}/g, // OpenAI keys
   /Bearer\s+[A-Za-z0-9\-._~+/]{20,}/gi,
   /Basic\s+[A-Za-z0-9+/]{20,}/gi,
 ];
@@ -37,7 +37,7 @@ export function truncate(content, maxLength = MAX_CONTENT_LENGTH) {
  */
 export function containsSecrets(content) {
   if (!content) return false;
-  return SECRET_PATTERNS.some(pattern => {
+  return SECRET_PATTERNS.some((pattern) => {
     pattern.lastIndex = 0;
     return pattern.test(content);
   });

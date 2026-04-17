@@ -7,8 +7,5 @@
     "declarationMap": true
   },
   "include": ["src/**/*"],
-  "references": [
-    { "path": "../kindling-core" },
-    { "path": "../kindling-store-sqlite" }
-  ]
+  "references": [{ "path": "../kindling-core" }, { "path": "../kindling-store-sqlite" }]
 }

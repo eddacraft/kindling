@@ -43,10 +43,7 @@ class MockCapsuleStore implements CapsuleStore {
 
   getOpenCapsuleForSession(sessionId: string): Capsule | undefined {
     for (const capsule of this.capsules.values()) {
-      if (
-        capsule.status === 'open' &&
-        capsule.scopeIds.sessionId === sessionId
-      ) {
+      if (capsule.status === 'open' && capsule.scopeIds.sessionId === sessionId) {
         return capsule;
       }
     }

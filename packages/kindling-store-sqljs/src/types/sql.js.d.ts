@@ -47,12 +47,7 @@ declare module 'sql.js' {
 
     run(sql: string, params?: BindParams): Database;
     exec(sql: string, params?: BindParams): QueryExecResult[];
-    each(
-      sql: string,
-      params: BindParams,
-      callback: ParamsCallback,
-      done: () => void
-    ): Database;
+    each(sql: string, params: BindParams, callback: ParamsCallback, done: () => void): Database;
     each(sql: string, callback: ParamsCallback, done: () => void): Database;
     prepare(sql: string, params?: BindParams): Statement;
     iterateStatements(sql: string): StatementIteratorResult;
@@ -66,7 +61,7 @@ declare module 'sql.js' {
         init?: () => unknown;
         step: (state: unknown, ...values: SqlValue[]) => unknown;
         finalize: (state: unknown) => SqlValue;
-      }
+      },
     ): Database;
   }
 

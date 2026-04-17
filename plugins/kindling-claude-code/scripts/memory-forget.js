@@ -13,9 +13,7 @@ if (!obsId) {
 const { db, store } = init(cwd);
 try {
   const obs = db
-    .prepare(
-      "SELECT id, kind, content FROM observations WHERE repo_id = ? AND id LIKE ? LIMIT 1",
-    )
+    .prepare('SELECT id, kind, content FROM observations WHERE repo_id = ? AND id LIKE ? LIMIT 1')
     .get(repoRoot, obsId + '%');
 
   if (!obs) {

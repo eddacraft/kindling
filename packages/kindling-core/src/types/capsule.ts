@@ -11,14 +11,14 @@ import type { ID, Timestamp, ScopeIds } from './common.js';
  * Types of capsules
  */
 export type CapsuleType =
-  | 'session'          // OpenCode session
+  | 'session' // OpenCode session
   | 'pocketflow_node'; // PocketFlow workflow node
 
 /**
  * Capsule lifecycle status
  */
 export type CapsuleStatus =
-  | 'open'    // Accepting observations
+  | 'open' // Accepting observations
   | 'closed'; // Finalized
 
 /**
@@ -82,18 +82,12 @@ export interface CapsuleInput {
 /**
  * All valid capsule types
  */
-export const CAPSULE_TYPES: readonly CapsuleType[] = [
-  'session',
-  'pocketflow_node',
-] as const;
+export const CAPSULE_TYPES: readonly CapsuleType[] = ['session', 'pocketflow_node'] as const;
 
 /**
  * All valid capsule statuses
  */
-export const CAPSULE_STATUSES: readonly CapsuleStatus[] = [
-  'open',
-  'closed',
-] as const;
+export const CAPSULE_STATUSES: readonly CapsuleStatus[] = ['open', 'closed'] as const;
 
 /**
  * Type guard to check if a string is a valid CapsuleType

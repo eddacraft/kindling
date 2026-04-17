@@ -28,6 +28,7 @@ $ARGUMENTS
 ### 1. Parse Arguments
 
 Extract from `$ARGUMENTS`:
+
 - **Agent 1**: First participant (states initial position)
 - **Agent 2**: Second participant (responds to position)
 - **Topic**: The technical decision to debate
@@ -108,12 +109,12 @@ After each agent response:
 
 ### 5. Termination Conditions
 
-| Condition | Action |
-|-----------|--------|
-| CONSENSUS found | End with agreement |
-| Max rounds reached | End with deadlock |
+| Condition                | Action                   |
+| ------------------------ | ------------------------ |
+| CONSENSUS found          | End with agreement       |
+| Max rounds reached       | End with deadlock        |
 | Both agents ask QUESTION | Inject context, continue |
-| Timeout | Report partial result |
+| Timeout                  | Report partial result    |
 
 ### 6. Report Outcome
 
@@ -126,6 +127,7 @@ After each agent response:
 **Outcome:** {CONSENSUS | DEADLOCK}
 
 ### Summary
+
 {one_paragraph_summary}
 
 ### Position History
@@ -139,25 +141,26 @@ After each agent response:
 ...
 
 ### Final Recommendation
+
 {if_consensus: the agreed approach}
 {if_deadlock: facilitator recommendation based on context}
 ```
 
 ## Agent Pairing Guide
 
-| Decision Type | Suggested Pairing |
-|---------------|-------------------|
-| Architecture | architect + security-analyst |
-| Performance | architect + debugger |
-| Testing | tdd-coach + code-reviewer |
+| Decision Type      | Suggested Pairing            |
+| ------------------ | ---------------------------- |
+| Architecture       | architect + security-analyst |
+| Performance        | architect + debugger         |
+| Testing            | tdd-coach + code-reviewer    |
 | Security tradeoffs | security-analyst + architect |
-| Code design | code-reviewer + architect |
+| Code design        | code-reviewer + architect    |
 
 ## Configuration
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `CLAUDE_NEGOTIATION_MAX_ROUNDS` | 4 | Max rounds before deadlock |
+| Variable                        | Default | Description                |
+| ------------------------------- | ------- | -------------------------- |
+| `CLAUDE_NEGOTIATION_MAX_ROUNDS` | 4       | Max rounds before deadlock |
 
 ## Available Agents
 

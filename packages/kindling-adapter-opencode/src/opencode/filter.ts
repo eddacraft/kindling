@@ -69,14 +69,8 @@ export interface FilterOptions {
  * @param options - Filter options
  * @returns Truncated content with optional notice
  */
-export function truncateContent(
-  content: string,
-  options: FilterOptions = {}
-): string {
-  const {
-    maxLength = MAX_CONTENT_LENGTH,
-    showTruncationNotice = true,
-  } = options;
+export function truncateContent(content: string, options: FilterOptions = {}): string {
+  const { maxLength = MAX_CONTENT_LENGTH, showTruncationNotice = true } = options;
 
   if (content.length <= maxLength) {
     return content;
@@ -99,7 +93,7 @@ export function truncateContent(
  * @returns True if content likely contains secrets
  */
 export function containsSecrets(content: string): boolean {
-  return SECRET_PATTERNS.some(pattern => {
+  return SECRET_PATTERNS.some((pattern) => {
     pattern.lastIndex = 0; // Reset regex state
     return pattern.test(content);
   });
@@ -141,10 +135,7 @@ export function maskSecrets(content: string): string {
  * @param options - Filter options
  * @returns Filtered content
  */
-export function filterContent(
-  content: string,
-  options: FilterOptions = {}
-): string {
+export function filterContent(content: string, options: FilterOptions = {}): string {
   const { maskSecrets: shouldMask = false } = options;
 
   let filtered = content;
@@ -167,7 +158,7 @@ export function filterContent(
  * @returns True if path should be excluded
  */
 export function isExcludedPath(path: string): boolean {
-  return EXCLUDED_PATHS.some(pattern => pattern.test(path));
+  return EXCLUDED_PATHS.some((pattern) => pattern.test(path));
 }
 
 /**
@@ -179,10 +170,7 @@ export function isExcludedPath(path: string): boolean {
  * @param result - Tool result object
  * @returns Filtered result
  */
-export function filterToolResult(
-  _toolName: string,
-  result: unknown
-): unknown {
+export function filterToolResult(_toolName: string, result: unknown): unknown {
   // For now, return as-is
   // Future: implement allowlists for specific tools
   // e.g., for 'read_file', only capture first N lines

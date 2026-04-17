@@ -4,10 +4,6 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    exclude: [
-      '**/node_modules/**',
-      '**/dist/**',
-      '**/vendor/pocketflow/tests/qa-pattern.test.ts',
-    ],
+    exclude: ['**/node_modules/**', '**/dist/**', '**/vendor/pocketflow/tests/qa-pattern.test.ts'],
   },
 });

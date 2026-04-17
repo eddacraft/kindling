@@ -7,7 +7,5 @@
     "typeRoots": ["./src/types", "./node_modules/@types"]
   },
   "include": ["src/**/*"],
-  "references": [
-    { "path": "../kindling-core" }
-  ]
+  "references": [{ "path": "../kindling-core" }]
 }

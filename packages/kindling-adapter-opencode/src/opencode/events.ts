@@ -115,8 +115,6 @@ export function isOpenCodeEvent(event: unknown): event is OpenCodeEvent {
 
   const e = event as Record<string, unknown>;
   return (
-    typeof e.type === 'string' &&
-    typeof e.timestamp === 'number' &&
-    typeof e.sessionId === 'string'
+    typeof e.type === 'string' && typeof e.timestamp === 'number' && typeof e.sessionId === 'string'
   );
 }

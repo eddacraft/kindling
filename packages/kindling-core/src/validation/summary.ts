@@ -3,16 +3,8 @@
  */
 
 import { randomUUID } from 'crypto';
-import type {
-  Summary,
-  ValidationError,
-  Result,
-} from '../types/index.js';
-import {
-  ok,
-  err,
-  isValidConfidence,
-} from '../types/index.js';
+import type { Summary, ValidationError, Result } from '../types/index.js';
+import { ok, err, isValidConfidence } from '../types/index.js';
 
 /**
  * Validate and normalize a summary input

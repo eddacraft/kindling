@@ -73,7 +73,7 @@ export interface ImportResult {
 export function restoreFromBundle(
   store: ImportStore,
   bundle: ExportBundle,
-  options: ImportOptions = {}
+  options: ImportOptions = {},
 ): ImportResult {
   const { skipValidation = false, dryRun = false } = options;
 
@@ -125,7 +125,7 @@ export function restoreFromBundle(
  */
 export function mergeBundles(
   bundles: ExportBundle[],
-  metadata?: { description?: string; tags?: string[] }
+  metadata?: { description?: string; tags?: string[] },
 ): ExportBundle {
   if (bundles.length === 0) {
     throw new Error('At least one bundle required for merge');
@@ -209,7 +209,7 @@ function deduplicateById<T extends { id: string }>(entities: T[]): T[] {
  */
 export function compareBundles(
   bundle1: ExportBundle,
-  bundle2: ExportBundle
+  bundle2: ExportBundle,
 ): {
   observations: { added: number; removed: number; common: number };
   capsules: { added: number; removed: number; common: number };
@@ -217,10 +217,10 @@ export function compareBundles(
   pins: { added: number; removed: number; common: number };
 } {
   const compareArrays = (arr1: { id: string }[], arr2: { id: string }[]) => {
-    const ids1 = new Set(arr1.map(e => e.id).filter(Boolean));
-    const ids2 = new Set(arr2.map(e => e.id).filter(Boolean));
+    const ids1 = new Set(arr1.map((e) => e.id).filter(Boolean));
+    const ids2 = new Set(arr2.map((e) => e.id).filter(Boolean));
 
-    const common = new Set([...ids1].filter(id => ids2.has(id)));
+    const common = new Set([...ids1].filter((id) => ids2.has(id)));
     const added = ids2.size - common.size;
     const removed = ids1.size - common.size;
 
@@ -228,10 +228,7 @@ export function compareBundles(
   };
 
   return {
-    observations: compareArrays(
-      bundle1.dataset.observations,
-      bundle2.dataset.observations
-    ),
+    observations: compareArrays(bundle1.dataset.observations, bundle2.dataset.observations),
     capsules: compareArrays(bundle1.dataset.capsules, bundle2.dataset.capsules),
     summaries: compareArrays(bundle1.dataset.summaries, bundle2.dataset.summaries),
     pins: compareArrays(bundle1.dataset.pins, bundle2.dataset.pins),

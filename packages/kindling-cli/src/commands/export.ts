@@ -19,7 +19,10 @@ interface ImportOptions {
   json?: boolean;
 }
 
-export async function exportCommand(output: string | undefined, options: ExportOptions): Promise<void> {
+export async function exportCommand(
+  output: string | undefined,
+  options: ExportOptions,
+): Promise<void> {
   try {
     const { service, db } = initializeService(options.db);
 
@@ -43,11 +46,16 @@ export async function exportCommand(output: string | undefined, options: ExportO
     writeFileSync(outputPath, jsonString, 'utf-8');
 
     if (options.json) {
-      console.log(formatJson({
-        success: true,
-        outputPath,
-        stats,
-      }, true));
+      console.log(
+        formatJson(
+          {
+            success: true,
+            outputPath,
+            stats,
+          },
+          true,
+        ),
+      );
     } else {
       console.log('\nExport successful');
       console.log(`Output: ${outputPath}`);
@@ -77,7 +85,9 @@ export async function importCommand(file: string, options: ImportOptions): Promi
     if (options.json) {
       console.log(formatJson(result, true));
     } else {
-      console.log(`\n${options.dryRun ? 'Dry run' : 'Import'} ${result.errors.length > 0 ? 'completed with errors' : 'successful'}`);
+      console.log(
+        `\n${options.dryRun ? 'Dry run' : 'Import'} ${result.errors.length > 0 ? 'completed with errors' : 'successful'}`,
+      );
       console.log(`\nImported:`);
       console.log(`  Observations: ${result.observations}`);
       console.log(`  Capsules:     ${result.capsules}`);
@@ -86,7 +96,7 @@ export async function importCommand(file: string, options: ImportOptions): Promi
 
       if (result.errors.length > 0) {
         console.log(`\nErrors (${result.errors.length}):`);
-        result.errors.forEach(error => console.log(`  - ${error}`));
+        result.errors.forEach((error) => console.log(`  - ${error}`));
       }
 
       console.log('');

@@ -46,7 +46,7 @@ function createMockStore(): PocketFlowStore & {
       });
     },
     closeCapsule(capsuleId) {
-      const capsule = capsules.find(c => c.id === capsuleId);
+      const capsule = capsules.find((c) => c.id === capsuleId);
       if (capsule) {
         capsule.status = 'closed';
       }
@@ -114,9 +114,7 @@ describe('inferIntent', () => {
   });
 
   it('should support custom patterns', () => {
-    const customPatterns = [
-      { keywords: ['magic'], intent: 'magical' },
-    ];
+    const customPatterns = [{ keywords: ['magic'], intent: 'magical' }];
     expect(inferIntent('doMagicStuff', customPatterns)).toBe('magical');
     expect(inferIntent('doOtherStuff', customPatterns)).toBe('general');
   });
@@ -342,7 +340,7 @@ describe('KindlingNode', () => {
     const node = new TestNode({ name: 'my-test-node' });
     await node.run(context);
 
-    const startObs = mockStore.observations.find(o => o.kind === 'node_start');
+    const startObs = mockStore.observations.find((o) => o.kind === 'node_start');
     expect(startObs).toBeDefined();
     expect(startObs?.content).toContain('my-test-node');
   });
@@ -357,10 +355,10 @@ describe('KindlingNode', () => {
     const node = new TestNode({ name: 'output-test' });
     await node.run(context);
 
-    const outputObs = mockStore.observations.find(o => o.kind === 'node_output');
+    const outputObs = mockStore.observations.find((o) => o.kind === 'node_output');
     expect(outputObs).toBeDefined();
 
-    const endObs = mockStore.observations.find(o => o.kind === 'node_end');
+    const endObs = mockStore.observations.find((o) => o.kind === 'node_end');
     expect(endObs).toBeDefined();
     expect(endObs?.content).toContain('completed successfully');
   });
@@ -376,7 +374,7 @@ describe('KindlingNode', () => {
 
     await expect(node.run(context)).rejects.toThrow('Test failure');
 
-    const errorObs = mockStore.observations.find(o => o.kind === 'node_error');
+    const errorObs = mockStore.observations.find((o) => o.kind === 'node_error');
     expect(errorObs).toBeDefined();
     expect(errorObs?.content).toContain('Test failure');
   });
@@ -396,7 +394,7 @@ describe('KindlingNode', () => {
 
     // All attachments should be to the same capsule
     const capsuleId = mockStore.attachments[0].capsuleId;
-    expect(mockStore.attachments.every(a => a.capsuleId === capsuleId)).toBe(true);
+    expect(mockStore.attachments.every((a) => a.capsuleId === capsuleId)).toBe(true);
   });
 
   it('should close capsule after execution', async () => {
@@ -422,7 +420,7 @@ describe('KindlingNode', () => {
     const node = new LongOutputNode({ name: 'long-output' });
     await node.run(context);
 
-    const outputObs = mockStore.observations.find(o => o.kind === 'node_output');
+    const outputObs = mockStore.observations.find((o) => o.kind === 'node_output');
     expect(outputObs?.content.length).toBeLessThan(5000);
     expect(outputObs?.content).toContain('truncated');
   });
@@ -469,13 +467,13 @@ describe('KindlingFlow', () => {
     await flow.run(context);
 
     const flowStartObs = mockStore.observations.find(
-      o => o.kind === 'node_start' && o.content.includes('Flow')
+      (o) => o.kind === 'node_start' && o.content.includes('Flow'),
     );
     expect(flowStartObs).toBeDefined();
     expect(flowStartObs?.content).toContain('my-flow');
 
     const flowEndObs = mockStore.observations.find(
-      o => o.kind === 'node_end' && o.content.includes('Flow')
+      (o) => o.kind === 'node_end' && o.content.includes('Flow'),
     );
     expect(flowEndObs).toBeDefined();
   });

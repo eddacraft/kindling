@@ -157,7 +157,7 @@ export class KindlingService {
       // Validate and store summary
       const validation = validateSummary(summary);
       if (!validation.ok) {
-        const errorMessages = validation.error.map(e => e.message).join(', ');
+        const errorMessages = validation.error.map((e) => e.message).join(', ');
         throw new Error(`Invalid summary: ${errorMessages}`);
       }
 
@@ -179,7 +179,7 @@ export class KindlingService {
     if (options?.validate !== false) {
       const validation = validateObservation(observation);
       if (!validation.ok) {
-        const errorMessages = validation.error.map(e => e.message).join(', ');
+        const errorMessages = validation.error.map((e) => e.message).join(', ');
         throw new Error(`Invalid observation: ${errorMessages}`);
       }
       obsToStore = validation.value;
@@ -226,7 +226,7 @@ export class KindlingService {
     // Validate pin
     const validation = validatePin(pin);
     if (!validation.ok) {
-      const errorMessages = validation.error.map(e => e.message).join(', ');
+      const errorMessages = validation.error.map((e) => e.message).join(', ');
       throw new Error(`Invalid pin: ${errorMessages}`);
     }
 
@@ -368,7 +368,7 @@ export class KindlingService {
    */
   mergeBundles(
     bundles: ExportBundle[],
-    metadata?: { description?: string; tags?: string[] }
+    metadata?: { description?: string; tags?: string[] },
   ): ExportBundle {
     return mergeBundles(bundles, metadata);
   }

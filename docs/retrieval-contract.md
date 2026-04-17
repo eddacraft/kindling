@@ -6,9 +6,9 @@ Kindling retrieval is **deterministic**, **scoped**, and **explainable**. The sa
 
 Retrieval combines three sources in a tiered structure:
 
-1. **Pins**  User-marked important items (non-evictable)
-2. **Current Summary**  Summary of the open capsule (non-evictable)
-3. **Provider Candidates**  FTS-ranked observations and summaries (evictable)
+1. **Pins** — User-marked important items (non-evictable)
+2. **Current Summary** — Summary of the open capsule (non-evictable)
+3. **Provider Candidates** — FTS-ranked observations and summaries (evictable)
 
 ## Core Interface
 
@@ -16,38 +16,38 @@ Retrieval combines three sources in a tiered structure:
 
 ```typescript
 interface RetrieveOptions {
-  query: string;                // Search query
-  scopeIds: ScopeIds;           // Isolation dimensions
-  tokenBudget?: number;         // Max tokens in response (for truncation)
-  maxCandidates?: number;       // Max candidates from provider (default: 50)
-  includeRedacted?: boolean;    // Include redacted observations (default: false)
+  query: string; // Search query
+  scopeIds: ScopeIds; // Isolation dimensions
+  tokenBudget?: number; // Max tokens in response (for truncation)
+  maxCandidates?: number; // Max candidates from provider (default: 50)
+  includeRedacted?: boolean; // Include redacted observations (default: false)
 }
 
 interface RetrieveResult {
-  pins: PinResult[];            // Active pins
-  currentSummary?: Summary;     // Summary for open capsule (if any)
+  pins: PinResult[]; // Active pins
+  currentSummary?: Summary; // Summary for open capsule (if any)
   candidates: CandidateResult[]; // Provider results
   provenance: RetrieveProvenance; // Explain how results were generated
 }
 
 interface PinResult {
-  pin: Pin;                     // The pin itself
+  pin: Pin; // The pin itself
   target: Observation | Summary; // The pinned entity
 }
 
 interface CandidateResult {
   entity: Observation | Summary; // The matched entity
-  score: number;                // Relevance score (0.0-1.0)
-  matchContext?: string;        // Snippet showing match
+  score: number; // Relevance score (0.0-1.0)
+  matchContext?: string; // Snippet showing match
 }
 
 interface RetrieveProvenance {
-  query: string;                // Original query
-  scopeIds: ScopeIds;           // Applied scope filters
-  totalCandidates: number;      // Total candidates before truncation
-  returnedCandidates: number;   // Actual candidates returned
+  query: string; // Original query
+  scopeIds: ScopeIds; // Applied scope filters
+  totalCandidates: number; // Total candidates before truncation
+  returnedCandidates: number; // Actual candidates returned
   truncatedDueToTokenBudget: boolean; // Whether truncation occurred
-  providerUsed: string;         // Provider name (e.g., "local-fts")
+  providerUsed: string; // Provider name (e.g., "local-fts")
 }
 ```
 
@@ -106,6 +106,7 @@ Retrieval results are organized in a **three-tier structure**:
 **Source:** Store (pins table)
 
 **Filtering:**
+
 - Active pins only (`expiresAt` is null or `> now`)
 - Scoped by `scopeIds`
 - Excludes redacted targets (unless `includeRedacted=true`)
@@ -113,6 +114,7 @@ Retrieval results are organized in a **three-tier structure**:
 **Ordering:** By `createdAt` (most recent first)
 
 **Characteristics:**
+
 - **Always included** (not subject to token budget truncation)
 - **User-curated** (explicitly marked important)
 - **Provenance:** Pin reason + creation timestamp
@@ -122,10 +124,12 @@ Retrieval results are organized in a **three-tier structure**:
 **Source:** Store (summaries table)
 
 **Filtering:**
+
 - Summary for the currently open capsule (if any)
 - Scoped by `scopeIds`
 
 **Characteristics:**
+
 - **At most one** (one summary per capsule)
 - **Always included** (not subject to token budget truncation)
 - **Context-aware** (reflects ongoing work in the session)
@@ -136,6 +140,7 @@ Retrieval results are organized in a **three-tier structure**:
 **Source:** Provider (e.g., local FTS + recency scoring)
 
 **Filtering:**
+
 - FTS query match
 - Scoped by `scopeIds`
 - Excludes redacted observations (unless `includeRedacted=true`)
@@ -144,6 +149,7 @@ Retrieval results are organized in a **three-tier structure**:
 **Ordering:** By relevance score (highest first)
 
 **Characteristics:**
+
 - **Ranked by provider** (FTS relevance + recency)
 - **Subject to truncation** (token budget applies)
 - **Explainable scoring** (score + match context)
@@ -163,17 +169,17 @@ interface RetrievalProvider {
 }
 
 interface ProviderSearchOptions {
-  query: string;                // Search query
-  scopeIds: ScopeIds;           // Scope filters
-  maxResults?: number;          // Max results to return
-  excludeIds?: string[];        // IDs to exclude (for deduplication)
-  includeRedacted?: boolean;    // Include redacted observations
+  query: string; // Search query
+  scopeIds: ScopeIds; // Scope filters
+  maxResults?: number; // Max results to return
+  excludeIds?: string[]; // IDs to exclude (for deduplication)
+  includeRedacted?: boolean; // Include redacted observations
 }
 
 interface ProviderSearchResult {
   entity: Observation | Summary; // The matched entity
-  score: number;                // Relevance score (0.0-1.0)
-  matchContext?: string;        // Snippet showing match
+  score: number; // Relevance score (0.0-1.0)
+  matchContext?: string; // Snippet showing match
 }
 ```
 
@@ -195,7 +201,7 @@ where:
 
 - **FTS-based:** Uses `observations_fts` and `summaries_fts` tables
 - **Recency-weighted:** Recent observations score higher
-- **Deterministic:** Same query + context � same results
+- **Deterministic:** Same query + context → same results
 - **Fast:** Leverages SQLite FTS5 indexes
 
 **Example:**
@@ -229,9 +235,9 @@ All retrieval queries are **scoped** to prevent cross-contamination.
 ```typescript
 interface ScopeIds {
   sessionId?: string; // Session isolation
-  repoId?: string;    // Repository isolation
-  agentId?: string;   // Agent isolation (future)
-  userId?: string;    // User isolation (future)
+  repoId?: string; // Repository isolation
+  agentId?: string; // Agent isolation (future)
+  userId?: string; // User isolation (future)
 }
 ```
 
@@ -275,6 +281,7 @@ Adapters typically scope retrieval to:
 ```
 
 This ensures:
+
 - Session isolation (no cross-session leakage)
 - Repository isolation (no cross-repo leakage)
 
@@ -320,8 +327,8 @@ function applyTokenBudget(result: RetrieveResult, budget: number): RetrieveResul
     candidates: truncatedCandidates,
     provenance: {
       ...result.provenance,
-      truncatedDueToTokenBudget: truncatedCandidates.length < result.candidates.length
-    }
+      truncatedDueToTokenBudget: truncatedCandidates.length < result.candidates.length,
+    },
   };
 }
 ```
@@ -349,16 +356,15 @@ Retrieval automatically deduplicates results:
 **Implementation:**
 
 ```typescript
-const excludeIds = [
-  ...result.pins.map(p => p.target.id),
-  result.currentSummary?.id
-].filter(Boolean);
+const excludeIds = [...result.pins.map((p) => p.target.id), result.currentSummary?.id].filter(
+  Boolean,
+);
 
 const candidates = await provider.search({
   query,
   scopeIds,
   maxResults: maxCandidates,
-  excludeIds // Provider excludes these IDs
+  excludeIds, // Provider excludes these IDs
 });
 ```
 
@@ -378,7 +384,7 @@ By default, **redacted observations are excluded** from retrieval.
 retrieve({
   query: 'auth',
   scopeIds: { repoId: '/repo' },
-  includeRedacted: true // Include redacted observations
+  includeRedacted: true, // Include redacted observations
 });
 ```
 
@@ -392,12 +398,12 @@ All retrieval results include **provenance** explaining how they were generated.
 
 ```typescript
 interface RetrieveProvenance {
-  query: string;                // Original query
-  scopeIds: ScopeIds;           // Applied scope filters
-  totalCandidates: number;      // Total candidates before truncation
-  returnedCandidates: number;   // Actual candidates returned
+  query: string; // Original query
+  scopeIds: ScopeIds; // Applied scope filters
+  totalCandidates: number; // Total candidates before truncation
+  returnedCandidates: number; // Actual candidates returned
   truncatedDueToTokenBudget: boolean; // Whether truncation occurred
-  providerUsed: string;         // Provider name (e.g., "local-fts")
+  providerUsed: string; // Provider name (e.g., "local-fts")
 }
 ```
 
@@ -434,17 +440,17 @@ Each result type has built-in provenance:
 
 Kindling retrieval is **deterministic** under these conditions:
 
-1. **Same query**  Identical query string
-2. **Same scope**  Identical `scopeIds`
-3. **Same data**  No new observations, capsules, or pins created
-4. **Same time**  TTL-based pins use `now` parameter (must be same)
-5. **Same provider**  Same provider with same configuration
+1. **Same query** — Identical query string
+2. **Same scope** — Identical `scopeIds`
+3. **Same data** — No new observations, capsules, or pins created
+4. **Same time** — TTL-based pins use `now` parameter (must be same)
+5. **Same provider** — Same provider with same configuration
 
 **Violation examples:**
 
-- Time-based pins expired � results change
-- New observations added � FTS index updated � results change
-- Provider algorithm updated � scoring changes � results change
+- Time-based pins expired → results change
+- New observations added → FTS index updated → results change
+- Provider algorithm updated → scoring changes → results change
 
 ## Performance Considerations
 
@@ -459,6 +465,7 @@ Kindling retrieval is **deterministic** under these conditions:
 Kindling does **not cache retrieval results** by default (to preserve determinism).
 
 Adapters may implement caching if:
+
 - Cache key includes all determinism inputs (query, scope, time)
 - Cache invalidation on data changes
 
@@ -493,10 +500,10 @@ interface CustomProvider extends RetrievalProvider {
 
 ### Future Enhancements (Not v0.1)
 
-- **Hybrid search**  FTS + semantic embeddings
-- **Re-ranking**  LLM-based relevance scoring
-- **Faceted retrieval**  Filter by observation kind, time range
-- **Personalization**  User-specific ranking heuristics
+- **Hybrid search** — FTS + semantic embeddings
+- **Re-ranking** — LLM-based relevance scoring
+- **Faceted retrieval** — Filter by observation kind, time range
+- **Personalization** — User-specific ranking heuristics
 
 ## Testing Retrieval
 
@@ -519,8 +526,8 @@ test('retrieval respects scope isolation', async () => {
   const result2 = await kindling.retrieve({ query: 'auth', scopeIds: { sessionId: 's2' } });
 
   // No overlap (assuming sessions are distinct)
-  const ids1 = result1.candidates.map(c => c.entity.id);
-  const ids2 = result2.candidates.map(c => c.entity.id);
+  const ids1 = result1.candidates.map((c) => c.entity.id);
+  const ids2 = result2.candidates.map((c) => c.entity.id);
   expect(intersection(ids1, ids2)).toEqual([]);
 });
 ```
@@ -532,7 +539,7 @@ test('retrieval respects token budget', async () => {
   const result = await kindling.retrieve({
     query: 'auth',
     scopeIds: { repoId: '/repo' },
-    tokenBudget: 1000
+    tokenBudget: 1000,
   });
 
   const totalTokens = estimateTokens(result);
@@ -543,13 +550,13 @@ test('retrieval respects token budget', async () => {
 
 ## Contract Summary
 
-| Property | Requirement |
-|----------|-------------|
-| **Determinism** | Same query + scope + data � same results |
-| **Scoping** | All results respect `scopeIds` filters |
-| **Tiering** | Pins � Summary � Candidates (in that order) |
-| **Non-eviction** | Pins and current summary never truncated |
-| **Provenance** | All results include explanation |
-| **Redaction** | Redacted observations excluded by default |
-| **Deduplication** | No entity appears in multiple tiers |
-| **Performance** | < 100ms for typical queries |
+| Property          | Requirement                                 |
+| ----------------- | ------------------------------------------- |
+| **Determinism**   | Same query + scope + data → same results    |
+| **Scoping**       | All results respect `scopeIds` filters      |
+| **Tiering**       | Pins → Summary → Candidates (in that order) |
+| **Non-eviction**  | Pins and current summary never truncated    |
+| **Provenance**    | All results include explanation             |
+| **Redaction**     | Redacted observations excluded by default   |
+| **Deduplication** | No entity appears in multiple tiers         |
+| **Performance**   | < 100ms for typical queries                 |

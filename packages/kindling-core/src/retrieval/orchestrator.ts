@@ -59,14 +59,9 @@ export interface RetrievalStore {
 export async function retrieve(
   store: RetrievalStore,
   provider: RetrievalProvider,
-  options: RetrieveOptions
+  options: RetrieveOptions,
 ): Promise<RetrieveResult> {
-  const {
-    query,
-    scopeIds,
-    maxCandidates = 10,
-    includeRedacted = false,
-  } = options;
+  const { query, scopeIds, maxCandidates = 10, includeRedacted = false } = options;
 
   const now = Date.now();
 
@@ -121,7 +116,7 @@ export async function retrieve(
   });
 
   // Step 5: Convert provider results to candidates
-  const candidates: CandidateResult[] = providerResults.map(result => ({
+  const candidates: CandidateResult[] = providerResults.map((result) => ({
     entity: result.entity,
     score: result.score,
     matchContext: result.matchContext,

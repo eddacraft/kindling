@@ -41,7 +41,7 @@ function ensureDependencies() {
     } catch (installErr) {
       throw new Error(
         `Failed to install better-sqlite3: ${installErr.message}\n` +
-        `Try running manually: cd ${pluginRoot} && npm install`
+          `Try running manually: cd ${pluginRoot} && npm install`,
       );
     }
   }
@@ -64,7 +64,11 @@ function getProjectRoot(cwd) {
     return cached;
   }
   try {
-    const root = execSync('git rev-parse --show-toplevel', { cwd, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+    const root = execSync('git rev-parse --show-toplevel', {
+      cwd,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
     // Cache for subsequent calls within this process
     process.env.KINDLING_REPO_ROOT = root;
     return root;
@@ -128,7 +132,9 @@ function readStdin() {
   return new Promise((resolve, reject) => {
     let input = '';
     process.stdin.setEncoding('utf8');
-    process.stdin.on('data', (chunk) => { input += chunk; });
+    process.stdin.on('data', (chunk) => {
+      input += chunk;
+    });
     process.stdin.on('end', () => {
       try {
         resolve(JSON.parse(input));

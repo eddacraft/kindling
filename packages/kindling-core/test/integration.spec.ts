@@ -74,7 +74,9 @@ describe('KindlingService Integration', () => {
     });
 
     expect(results.candidates.length).toBeGreaterThan(0);
-    expect(results.candidates.some(c => c.entity.id === 'obs-1' || c.entity.id === 'obs-2')).toBe(true);
+    expect(results.candidates.some((c) => c.entity.id === 'obs-1' || c.entity.id === 'obs-2')).toBe(
+      true,
+    );
 
     // Pin an important observation
     const pin = service.pin({
@@ -181,7 +183,7 @@ describe('KindlingService Integration', () => {
       includeRedacted: false,
     });
 
-    expect(results.candidates.find(c => c.entity.id === 'obs-secret')).toBeUndefined();
+    expect(results.candidates.find((c) => c.entity.id === 'obs-secret')).toBeUndefined();
 
     // But still exists with redacted flag
     retrieved = service.getObservation('obs-secret');

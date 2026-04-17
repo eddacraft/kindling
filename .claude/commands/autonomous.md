@@ -12,7 +12,9 @@ $ARGUMENTS
 ## Execution Protocol
 
 ### 1. Task Planning
+
 Before starting:
+
 - Break the task into discrete, verifiable steps
 - Identify dependencies between steps
 - Create rollback points
@@ -21,6 +23,7 @@ Before starting:
 ### 2. Execution Loop
 
 For each step:
+
 ```
 1. [START] Log step beginning
 2. [EXECUTE] Perform the action
@@ -32,6 +35,7 @@ For each step:
 ### 3. Progress Reporting
 
 Report status regularly:
+
 ```
 [PROGRESS] Step X/Y: Description
 [SUCCESS] Completed: What was done
@@ -50,6 +54,7 @@ Report status regularly:
 ### 5. Checkpointing
 
 After significant progress:
+
 - Commit changes (if code)
 - Save state to `.claude/autonomous-state.json`
 - Log checkpoint to `.claude/logs/autonomous.log`
@@ -57,6 +62,7 @@ After significant progress:
 ### 6. Completion
 
 When finished:
+
 - Verify all success criteria met
 - Run tests if applicable
 - Summarize what was accomplished

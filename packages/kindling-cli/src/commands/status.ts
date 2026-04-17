@@ -16,22 +16,34 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
 
     // Get database info
     const dbInfo = db.pragma('database_list') as Array<{ name: string; file: string }>;
-    const mainDb = dbInfo.find(d => d.name === 'main');
+    const mainDb = dbInfo.find((d) => d.name === 'main');
 
     // Get entity counts
-    const observationCount = db.prepare('SELECT COUNT(*) as count FROM observations').get() as { count: number };
-    const capsuleCount = db.prepare('SELECT COUNT(*) as count FROM capsules').get() as { count: number };
-    const summaryCount = db.prepare('SELECT COUNT(*) as count FROM summaries').get() as { count: number };
+    const observationCount = db.prepare('SELECT COUNT(*) as count FROM observations').get() as {
+      count: number;
+    };
+    const capsuleCount = db.prepare('SELECT COUNT(*) as count FROM capsules').get() as {
+      count: number;
+    };
+    const summaryCount = db.prepare('SELECT COUNT(*) as count FROM summaries').get() as {
+      count: number;
+    };
     const pinCount = db.prepare('SELECT COUNT(*) as count FROM pins').get() as { count: number };
 
     // Get redacted count
-    const redactedCount = db.prepare('SELECT COUNT(*) as count FROM observations WHERE redacted = 1').get() as { count: number };
+    const redactedCount = db
+      .prepare('SELECT COUNT(*) as count FROM observations WHERE redacted = 1')
+      .get() as { count: number };
 
     // Get open capsules count
-    const openCapsulesCount = db.prepare('SELECT COUNT(*) as count FROM capsules WHERE status = \'open\'').get() as { count: number };
+    const openCapsulesCount = db
+      .prepare("SELECT COUNT(*) as count FROM capsules WHERE status = 'open'")
+      .get() as { count: number };
 
     // Get latest activity timestamp
-    const latestActivity = db.prepare('SELECT MAX(ts) as ts FROM observations').get() as { ts: number | null };
+    const latestActivity = db.prepare('SELECT MAX(ts) as ts FROM observations').get() as {
+      ts: number | null;
+    };
 
     // Get database size
     const pageCount = db.pragma('page_count') as number;

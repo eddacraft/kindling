@@ -81,7 +81,7 @@ const DEFAULT_CONFIG: ConfidenceConfig = {
  */
 export function calculateConfidence(
   state: Pick<ConfidenceState, 'successCount' | 'failureCount' | 'consecutiveFailures' | 'history'>,
-  config: ConfidenceConfig = DEFAULT_CONFIG
+  config: ConfidenceConfig = DEFAULT_CONFIG,
 ): number {
   const total = state.successCount + state.failureCount;
 
@@ -95,11 +95,12 @@ export function calculateConfidence(
 
   // Calculate recent success rate (weighted more heavily)
   const recentHistory = state.history.slice(0, Math.min(5, state.history.length));
-  const recentSuccesses = recentHistory.filter(r => r.success).length;
-  const recentRate = recentHistory.length > 0 ? recentSuccesses / recentHistory.length : overallRate;
+  const recentSuccesses = recentHistory.filter((r) => r.success).length;
+  const recentRate =
+    recentHistory.length > 0 ? recentSuccesses / recentHistory.length : overallRate;
 
   // Blend overall and recent rates
-  const blendedRate = (overallRate * (1 - config.recencyWeight)) + (recentRate * config.recencyWeight);
+  const blendedRate = overallRate * (1 - config.recencyWeight) + recentRate * config.recencyWeight;
 
   // Apply consecutive failure penalty
   const failurePenalty = Math.min(state.consecutiveFailures * 0.1, 0.3);

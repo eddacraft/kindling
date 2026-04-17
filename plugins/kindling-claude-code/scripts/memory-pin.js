@@ -21,7 +21,7 @@ if (!note) note = 'Pinned observation';
 const { db, store } = init(cwd);
 try {
   const lastObs = db
-    .prepare("SELECT * FROM observations WHERE repo_id = ? ORDER BY ts DESC LIMIT 1")
+    .prepare('SELECT * FROM observations WHERE repo_id = ? ORDER BY ts DESC LIMIT 1')
     .get(repoRoot);
   if (!lastObs) {
     console.log('No observations to pin yet.');

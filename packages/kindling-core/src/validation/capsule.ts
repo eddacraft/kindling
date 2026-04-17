@@ -3,17 +3,8 @@
  */
 
 import { randomUUID } from 'crypto';
-import type {
-  Capsule,
-  ValidationError,
-  Result,
-} from '../types/index.js';
-import {
-  ok,
-  err,
-  isCapsuleType,
-  isCapsuleStatus,
-} from '../types/index.js';
+import type { Capsule, ValidationError, Result } from '../types/index.js';
+import { ok, err, isCapsuleType, isCapsuleStatus } from '../types/index.js';
 
 /**
  * Validate and normalize a capsule input

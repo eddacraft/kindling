@@ -29,7 +29,7 @@ class MockStore implements RetrievalStore {
   capsuleSummaries: Map<ID, Summary> = new Map();
 
   listActivePins(scopeIds?: Partial<Record<string, string>>, now?: number): Pin[] {
-    return this.pins.filter(pin => {
+    return this.pins.filter((pin) => {
       // Check expiry
       if (pin.expiresAt && now && pin.expiresAt <= now) {
         return false;
@@ -73,7 +73,7 @@ class MockProvider implements RetrievalProvider {
     let filtered = this.results;
     if (options.excludeIds && options.excludeIds.length > 0) {
       const excludeSet = new Set(options.excludeIds);
-      filtered = this.results.filter(r => !excludeSet.has(r.entity.id));
+      filtered = this.results.filter((r) => !excludeSet.has(r.entity.id));
     }
 
     // Limit results
@@ -322,7 +322,7 @@ describe('Retrieval Orchestration', () => {
 
       provider.results = [
         { entity: obs1, score: 0.95, matchContext: 'match 1' },
-        { entity: obs2, score: 0.90, matchContext: 'match 2' },
+        { entity: obs2, score: 0.9, matchContext: 'match 2' },
       ];
 
       const result = await retrieve(store, provider, {
@@ -349,9 +349,7 @@ describe('Retrieval Orchestration', () => {
       store.capsuleSummaries.set('cap-1', summary);
       store.openCapsules.set('s1', { id: 'cap-1' });
 
-      provider.results = [
-        { entity: summary, score: 0.95, matchContext: 'match' },
-      ];
+      provider.results = [{ entity: summary, score: 0.95, matchContext: 'match' }];
 
       const result = await retrieve(store, provider, {
         query: 'test',
@@ -448,9 +446,7 @@ describe('Retrieval Orchestration', () => {
         redacted: false,
       };
 
-      const tiered = assignTiers([], undefined, [
-        { entity: obs, score: 0.9 },
-      ]);
+      const tiered = assignTiers([], undefined, [{ entity: obs, score: 0.9 }]);
 
       expect(tiered).toHaveLength(1);
       expect(tiered[0].tier).toBe(Tier.CANDIDATE);
@@ -494,11 +490,7 @@ describe('Retrieval Orchestration', () => {
         scopeIds: { sessionId: 's1' },
       };
 
-      const tiered = assignTiers(
-        [{ pin, target: obs1 }],
-        summary,
-        [{ entity: obs2, score: 0.8 }]
-      );
+      const tiered = assignTiers([{ pin, target: obs1 }], summary, [{ entity: obs2, score: 0.8 }]);
 
       expect(tiered).toHaveLength(3);
       expect(tiered[0].id).toBe('obs-1'); // Pin

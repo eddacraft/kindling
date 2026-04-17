@@ -36,19 +36,31 @@ export const DEFAULT_INTENT_PATTERNS: IntentMapping[] = [
   { keywords: ['implement', 'add', 'create', 'feature', 'develop', 'make'], intent: 'feature' },
 
   // Refactoring
-  { keywords: ['refactor', 'restructure', 'reorganize', 'cleanup', 'clean-up'], intent: 'refactor' },
+  {
+    keywords: ['refactor', 'restructure', 'reorganize', 'cleanup', 'clean-up'],
+    intent: 'refactor',
+  },
 
   // Data processing
-  { keywords: ['process', 'transform', 'convert', 'parse', 'extract', 'load', 'etl'], intent: 'process' },
+  {
+    keywords: ['process', 'transform', 'convert', 'parse', 'extract', 'load', 'etl'],
+    intent: 'process',
+  },
 
   // Analysis/Research
-  { keywords: ['analyze', 'analyse', 'research', 'investigate', 'explore', 'scan'], intent: 'analyze' },
+  {
+    keywords: ['analyze', 'analyse', 'research', 'investigate', 'explore', 'scan'],
+    intent: 'analyze',
+  },
 
   // Generation
   { keywords: ['generate', 'gen', 'scaffold', 'template', 'init', 'setup'], intent: 'generate' },
 
   // Communication/API
-  { keywords: ['fetch', 'request', 'call', 'api', 'http', 'send', 'receive'], intent: 'communicate' },
+  {
+    keywords: ['fetch', 'request', 'call', 'api', 'http', 'send', 'receive'],
+    intent: 'communicate',
+  },
 
   // Storage/Persistence
   { keywords: ['save', 'store', 'persist', 'write', 'cache', 'backup'], intent: 'store' },
@@ -68,16 +80,18 @@ export const DEFAULT_INTENT_PATTERNS: IntentMapping[] = [
  * Converts camelCase, PascalCase, snake_case, and kebab-case to space-separated words.
  */
 function normalizeNodeName(name: string): string {
-  return name
-    // Insert space before uppercase letters (camelCase/PascalCase)
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
-    // Replace underscores and hyphens with spaces
-    .replace(/[_-]/g, ' ')
-    // Convert to lowercase
-    .toLowerCase()
-    // Collapse multiple spaces
-    .replace(/\s+/g, ' ')
-    .trim();
+  return (
+    name
+      // Insert space before uppercase letters (camelCase/PascalCase)
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      // Replace underscores and hyphens with spaces
+      .replace(/[_-]/g, ' ')
+      // Convert to lowercase
+      .toLowerCase()
+      // Collapse multiple spaces
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
 }
 
 /**
@@ -99,7 +113,7 @@ function normalizeNodeName(name: string): string {
  */
 export function inferIntent(
   nodeName: string,
-  patterns: IntentMapping[] = DEFAULT_INTENT_PATTERNS
+  patterns: IntentMapping[] = DEFAULT_INTENT_PATTERNS,
 ): string {
   const normalized = normalizeNodeName(nodeName);
 
@@ -108,7 +122,7 @@ export function inferIntent(
     return 'general';
   }
 
-  const words = normalized.split(' ').filter(w => w.length > 0);
+  const words = normalized.split(' ').filter((w) => w.length > 0);
 
   // Check each pattern's keywords against the normalized words
   for (const pattern of patterns) {
@@ -116,7 +130,11 @@ export function inferIntent(
       // Check if any word starts with the keyword (prefix match)
       // This handles cases like "testing" matching "test"
       // Require minimum word length of 2 to avoid false positives
-      if (words.some(word => word.length >= 2 && (word.startsWith(keyword) || keyword.startsWith(word)))) {
+      if (
+        words.some(
+          (word) => word.length >= 2 && (word.startsWith(keyword) || keyword.startsWith(word)),
+        )
+      ) {
         return pattern.intent;
       }
     }

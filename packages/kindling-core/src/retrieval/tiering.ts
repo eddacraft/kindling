@@ -46,7 +46,7 @@ export interface TieredResult {
 export function assignTiers(
   pins: PinResult[],
   currentSummary: Summary | undefined,
-  candidates: CandidateResult[]
+  candidates: CandidateResult[],
 ): TieredResult[] {
   const tiered: TieredResult[] = [];
 
@@ -94,7 +94,7 @@ export function assignTiers(
 export function filterByTokenBudget(
   tiered: TieredResult[],
   tokenBudget: number,
-  estimateTokens: (content: string) => number = estimateTokensSimple
+  estimateTokens: (content: string) => number = estimateTokensSimple,
 ): TieredResult[] {
   const included: TieredResult[] = [];
   let tokensUsed = 0;
@@ -145,7 +145,7 @@ export function estimateTokensSimple(content: string): number {
 export function tier0ExceedsBudget(
   tiered: TieredResult[],
   tokenBudget: number,
-  estimateTokens: (content: string) => number = estimateTokensSimple
+  estimateTokens: (content: string) => number = estimateTokensSimple,
 ): boolean {
   let tier0Tokens = 0;
 

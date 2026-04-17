@@ -37,8 +37,10 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error(`[kindling] UserPromptSubmit error: ${err.message}`);
-}).finally(() => {
-  process.exit(0);
-});
+main()
+  .catch((err) => {
+    console.error(`[kindling] UserPromptSubmit error: ${err.message}`);
+  })
+  .finally(() => {
+    process.exit(0);
+  });

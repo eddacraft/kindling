@@ -72,14 +72,8 @@ export interface FilterOptions {
 /**
  * Truncate content if it exceeds max length
  */
-export function truncateContent(
-  content: string,
-  options: FilterOptions = {}
-): string {
-  const {
-    maxLength = MAX_CONTENT_LENGTH,
-    showTruncationNotice = true,
-  } = options;
+export function truncateContent(content: string, options: FilterOptions = {}): string {
+  const { maxLength = MAX_CONTENT_LENGTH, showTruncationNotice = true } = options;
 
   if (content.length <= maxLength) {
     return content;
@@ -99,7 +93,7 @@ export function truncateContent(
  * Detect if content contains potential secrets
  */
 export function containsSecrets(content: string): boolean {
-  return SECRET_PATTERNS.some(pattern => {
+  return SECRET_PATTERNS.some((pattern) => {
     pattern.lastIndex = 0;
     return pattern.test(content);
   });
@@ -128,10 +122,7 @@ export function maskSecrets(content: string): string {
 /**
  * Filter content with all safety rules
  */
-export function filterContent(
-  content: string,
-  options: FilterOptions = {}
-): string {
+export function filterContent(content: string, options: FilterOptions = {}): string {
   const { maskSecrets: shouldMask = true } = options;
 
   let filtered = content;
@@ -149,7 +140,7 @@ export function filterContent(
  * Check if a file path should be excluded from capture
  */
 export function isExcludedPath(path: string): boolean {
-  return EXCLUDED_PATHS.some(pattern => pattern.test(path));
+  return EXCLUDED_PATHS.some((pattern) => pattern.test(path));
 }
 
 /**
@@ -165,7 +156,7 @@ export function shouldCaptureToolResult(toolName: string): boolean {
 export function filterToolResult(
   toolName: string,
   result: unknown,
-  maxLength: number = MAX_RESULT_LENGTH
+  maxLength: number = MAX_RESULT_LENGTH,
 ): string | null {
   if (!shouldCaptureToolResult(toolName)) {
     return '[Result not captured]';

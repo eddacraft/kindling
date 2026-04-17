@@ -35,10 +35,7 @@ export interface CapsuleStore {
  * @returns The created capsule
  * @throws Error if validation fails or duplicate open capsule exists
  */
-export function openCapsule(
-  store: CapsuleStore,
-  options: OpenCapsuleOptions
-): Capsule {
+export function openCapsule(store: CapsuleStore, options: OpenCapsuleOptions): Capsule {
   const { type, intent, scopeIds, id } = options;
 
   // Check for duplicate open capsule (session-scoped)
@@ -46,7 +43,7 @@ export function openCapsule(
     const existingCapsule = store.getOpenCapsuleForSession(scopeIds.sessionId);
     if (existingCapsule) {
       throw new Error(
-        `Cannot open capsule: session ${scopeIds.sessionId} already has an open capsule (${existingCapsule.id})`
+        `Cannot open capsule: session ${scopeIds.sessionId} already has an open capsule (${existingCapsule.id})`,
       );
     }
   }
@@ -62,7 +59,7 @@ export function openCapsule(
 
   if (!capsuleResult.ok) {
     throw new Error(
-      `Capsule validation failed: ${capsuleResult.error.map(e => e.message).join(', ')}`
+      `Capsule validation failed: ${capsuleResult.error.map((e) => e.message).join(', ')}`,
     );
   }
 
@@ -89,7 +86,7 @@ export function openCapsule(
 export function closeCapsule(
   store: CapsuleStore,
   capsuleId: ID,
-  signals: CloseCapsuleSignals = {}
+  signals: CloseCapsuleSignals = {},
 ): Capsule {
   // Get existing capsule
   const capsule = store.getCapsuleById(capsuleId);
@@ -117,7 +114,7 @@ export function closeCapsule(
 
     if (!summaryResult.ok) {
       throw new Error(
-        `Summary validation failed: ${summaryResult.error.map(e => e.message).join(', ')}`
+        `Summary validation failed: ${summaryResult.error.map((e) => e.message).join(', ')}`,
       );
     }
 
@@ -139,10 +136,7 @@ export function closeCapsule(
  * @param capsuleId - Capsule ID to lookup
  * @returns Capsule or undefined if not found
  */
-export function getCapsule(
-  store: CapsuleStore,
-  capsuleId: ID
-): Capsule | undefined {
+export function getCapsule(store: CapsuleStore, capsuleId: ID): Capsule | undefined {
   return store.getCapsuleById(capsuleId);
 }
 
@@ -153,9 +147,6 @@ export function getCapsule(
  * @param sessionId - Session ID to search for
  * @returns Open capsule or undefined
  */
-export function getOpenCapsule(
-  store: CapsuleStore,
-  sessionId: string
-): Capsule | undefined {
+export function getOpenCapsule(store: CapsuleStore, sessionId: string): Capsule | undefined {
   return store.getOpenCapsuleForSession(sessionId);
 }

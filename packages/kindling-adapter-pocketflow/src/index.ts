@@ -16,11 +16,7 @@ export {
 } from './pocketflow/lifecycle.js';
 
 // Intent inference
-export {
-  inferIntent,
-  type IntentMapping,
-  DEFAULT_INTENT_PATTERNS,
-} from './pocketflow/intent.js';
+export { inferIntent, type IntentMapping, DEFAULT_INTENT_PATTERNS } from './pocketflow/intent.js';
 
 // Confidence tracking
 export {

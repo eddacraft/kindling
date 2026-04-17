@@ -17,7 +17,9 @@ describe('CLI Commands', () => {
         .version('0.1.0');
 
       expect(program.name()).toBe('kindling');
-      expect(program.description()).toBe('Local memory and continuity engine for AI-assisted development');
+      expect(program.description()).toBe(
+        'Local memory and continuity engine for AI-assisted development',
+      );
       expect(program.version()).toBe('0.1.0');
     });
 
@@ -32,7 +34,7 @@ describe('CLI Commands', () => {
         .option('--json', 'Output as JSON')
         .action(mockAction);
 
-      const statusCmd = program.commands.find(c => c.name() === 'status');
+      const statusCmd = program.commands.find((c) => c.name() === 'status');
       expect(statusCmd).toBeDefined();
       expect(statusCmd?.description()).toBe('Show database status and statistics');
     });
@@ -49,7 +51,7 @@ describe('CLI Commands', () => {
         .option('--max <n>', 'Maximum results', '10')
         .action(mockAction);
 
-      const searchCmd = program.commands.find(c => c.name() === 'search');
+      const searchCmd = program.commands.find((c) => c.name() === 'search');
       expect(searchCmd).toBeDefined();
       expect(searchCmd?.description()).toBe('Search for relevant context in memory');
     });
@@ -64,7 +66,7 @@ describe('CLI Commands', () => {
         .option('--limit <n>', 'Maximum results', '20')
         .action(mockAction);
 
-      const listCmd = program.commands.find(c => c.name() === 'list');
+      const listCmd = program.commands.find((c) => c.name() === 'list');
       expect(listCmd).toBeDefined();
     });
 
@@ -79,7 +81,7 @@ describe('CLI Commands', () => {
         .option('--ttl <ms>', 'Time-to-live in milliseconds')
         .action(mockAction);
 
-      const pinCmd = program.commands.find(c => c.name() === 'pin');
+      const pinCmd = program.commands.find((c) => c.name() === 'pin');
       expect(pinCmd).toBeDefined();
     });
 
@@ -87,12 +89,9 @@ describe('CLI Commands', () => {
       const program = new Command();
       const mockAction = vi.fn();
 
-      program
-        .command('unpin <id>')
-        .description('Remove a pin by ID')
-        .action(mockAction);
+      program.command('unpin <id>').description('Remove a pin by ID').action(mockAction);
 
-      const unpinCmd = program.commands.find(c => c.name() === 'unpin');
+      const unpinCmd = program.commands.find((c) => c.name() === 'unpin');
       expect(unpinCmd).toBeDefined();
     });
 
@@ -106,7 +105,7 @@ describe('CLI Commands', () => {
         .option('--pretty', 'Pretty-print JSON output')
         .action(mockAction);
 
-      const exportCmd = program.commands.find(c => c.name() === 'export');
+      const exportCmd = program.commands.find((c) => c.name() === 'export');
       expect(exportCmd).toBeDefined();
     });
 
@@ -120,7 +119,7 @@ describe('CLI Commands', () => {
         .option('--dry-run', 'Validate without importing')
         .action(mockAction);
 
-      const importCmd = program.commands.find(c => c.name() === 'import');
+      const importCmd = program.commands.find((c) => c.name() === 'import');
       expect(importCmd).toBeDefined();
     });
 
@@ -135,7 +134,7 @@ describe('CLI Commands', () => {
         .option('--host <host>', 'Host to bind to', '127.0.0.1')
         .action(mockAction);
 
-      const serveCmd = program.commands.find(c => c.name() === 'serve');
+      const serveCmd = program.commands.find((c) => c.name() === 'serve');
       expect(serveCmd).toBeDefined();
     });
   });
@@ -150,8 +149,8 @@ describe('CLI Commands', () => {
         .option('--max <n>', 'Maximum results', '10')
         .action(mockAction);
 
-      const searchCmd = program.commands.find(c => c.name() === 'search');
-      const maxOption = searchCmd?.options.find(o => o.long === '--max');
+      const searchCmd = program.commands.find((c) => c.name() === 'search');
+      const maxOption = searchCmd?.options.find((o) => o.long === '--max');
       expect(maxOption?.defaultValue).toBe('10');
     });
 
@@ -159,13 +158,10 @@ describe('CLI Commands', () => {
       const program = new Command();
       const mockAction = vi.fn();
 
-      program
-        .command('serve')
-        .option('--port <port>', 'Port', '8080')
-        .action(mockAction);
+      program.command('serve').option('--port <port>', 'Port', '8080').action(mockAction);
 
-      const serveCmd = program.commands.find(c => c.name() === 'serve');
-      const portOption = serveCmd?.options.find(o => o.long === '--port');
+      const serveCmd = program.commands.find((c) => c.name() === 'serve');
+      const portOption = serveCmd?.options.find((o) => o.long === '--port');
       expect(portOption?.defaultValue).toBe('8080');
     });
   });
@@ -174,27 +170,23 @@ describe('CLI Commands', () => {
     it('should support sync subcommand with nested commands', () => {
       const program = new Command();
 
-      const syncCommand = program
-        .command('sync')
-        .description('GitHub sync commands');
+      const syncCommand = program.command('sync').description('GitHub sync commands');
 
       syncCommand
         .command('init')
         .description('Initialize sync')
         .requiredOption('--repo <name>', 'GitHub repo');
 
-      syncCommand
-        .command('push')
-        .description('Push to GitHub');
+      syncCommand.command('push').description('Push to GitHub');
 
-      const sync = program.commands.find(c => c.name() === 'sync');
+      const sync = program.commands.find((c) => c.name() === 'sync');
       expect(sync).toBeDefined();
       expect(sync?.commands).toHaveLength(2);
 
-      const initCmd = sync?.commands.find(c => c.name() === 'init');
+      const initCmd = sync?.commands.find((c) => c.name() === 'init');
       expect(initCmd).toBeDefined();
 
-      const pushCmd = sync?.commands.find(c => c.name() === 'push');
+      const pushCmd = sync?.commands.find((c) => c.name() === 'push');
       expect(pushCmd).toBeDefined();
     });
   });
@@ -204,7 +196,7 @@ describe('Entity Validation', () => {
   it('should validate list entity types', () => {
     const validEntities = ['capsules', 'pins', 'observations'];
 
-    validEntities.forEach(entity => {
+    validEntities.forEach((entity) => {
       expect(validEntities.includes(entity)).toBe(true);
     });
 
@@ -214,7 +206,7 @@ describe('Entity Validation', () => {
   it('should validate pin target types', () => {
     const validTypes = ['observation', 'summary'];
 
-    validTypes.forEach(type => {
+    validTypes.forEach((type) => {
       expect(validTypes.includes(type)).toBe(true);
     });
 
