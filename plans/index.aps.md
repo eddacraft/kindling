@@ -9,7 +9,7 @@
 
 ## Problem
 
-Kindling is functional (596 tests passing, 9 packages building) but not yet published or optimized for production use. The remaining work falls into three phases: get the TypeScript packages published to npm, ship the intent capture primitive, then port the production surface to Rust so Anvil can integrate directly without a TypeScript bridge.
+Kindling is functional (596 tests passing, 10 packages building) but not yet published or optimized for production use. The remaining work falls into three phases: get the TypeScript packages published to npm, ship the intent capture primitive, then port the production surface to Rust so Anvil can integrate directly without a TypeScript bridge.
 
 ## Success Criteria
 
