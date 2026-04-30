@@ -56,27 +56,43 @@ pnpm clean
 
 ## Branching Model
 
-This project uses a two-tier branching workflow:
+Kindling uses a two-branch model that supports multiple active streams in
+parallel worktrees:
 
-```
-feature branches → dev (default) → main (releases)
-```
+- `main` is the stable release branch. Always publishable to npm.
+- `dev` is the active integration branch and the default branch.
+- normal feat, fix, docs, and chore branches are created from `dev`.
+- hotfix branches are created from `main` or the active `release/*` branch.
 
-- **`dev`** is the default branch and integration target for all development.
-- **`main`** is the release branch. Merges into `main` trigger publishing.
-- **Feature branches** are created from `dev` and merged back via PR.
-- PRs into both `dev` and `main` require CI to pass.
-- Only maintainers merge `dev` → `main` for releases.
+Keep `main` and `dev` as the only permanent worktrees. Treat all other
+worktrees as disposable and remove them once the branch is merged, replaced,
+or paused.
+
+Release guidance:
+
+- small releases may promote directly from `dev` to `main`
+- larger releases should use a short-lived `release/*` branch
+- any fix that lands during release stabilisation must be merged back to `dev`
+  immediately after release
+
+See the detailed guides for the full policy:
+
+- [`docs/guides/branching-strategy.md`](docs/guides/branching-strategy.md)
+- [`docs/guides/worktree-policy.md`](docs/guides/worktree-policy.md)
+- [`docs/guides/release-runbook.md`](docs/guides/release-runbook.md)
 
 ## Pull Request Process
 
 1. **Open an issue first** for significant changes to discuss approach
-2. **Create a feature branch** from `dev`
+2. **Create a branch from `dev`** for normal work, or from `main` only for
+   production hotfixes
 3. **Write tests** for new functionality
 4. **Update documentation** if behavior changes
-5. **Keep PRs focused** - one logical change per PR
-6. **Ensure CI passes** before requesting review
-7. **Target `dev`** — PRs should target the `dev` branch, not `main`
+5. **Keep PRs focused** — one logical change per PR
+6. **Run the full test suite**: `pnpm build && pnpm test && pnpm lint`
+7. **Ensure CI passes** before requesting review
+8. **Target `dev`** — feature PRs should target `dev`, not `main`. Only
+   release-promotion and hotfix PRs target `main`.
 
 ### Commit Messages
 
