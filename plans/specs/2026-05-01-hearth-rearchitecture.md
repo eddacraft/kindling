@@ -1,9 +1,14 @@
 # Hearth Rearchitecture Plan
 
-**Date:** 2026-05-01
-**Status:** Brainstorm / proposal — pre-ADR
-**Branch:** `claude/rearchitect-hearth-daemon-RbDYw`
-**Scope:** EddaCraft stack across `eddacraft/anvil-001` + `eddacraft/kindling`
+| Field      | Value                                                                              |
+| ---------- | ---------------------------------------------------------------------------------- |
+| Status     | Brainstorm / proposal — pre-ADR                                                    |
+| Owner      | @joshuaboys                                                                        |
+| Created    | 2026-05-01                                                                         |
+| Branch     | `claude/rearchitect-hearth-daemon-RbDYw`                                           |
+| Scope      | EddaCraft stack across `eddacraft/anvil-001` + `eddacraft/kindling`                |
+| Mirror of  | `eddacraft/anvil-001` `plans/brainstorms/2026-05-01-hearth-rearchitecture.md`      |
+
 **Locked-in decisions** (do not relitigate):
 
 1. Introduce a fifth named primitive — **Hearth** — the always-on local Rust daemon that hosts the Anvil kernel, Kindling log, Ember proposal queue, and Edda memory store in one process, sharing one semantic substrate (witchcraft).
@@ -44,7 +49,7 @@ All four lanes converge on the same `HearthService` trait inside the daemon — 
 
 | Lane | Transport | Schema | Primary client | Notes |
 |------|-----------|--------|---------------|-------|
-| **Local socket** | Unix socket (`socket`) / Windows named pipe | JSON-RPC 2.0 (existing `anvil-intercept-proto`) | CLI, TUI, drivers | Default, lowest-latency. Auth via filesystem ACL + per-session token. |
+| **Local socket** | Unix socket (`socket`) / Windows named pipe | JSON-RPC 2.0 (`hearth-proto` — see §3.1; renamed from today's `anvil-intercept-proto`) | CLI, TUI, drivers | Default, lowest-latency. Auth via filesystem ACL + per-session token. |
 | **HTTP** | `axum` on `127.0.0.1:<random>` (port written to state dir) | JSON-RPC 2.0 over HTTP POST + SSE for streams | Web dashboard, agents in containers | Loopback-only by default. Bearer token in state dir. |
 | **MCP** | stdio JSON-RPC | Model Context Protocol | Claude Code, Cursor, OpenAI agents | Existing `anvil mcp serve --stdio` (RMCP) becomes a thin shim that forwards to the local socket. |
 | **stdio hooks** | stdin/stdout JSON, one observation per process | Kindling hook contract (D-003 immutable) | Claude Code hook, OpenCode adapter, PocketFlow | The `kindling-hook` binary ships independently and proxies into Hearth's local socket; <10 ms round-trip target preserved. |
@@ -95,7 +100,7 @@ The session-registry, process-group enforcement, and IPC plumbing already in `an
 | `anvil` CLI does its own scan inline (or via embedded `anvil-checks`) | Thin client; sends `validate_buffer` to Hearth socket. Falls back to embedded scanner if no daemon. |
 | `anvil watch` runs a foreground watcher | Subcommand becomes alias for `hearth watch`; daemon owns the watcher, CLI subscribes to event stream. |
 | `anvil mcp serve --stdio` is a launch shim with embedded fallback (RMCP) | Forwards every MCP request to Hearth socket; embedded fallback retained for offline use. |
-| Claude Code hook (`kindling-hook` binary) writes directly to a SQLite file | Connects to Hearth socket → daemon writes Kindling. Hook stays a small, statically-linked binary so it works on machines without `hearth` if needed (back-channel direct DB write retained as fallback per D-003 contract). |
+| Claude Code hook (`kindling-hook` binary) writes directly to a SQLite file | Connects to Hearth socket → daemon writes Kindling. Hook stays a small, statically-linked binary so it works on machines without `hearth` if needed (back-channel direct DB write retained as fallback per D-003 contract). **Single-writer invariant preserved by socket-first probe:** the hook always checks for the Hearth socket and sends over IPC if present; only when the socket is absent (i.e. daemon not running, writer lock free) does it open the SQLite file directly. The hook never opens the DB while the daemon is alive. |
 | `archive/anvil-vscode-extension/` (paused) | Re-introduced as `crates/anvil-vscode-driver/` LSP-style client; pure presentation, all logic in Hearth. (DRVR-003.) |
 | TUI (`anvil-tui`) is in-process | Becomes a thin client using the existing `EngineEvent` stream; `anvil-tui` crate stays but its surfaces consume the daemon stream rather than embedding the kernel. |
 
@@ -235,11 +240,17 @@ pub enum IndexKind {
 }
 
 impl ForgeRetrieval {
-    pub fn open(state_dir: &Path) -> Result<Self>;
-    pub fn upsert(&self, kind: IndexKind, doc: Document) -> Result<()>;
-    pub fn delete(&self, kind: IndexKind, id: DocumentId) -> Result<()>;
+    /// Writer handle. Sealed crate-internally so only `hearth-daemon` can construct it
+    /// (see §4.5 for the rationale — preserves witchcraft's single-writer constraint).
+    pub(crate) fn open_writer(state_dir: &Path) -> Result<Self>;
+
+    /// Reader handle. Open to external tools, dry-run paths, and tests.
+    pub fn open_reader(state_dir: &Path) -> Result<Self>;
+
+    pub fn upsert(&self, kind: IndexKind, doc: Document) -> Result<()>;       // writer only
+    pub fn delete(&self, kind: IndexKind, id: DocumentId) -> Result<()>;      // writer only
     pub fn query(&self, kind: IndexKind, q: Query, policy: QueryPolicy) -> Result<Hits>;
-    pub fn rebuild(&self, kind: IndexKind) -> Result<()>;
+    pub fn rebuild(&self, kind: IndexKind) -> Result<()>;                     // writer only
 }
 
 pub struct QueryPolicy {
@@ -263,7 +274,7 @@ pub struct QueryPolicy {
 
 ### 4.3 Storage layout
 
-- `~/.hearth/<workspace>/forge.db` — single SQLite file with **three logical indexes** (Ember, Edda, SymbolGraph) keyed by `IndexKind` in document metadata. Witchcraft's schema permits this via the `metadata` JSON column.
+- `~/.hearth/<workspace-fingerprint>/forge.db` — single SQLite file with **three logical indexes** (Ember, Edda, SymbolGraph) keyed by `IndexKind` in document metadata. Witchcraft's schema permits this via the `metadata` JSON column. (`<workspace-fingerprint>` is the same per-workspace state-directory key used in §2.1.)
 - Backed up by `hearth backup` (forge.db is rebuildable from Kindling + Edda + the symbol graph, but rebuild is slow so we ship a backup tool).
 - **Witchcraft schema is opinionated** (UUID, ts, metadata JSON, hash, body; 128-d 4-bit-quantized residual embeddings). We accept that constraint — our payload shape is small enough to fit. The crate hides the witchcraft schema from upstream consumers behind `Document` and `Hits`.
 
@@ -517,4 +528,4 @@ For context, the current `crates/` directory in `eddacraft/anvil-001` holds: `an
 - **`plans/brainstorms/missing-features-analysis.md`** — auto-fix, MCP, web dashboard gaps.
 - **`eddacraft/kindling` `plans/specs/2026-04-15-rust-port-design.md`** — D-003 dual-maintain Rust + TS.
 - **`eddacraft/kindling` `docs/architecture.md`, `docs/data-model.md`, `docs/retrieval-contract.md`** — write-emit contract, FTS-only retrieval.
-- **`github.com/dropbox/witchcraft`** (read 2026-05-01) — library API, schema, embedder options, perf claims, license.
+- **<https://github.com/dropbox/witchcraft>** (read 2026-05-01) — library API, schema, embedder options, perf claims, license.
