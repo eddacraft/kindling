@@ -2,7 +2,7 @@
 
 | ID      | Owner  | Status |
 | ------- | ------ | ------ |
-| PUBLISH | @aneki | Ready  |
+| PUBLISH | @aneki | Done   |
 
 ## Purpose
 
