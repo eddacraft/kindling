@@ -158,3 +158,8 @@ settings.local.json
 
 # Admin-only files (publishing, plans, internal checklists)
 admin/
+
+# Rust
+target/
+**/*.rs.bk
+*.pdb
