@@ -12,7 +12,7 @@ Supersedes `02-rust-hook-binary` and `03-rust-cli`. Replaces the dual-maintain p
 
 ## In Scope
 
-- 10-crate Rust workspace at `crates/` (`kindling-types`, `-store`, `-filter`, `-provider`, `-service`, `-server`, `-client`, `-hook`, `-cli`, umbrella `kindling`)
+- 10-crate Rust workspace — workspace root `Cargo.toml` at the repo root, member crates under `crates/` (`kindling-types`, `-store`, `-filter`, `-provider`, `-service`, `-server`, `-client`, `-hook`, `-cli`, umbrella `kindling`)
 - Single statically-linked `kindling` binary covering hook, CLI, and daemon
 - `kindling serve` long-running daemon: Unix domain socket transport (TCP fallback on Windows), per-user single instance, idle shutdown, project routing, WAL-mode SQLite
 - HTTP/1 over UDS API (v1) covering capsules, observations, retrieval, pins, health
@@ -43,7 +43,7 @@ Supersedes `02-rust-hook-binary` and `03-rust-cli`. Replaces the dual-maintain p
 
 **Exposes:**
 
-- `crates/` workspace at repo root, built with `cargo build --workspace --release`
+- Cargo workspace — root `Cargo.toml` at the repo root, member crates under `crates/` — built with `cargo build --workspace --release` from the repo root
 - `kindling` binary (single statically-linked artifact) — `kindling serve`, `kindling hook`, `kindling <cli>`
 - `@eddacraft/kindling` (thin client, postinstall-binary) on npm
 - Generated TypeScript types via `ts-rs`, bundled into `@eddacraft/kindling`

@@ -173,7 +173,7 @@ Out of scope. The `kindling-store-sqljs` package goes away. If a real browser co
 | `kindling-cli`         | clap subcommands wrapping `kindling-service` or `-client` |
 | `kindling`             | Umbrella binary — dispatches to hook / CLI / server |
 
-Workspace lives at `crates/` in this repo. Existing `packages/` directory shrinks to: `@eddacraft/kindling` (thin client) + adapter packages, all of which become consumers of the daemon.
+The workspace root `Cargo.toml` lives at the repo root with `members = ["crates/*"]`; member crates live under `crates/`. Existing `packages/` directory shrinks to: `@eddacraft/kindling` (thin client) + adapter packages, all of which become consumers of the daemon.
 
 ## Migration Path
 
