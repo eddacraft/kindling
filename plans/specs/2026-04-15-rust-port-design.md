@@ -1,12 +1,16 @@
 # Rust Port — Design Spec
 
-| Field      | Value                                |
-| ---------- | ------------------------------------ |
-| Status     | Ready for review                     |
-| Owner      | @aneki                               |
-| Created    | 2026-04-15                           |
-| Supersedes | `02-rust-hook-binary`, `03-rust-cli` |
-| APS Module | `plans/modules/05-rust-port.aps.md`  |
+| Field        | Value                                                          |
+| ------------ | -------------------------------------------------------------- |
+| Status       | Superseded                                                     |
+| Owner        | @aneki                                                         |
+| Created      | 2026-04-15                                                     |
+| Superseded   | 2026-05-03                                                     |
+| Superseded by | `plans/specs/2026-05-03-rust-canonical-thin-client-design.md` |
+| Supersedes   | `02-rust-hook-binary`, `03-rust-cli`                           |
+| APS Module   | `plans/modules/05-rust-port.aps.md`                            |
+
+> **Note (2026-05-03):** This spec proposed *dual-maintain* Rust + TS with Rust-canonical types via `ts-rs`. After review, the plan changed: Rust becomes the **only** implementation, accessed by non-Rust consumers via a long-running local daemon (`kindling serve`) over a Unix domain socket. The TypeScript surface collapses to a single thin HTTP client package. See the superseding spec for the daemon model, transport, distribution, and TS package deprecation strategy.
 
 ## Context
 

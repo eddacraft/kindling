@@ -1,0 +1,8 @@
+# Pinned to a specific stable release so rustfmt / clippy results are
+# reproducible across machines and over time. Bump intentionally — a new
+# stable can introduce lints that fail CI without any code change here.
+# Keep this >= the workspace `rust-version` (MSRV) in Cargo.toml.
+[toolchain]
+channel = "1.95.0"
+components = ["rustfmt", "clippy"]
+profile = "minimal"
