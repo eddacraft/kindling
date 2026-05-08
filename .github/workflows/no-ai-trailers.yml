@@ -1,0 +1,57 @@
+name: no-ai-trailers
+
+on:
+  pull_request:
+    branches: [dev, main]
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: scan PR commits for AI provenance leaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reject AI-tooling tells in commit messages
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -eu
+
+          patterns=(
+            'Co-Authored-By: Claude'
+            'co-authored-by: claude'
+            'claude\.ai/code/session_'
+            'noreply@anthropic\.com'
+            'Generated with \[Claude Code\]'
+            '🤖 Generated with'
+          )
+
+          range="$BASE..$HEAD"
+          violators=$(
+            git log --format='%H%n%B%n--END--' "$range" \
+              | awk -v RS='--END--\n' 'NF { print $0 }'
+          )
+
+          fail=0
+          while IFS= read -r sha; do
+            [ -z "$sha" ] && continue
+            body=$(git log -1 --format='%B' "$sha")
+            for p in "${patterns[@]}"; do
+              if printf '%s' "$body" | grep -qE "$p"; then
+                echo "::error::commit $sha leaks AI provenance — matches: $p"
+                fail=1
+              fi
+            done
+          done < <(git log --format='%H' "$range")
+
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::Reword the offending commits before merging."
+            exit 1
+          fi
+          echo "no AI provenance leaks found in $(git rev-list --count "$range") commits"
