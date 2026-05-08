@@ -7,10 +7,6 @@ Local memory and continuity engine for AI-assisted development.
 
 **Kindling** captures observations (tool calls, diffs, commands, errors) from AI workflows, organizes them into capsules, and makes context retrievable with deterministic, explainable results. All data is stored locally using embedded SQLite with FTS5.
 
-**Kindling** captures what happened.
-**Anvil** enforces what should happen.
-Request access to the Anvil closed beta → [eddacraft.ai](https://eddacraft.ai)
-
 ## Installation
 
 ```bash
@@ -129,3 +125,7 @@ Full documentation at [docs.eddacraft.ai/docs/kindling](https://docs.eddacraft.a
 ## License
 
 Apache-2.0
+
+## Related
+
+- [Anvil](https://eddacraft.ai) — policy and enforcement layer for AI-assisted development; complements Kindling by enforcing what should happen rather than capturing what did.

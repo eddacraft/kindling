@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Block commit messages that leak AI-tooling provenance.
+#
+# Rejects:
+#   - "Co-Authored-By: Claude*" (Claude Code's default trailer)
+#   - claude.ai/code/session_* URLs (Claude Code session links)
+#   - noreply@anthropic.com authorship references
+#   - "Generated with Claude Code" / "🤖 Generated with" footers
+#
+# Override: COMMIT_ALLOW_AI_TRAILERS=1 git commit ... (use only when intentional).
+
+set -eu
+
+msg_file="$1"
+
+if [ "${COMMIT_ALLOW_AI_TRAILERS:-0}" = "1" ]; then
+  exit 0
+fi
+
+# Strip standard comment lines so we only inspect actual message content.
+content=$(grep -v '^#' "$msg_file" || true)
+
+found=""
+case "$content" in
+  *"Co-Authored-By: Claude"*)              found="Co-Authored-By: Claude trailer" ;;
+  *"co-authored-by: claude"*)              found="co-authored-by: claude trailer" ;;
+  *"claude.ai/code/session_"*)             found="claude.ai/code/session_* URL" ;;
+  *"noreply@anthropic.com"*)               found="noreply@anthropic.com reference" ;;
+  *"Generated with [Claude Code]"*)        found="Generated with [Claude Code] footer" ;;
+  *"🤖 Generated with"*)                    found="🤖 Generated with footer" ;;
+esac
+
+if [ -n "$found" ]; then
+  echo "✖ commit-msg blocked: message contains $found." >&2
+  echo "  Remove the line, or set COMMIT_ALLOW_AI_TRAILERS=1 if this is intentional." >&2
+  exit 1
+fi

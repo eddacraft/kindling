@@ -149,15 +149,18 @@ Or capture manually with the CLI (`kindling log`, `kindling capsule open/close`)
 
 ## Packages
 
-| Package                                                                              | Description                                                   |
-| ------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
-| [`@eddacraft/kindling`](./packages/kindling)                                         | **Main package**: core + SQLite store + provider + API server |
-| [`@eddacraft/kindling-cli`](./packages/kindling-cli)                                 | CLI for reading, writing, and managing memory                 |
-| [`@eddacraft/kindling-core`](./packages/kindling-core)                               | Lightweight types + KindlingService (for adapter authors)     |
-| [`@eddacraft/kindling-store-sqljs`](./packages/kindling-store-sqljs)                 | sql.js WASM store (browser environments)                      |
-| [`@eddacraft/kindling-adapter-claude-code`](./packages/kindling-adapter-claude-code) | Claude Code hooks integration                                 |
-| [`@eddacraft/kindling-adapter-opencode`](./packages/kindling-adapter-opencode)       | OpenCode session integration                                  |
-| [`@eddacraft/kindling-adapter-pocketflow`](./packages/kindling-adapter-pocketflow)   | PocketFlow workflow integration                               |
+| Package                                                                              | Description                                                              |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
+| [`@eddacraft/kindling`](./packages/kindling)                                         | **Main package**: re-exports core + SQLite store + local FTS provider    |
+| [`@eddacraft/kindling-core`](./packages/kindling-core)                               | Domain types, KindlingService, validation (for adapter authors, browser) |
+| [`@eddacraft/kindling-store-sqlite`](./packages/kindling-store-sqlite)               | SQLite persistence with FTS5 and WAL mode                                |
+| [`@eddacraft/kindling-store-sqljs`](./packages/kindling-store-sqljs)                 | sql.js WASM store for browser compatibility                              |
+| [`@eddacraft/kindling-provider-local`](./packages/kindling-provider-local)           | Local FTS-based retrieval provider with deterministic ranking            |
+| [`@eddacraft/kindling-server`](./packages/kindling-server)                           | HTTP API server for multi-agent concurrency (Fastify)                    |
+| [`@eddacraft/kindling-cli`](./packages/kindling-cli)                                 | CLI tools for inspection, search, and management                         |
+| [`@eddacraft/kindling-adapter-opencode`](./packages/kindling-adapter-opencode)       | OpenCode session integration                                             |
+| [`@eddacraft/kindling-adapter-pocketflow`](./packages/kindling-adapter-pocketflow)   | PocketFlow workflow integration with intent and confidence tracking      |
+| [`@eddacraft/kindling-adapter-claude-code`](./packages/kindling-adapter-claude-code) | Claude Code hooks integration                                            |
 
 ## Programmatic Usage
 
@@ -213,21 +216,6 @@ service.closeCapsule(capsule.id, {
 db.close();
 ```
 
-## Packages
-
-| Package                                                                              | Description                                                              |
-| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
-| [`@eddacraft/kindling`](./packages/kindling)                                         | **Main package**: re-exports core + SQLite store + local FTS provider    |
-| [`@eddacraft/kindling-core`](./packages/kindling-core)                               | Domain types, KindlingService, validation (for adapter authors, browser) |
-| [`@eddacraft/kindling-store-sqlite`](./packages/kindling-store-sqlite)               | SQLite persistence with FTS5 and WAL mode                                |
-| [`@eddacraft/kindling-store-sqljs`](./packages/kindling-store-sqljs)                 | sql.js WASM store for browser compatibility                              |
-| [`@eddacraft/kindling-provider-local`](./packages/kindling-provider-local)           | Local FTS-based retrieval provider with deterministic ranking            |
-| [`@eddacraft/kindling-server`](./packages/kindling-server)                           | HTTP API server for multi-agent concurrency (Fastify)                    |
-| [`@eddacraft/kindling-cli`](./packages/kindling-cli)                                 | CLI tools for inspection, search, and management                         |
-| [`@eddacraft/kindling-adapter-opencode`](./packages/kindling-adapter-opencode)       | OpenCode session integration                                             |
-| [`@eddacraft/kindling-adapter-pocketflow`](./packages/kindling-adapter-pocketflow)   | PocketFlow workflow integration with intent and confidence tracking      |
-| [`@eddacraft/kindling-adapter-claude-code`](./packages/kindling-adapter-claude-code) | Claude Code hooks integration                                            |
-
 ## Architecture
 
 ```diagram
@@ -259,28 +247,6 @@ db.close();
      │                              │
      │  API Server (Fastify)        │
      └──────────────────────────────┘
-```
-
-## CLI Usage
-
-```bash
-# Show database status
-kindling status
-
-# Search for context
-kindling search "authentication error"
-kindling search --session session-123
-
-# List entities
-kindling list capsules
-kindling list pins
-kindling list observations
-
-# Pin important findings
-kindling pin observation obs_abc123 --note "Root cause identified"
-
-# Remove a pin
-kindling unpin pin_xyz789
 ```
 
 ## Core Concepts
