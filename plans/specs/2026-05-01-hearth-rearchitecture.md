@@ -5,7 +5,6 @@
 | Status    | Brainstorm / proposal — pre-ADR                                               |
 | Owner     | @joshuaboys                                                                   |
 | Created   | 2026-05-01                                                                    |
-| Branch    | `claude/rearchitect-hearth-daemon-RbDYw`                                      |
 | Scope     | EddaCraft stack across `eddacraft/anvil-001` + `eddacraft/kindling`           |
 | Mirror of | `eddacraft/anvil-001` `plans/brainstorms/2026-05-01-hearth-rearchitecture.md` |
 
@@ -487,7 +486,7 @@ This is **a sketch**, not a contract — use the existing APS planning surface t
 | Horizon                                       | Headline                                                                                                                                         | Crates new/touched                                                                                        |
 | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
 | **H2** (next release, slate already drafting) | Rename intercept → hearth; add forge-retrieval skeleton; ship Kindling Rust crates; preserve current behaviour. **No new user-facing features.** | hearth-\* renames, kindling-types/store/provider/service/filter/hook, forge-retrieval (no consumers yet). |
-| **H3**                                        | Wire forge-retrieval into Ember + Edda Rust modules; ts-rs projections; delete `packages/kindling-integration` and `packages/anvil/runtime`.     | ember-_, edda-_, ts-rs export pipeline.                                                                   |
+| **H3**                                        | Wire forge-retrieval into Ember + Edda Rust modules; ts-rs projections; delete `packages/kindling-integration` and `packages/anvil/runtime`.     | `ember-*`, `edda-*`, ts-rs export pipeline.                                                               |
 | **H4** (the substrate-unlock release)         | Anvil kernel symbol embeddings + ADP + BDR + PAW + IMR ship. EU AI Act-aligned audit trail surfaces.                                             | anvil-symbol-index, kernel ADP path, MCP `query_edda`, VS Code driver re-introduction (DRVR-003).         |
 | **H5**                                        | Cross-project pattern library (Hearth-v2 federation); web dashboard.                                                                             | (deferred from this rearchitecture)                                                                       |
 
