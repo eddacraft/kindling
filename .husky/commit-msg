@@ -18,16 +18,16 @@ if [ "${COMMIT_ALLOW_AI_TRAILERS:-0}" = "1" ]; then
 fi
 
 # Strip standard comment lines so we only inspect actual message content.
-content=$(grep -v '^#' "$msg_file" || true)
+# Normalize to lowercase so trailer/footer checks are case-insensitive.
+content=$(grep -v '^#' "$msg_file" | tr '[:upper:]' '[:lower:]' || true)
 
 found=""
 case "$content" in
-  *"Co-Authored-By: Claude"*)              found="Co-Authored-By: Claude trailer" ;;
   *"co-authored-by: claude"*)              found="co-authored-by: claude trailer" ;;
   *"claude.ai/code/session_"*)             found="claude.ai/code/session_* URL" ;;
   *"noreply@anthropic.com"*)               found="noreply@anthropic.com reference" ;;
-  *"Generated with [Claude Code]"*)        found="Generated with [Claude Code] footer" ;;
-  *"🤖 Generated with"*)                    found="🤖 Generated with footer" ;;
+  *"generated with [claude code]"*)        found="Generated with [Claude Code] footer" ;;
+  *"🤖 generated with"*)                    found="🤖 Generated with footer" ;;
 esac
 
 if [ -n "$found" ]; then
