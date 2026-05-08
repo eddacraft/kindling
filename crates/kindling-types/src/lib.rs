@@ -1,7 +1,27 @@
 //! Canonical Kindling domain types.
 //!
-//! This crate defines `Observation`, `Capsule`, `Retrieval`, `ScopeIds`, and
-//! related types as the source of truth for both the Rust implementation and
-//! the generated TypeScript projection (via `ts-rs`).
+//! This crate is the source of truth for the wire-format shapes shared between
+//! the Rust implementation and TypeScript consumers. Each public type
+//! round-trips through the JSON encoding produced by the existing TypeScript
+//! definitions in `packages/kindling-core/src/types/`.
 //!
-//! Filled in by PORT-002.
+//! Enable the `ts-rs` feature to derive the TypeScript projection — running
+//! `cargo test -p kindling-types --features ts-rs` writes the corresponding
+//! `.ts` files into `crates/kindling-types/bindings/`.
+
+pub mod capsule;
+pub mod common;
+pub mod observation;
+pub mod pin;
+pub mod retrieval;
+pub mod summary;
+
+pub use capsule::{Capsule, CapsuleInput, CapsuleStatus, CapsuleType};
+pub use common::{Id, ScopeIds, Timestamp, ValidationError};
+pub use observation::{Observation, ObservationInput, ObservationKind};
+pub use pin::{is_pin_active, Pin, PinInput, PinTargetType};
+pub use retrieval::{
+    CandidateResult, PinResult, ProviderSearchOptions, ProviderSearchResult, RetrieveOptions,
+    RetrieveProvenance, RetrieveResult, RetrievedEntity,
+};
+pub use summary::{is_valid_confidence, Summary, SummaryInput};
