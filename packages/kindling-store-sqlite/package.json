@@ -1,6 +1,6 @@
 {
   "name": "@eddacraft/kindling-store-sqlite",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "SQLite persistence layer for Kindling with FTS5 full-text search and WAL mode",
   "type": "module",
   "main": "./dist/index.js",
