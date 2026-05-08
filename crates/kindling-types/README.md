@@ -23,7 +23,11 @@ Rust change without also refreshing the bindings.
 - All structs are camelCase on the wire (`scope_ids` → `scopeIds`).
 - Enum variants are snake_case strings (`ToolCall` → `tool_call`).
 - Optional fields are omitted from JSON when `None`, never serialised as `null`.
-- `Timestamp` and counts are plain JSON numbers; `i64` and `u64` are not used
-  in public types (avoids the `bigint` hazard on the TypeScript side).
+- `Timestamp` and counts are plain JSON numbers. `Timestamp` is an `i64`
+  alias (epoch milliseconds) and is the only integer wider than `i32` in
+  public types; every field that holds a `Timestamp` carries a
+  `#[ts(type = "number")]` override so the TypeScript projection emits
+  `number`, not `bigint`. New fields with `Timestamp` must carry the same
+  override — the round-trip and bindings tests will fail otherwise.
 - `RetrievedEntity` is an untagged union of `Observation | Summary` so it
   matches the structural union TS already uses.

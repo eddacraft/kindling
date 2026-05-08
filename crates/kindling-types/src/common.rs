@@ -7,6 +7,13 @@ use ts_rs::TS;
 pub type Id = String;
 
 /// Timestamp in epoch milliseconds.
+///
+/// Aliased to `i64` to keep arithmetic ergonomic in Rust. Every public field
+/// that holds a `Timestamp` MUST carry a `#[cfg_attr(feature = "ts-rs",
+/// ts(type = "number"))]` override (use `ts(optional, type = "number")` for
+/// `Option<Timestamp>`); without it the `ts-rs` projection would emit
+/// `bigint`, breaking the JSON `number` wire contract. Round-trip and
+/// bindings tests will fail if the override is missed.
 pub type Timestamp = i64;
 
 /// Scope identifiers for multi-dimensional isolation.
