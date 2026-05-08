@@ -1,6 +1,6 @@
 {
   "name": "@eddacraft/kindling-adapter-opencode",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "OpenCode session adapter for Kindling - capture tool calls, commands, and file changes from AI coding sessions",
   "type": "module",
   "main": "./dist/index.js",

@@ -1,6 +1,6 @@
 {
   "name": "@eddacraft/kindling",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Local memory and continuity engine for AI-assisted development",
   "type": "module",
   "main": "./dist/index.js",
