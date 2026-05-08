@@ -1,0 +1,52 @@
+{
+  "pins": [
+    {
+      "pin": {
+        "id": "01J8XS7PIN0000000000000000001",
+        "targetType": "observation",
+        "targetId": "01J8XS7OBSERVATION0000000001",
+        "createdAt": 1746662400000,
+        "scopeIds": {
+          "sessionId": "01J8XS7ABCDEF0123456789ABC"
+        }
+      },
+      "target": {
+        "id": "01J8XS7OBSERVATION0000000001",
+        "kind": "tool_call",
+        "content": "rg --files src/",
+        "provenance": {
+          "toolName": "ripgrep"
+        },
+        "ts": 1746662400000,
+        "scopeIds": {
+          "sessionId": "01J8XS7ABCDEF0123456789ABC"
+        },
+        "redacted": false
+      }
+    }
+  ],
+  "candidates": [
+    {
+      "entity": {
+        "id": "01J8XS7SUMMARY00000000000001",
+        "capsuleId": "01J8XS7CAPSULE0000000000002",
+        "content": "Identified missing token rotation in auth middleware.",
+        "confidence": 0.82,
+        "createdAt": 1746662460000,
+        "evidenceRefs": []
+      },
+      "score": 0.91,
+      "matchContext": "auth middleware"
+    }
+  ],
+  "provenance": {
+    "query": "auth middleware",
+    "scopeIds": {
+      "sessionId": "01J8XS7ABCDEF0123456789ABC"
+    },
+    "totalCandidates": 12,
+    "returnedCandidates": 1,
+    "truncatedDueToTokenBudget": false,
+    "providerUsed": "local-fts"
+  }
+}

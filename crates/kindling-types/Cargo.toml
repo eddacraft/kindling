@@ -10,3 +10,14 @@ rust-version.workspace = true
 
 [lints]
 workspace = true
+
+[features]
+# Enable ts-rs derives so `cargo test --features ts-rs` writes the TypeScript
+# projection of every public type into `bindings/`. Off by default to keep the
+# crate's normal compile cheap and free of dev-only dependencies.
+ts-rs = ["dep:ts-rs"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+ts-rs = { version = "11", optional = true, features = ["serde-json-impl"] }

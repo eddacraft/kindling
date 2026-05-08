@@ -1,0 +1,14 @@
+{
+  "id": "01J8XS7CAPSULE0000000000001",
+  "type": "session",
+  "intent": "Fix authentication bug",
+  "status": "open",
+  "openedAt": 1746662400000,
+  "scopeIds": {
+    "sessionId": "01J8XS7ABCDEF0123456789ABC"
+  },
+  "observationIds": [
+    "01J8XS7OBSERVATION0000000001",
+    "01J8XS7OBSERVATION0000000002"
+  ]
+}

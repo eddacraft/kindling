@@ -1,0 +1,16 @@
+{
+  "id": "01J8XS7OBSERVATION0000000001",
+  "kind": "tool_call",
+  "content": "rg --files src/",
+  "provenance": {
+    "toolName": "ripgrep",
+    "exitCode": 0,
+    "durationMs": 47
+  },
+  "ts": 1746662400000,
+  "scopeIds": {
+    "sessionId": "01J8XS7ABCDEF0123456789ABC",
+    "repoId": "/home/dev/kindling"
+  },
+  "redacted": false
+}

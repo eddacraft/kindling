@@ -1,0 +1,11 @@
+{
+  "id": "01J8XS7PIN0000000000000000001",
+  "targetType": "observation",
+  "targetId": "01J8XS7OBSERVATION0000000001",
+  "reason": "Critical context for auth flow",
+  "createdAt": 1746662400000,
+  "expiresAt": 1746748800000,
+  "scopeIds": {
+    "sessionId": "01J8XS7ABCDEF0123456789ABC"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "id": "01J8XS7CAPSULE0000000000002",
+  "type": "pocketflow_node",
+  "intent": "Run retrieval node",
+  "status": "closed",
+  "openedAt": 1746662400000,
+  "closedAt": 1746662460000,
+  "scopeIds": {
+    "sessionId": "01J8XS7ABCDEF0123456789ABC",
+    "repoId": "/home/dev/kindling"
+  },
+  "observationIds": [
+    "01J8XS7OBSERVATION0000000003"
+  ],
+  "summaryId": "01J8XS7SUMMARY00000000000001"
+}
