@@ -64,11 +64,11 @@ Supersedes `02-rust-hook-binary` and `03-rust-cli`. Replaces the dual-maintain p
 
 ## Phases
 
-| Phase | Tasks         | Outcome                                                                                            |
-| ----- | ------------- | -------------------------------------------------------------------------------------------------- |
-| 1     | PORT-001..004 | Foundation: workspace, types, store, filter                                                        |
-| 2     | PORT-005..011 | Service + daemon + hook + Rust client; Anvil unblocks                                              |
-| 3     | PORT-012..015 | CLI + umbrella binary + cross-platform builds + native distribution (cargo, brew, curl)            |
+| Phase | Tasks         | Outcome                                                                                             |
+| ----- | ------------- | --------------------------------------------------------------------------------------------------- |
+| 1     | PORT-001..004 | Foundation: workspace, types, store, filter                                                         |
+| 2     | PORT-005..011 | Service + daemon + hook + Rust client; Anvil unblocks                                               |
+| 3     | PORT-012..015 | CLI + umbrella binary + cross-platform builds + native distribution (cargo, brew, curl)             |
 | 4     | PORT-016..020 | Thin TS client SDK + npm postinstall release; deprecate TS implementation packages and Anvil bridge |
 
 ## Tasks
@@ -87,7 +87,7 @@ Supersedes `02-rust-hook-binary` and `03-rust-cli`. Replaces the dual-maintain p
 - **Intent:** Canonical Rust definitions for `Observation`, `Capsule`, `Retrieval`, `ScopeIds`, `Id`, `Timestamp`, `Result<T>` with `ts-rs` derives
 - **Expected Outcome:** Types in `kindling-types` match shapes in `packages/kindling-core/src/types/*.ts`; `#[derive(TS)]` produces `.d.ts` output that round-trips JSON with the existing TS shapes; export task wired up
 - **Validation:** `cargo test -p kindling-types` passes including round-trip tests against sample JSON fixtures; `cargo test -p kindling-types --features ts-rs` writes `.d.ts` files cleanly
-- **Status:** Done — `feat/rust-port-types`. 16 round-trip tests + 22 ts-rs derive tests + 1 export test pass; bindings written to `crates/kindling-types/bindings/` and committed; CI gate `ts-bindings` job fails on drift. `Result<T, E>` excluded as it's a TS control-flow shape — Rust uses native `std::result::Result`. `i64`/`u64` avoided in public types so the TS projection emits `number`, not `bigint`, matching the existing wire format.
+- **Status:** Done — `feat/rust-port-types`. 16 round-trip tests + 22 ts-rs derive tests + 1 export test pass; bindings written to `crates/kindling-types/bindings/` and committed; CI gate `ts-bindings` job fails on drift. `Result<T, E>` excluded as it's a TS control-flow shape — Rust uses native `std::result::Result`. `Timestamp` is the only integer wider than `i32` in public types (an `i64` alias for epoch ms); every field that uses it carries a `#[ts(type = "number")]` override so the TS projection emits `number`, not `bigint`, matching the existing wire format.
 - **Dependencies:** PORT-001
 
 #### PORT-003: kindling-store crate
