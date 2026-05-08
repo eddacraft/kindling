@@ -1,0 +1,11 @@
+{
+  "id": "01J8XS7SUMMARY00000000000001",
+  "capsuleId": "01J8XS7CAPSULE0000000000002",
+  "content": "Identified missing token rotation in auth middleware.",
+  "confidence": 0.82,
+  "createdAt": 1746662460000,
+  "evidenceRefs": [
+    "01J8XS7OBSERVATION0000000003",
+    "01J8XS7OBSERVATION0000000004"
+  ]
+}

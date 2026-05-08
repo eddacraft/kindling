@@ -57,6 +57,21 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --workspace
 
+  ts-bindings:
+    name: ts-rs bindings up to date
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test -p kindling-types --features ts-rs
+      - name: Fail if bindings drifted
+        run: |
+          if ! git diff --exit-code -- crates/kindling-types/bindings; then
+            echo "::error::TypeScript bindings are out of date. Run: cargo test -p kindling-types --features ts-rs"
+            exit 1
+          fi
+
   build:
     name: cargo build --release
     runs-on: ubuntu-latest
