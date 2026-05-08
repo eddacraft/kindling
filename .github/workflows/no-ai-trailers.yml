@@ -23,25 +23,22 @@ jobs:
         run: |
           set -eu
 
+          # Lowercase patterns; commit bodies are normalised to lowercase
+          # before matching so case variants ("Co-Authored-By", "CO-AUTHORED-BY",
+          # etc.) all hit the same rule.
           patterns=(
-            'Co-Authored-By: Claude'
             'co-authored-by: claude'
             'claude\.ai/code/session_'
             'noreply@anthropic\.com'
-            'Generated with \[Claude Code\]'
-            '🤖 Generated with'
+            'generated with \[claude code\]'
+            '🤖 generated with'
           )
 
           range="$BASE..$HEAD"
-          violators=$(
-            git log --format='%H%n%B%n--END--' "$range" \
-              | awk -v RS='--END--\n' 'NF { print $0 }'
-          )
-
           fail=0
           while IFS= read -r sha; do
             [ -z "$sha" ] && continue
-            body=$(git log -1 --format='%B' "$sha")
+            body=$(git log -1 --format='%B' "$sha" | tr '[:upper:]' '[:lower:]')
             for p in "${patterns[@]}"; do
               if printf '%s' "$body" | grep -qE "$p"; then
                 echo "::error::commit $sha leaks AI provenance — matches: $p"

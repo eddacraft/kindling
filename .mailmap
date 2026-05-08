@@ -1,8 +1,11 @@
 # .mailmap — display-name normalisation for git log / GitHub.
 #
 # Maps inconsistent author names to a canonical display name without
-# rewriting history. Format: <canonical name> <commit email> <commit name> <commit email>.
-# See `git help mailmap`.
+# rewriting history. Each line below uses git's full form:
+#   <Proper Name> <proper@email> <Commit Name> <commit@email>
+# which replaces both the name and the email when a matching commit
+# (Commit Name + commit@email) is rendered. See `git help mailmap`
+# for the other supported variants.
 
 Josh Boys <aneki@eddacraft.ai> aneki <josh@eddacraft.ai>
 Josh Boys <aneki@eddacraft.ai> aneki <josh@eddacraft.io>
