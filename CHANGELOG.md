@@ -88,7 +88,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub sync commands for Claude Code Web integration
 - Automatic secret detection and redaction
 - Export/import functionality for data portability
-- Comprehensive test coverage across all packages
+- Test coverage across all packages
 
 ### Security
 
