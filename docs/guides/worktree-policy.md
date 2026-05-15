@@ -4,22 +4,20 @@
 
 Use git worktrees as lightweight execution spaces for active branches.
 
-Kindling keeps two permanent anchor worktrees and treats everything else as
+Kindling keeps one permanent anchor worktree and treats everything else as
 disposable.
 
 ## Permanent Worktrees
 
-Keep exactly two long-lived worktrees:
+Keep exactly one long-lived worktree:
 
 1. `main`
-2. `dev`
 
 Suggested directories:
 
 - `../kindling.main`
-- `../kindling.dev`
 
-These are the stable anchors for release and integration work.
+This is the stable anchor for integration and release work.
 
 ## Disposable Worktrees
 
@@ -51,7 +49,7 @@ Disposable worktrees reduce drift and maintenance overhead.
 Permanent feature worktrees tend to accumulate:
 
 - stale branches
-- hidden divergence from `dev`
+- hidden divergence from `main`
 - rebasing overhead
 - unfinished work that feels active but is not moving
 
@@ -59,8 +57,8 @@ The branch or PR is the unit of work. The worktree is just the workspace.
 
 ## Branch Creation Rules
 
-1. Create normal work branches from `dev`.
-2. Create release branches from `dev`.
+1. Create normal work branches from `main`.
+2. Create release branches from `main`.
 3. Create hotfix branches from `main` or the active `release/*` branch.
 4. Merge completed work into its target branch, then remove the worktree.
 
@@ -105,13 +103,12 @@ Review open worktrees at least twice a week. Check for:
 1. merged branches that still have a worktree
 2. stale branches with no recent progress
 3. branches that should be split or rebased
-4. streams that should be promoted into `dev`
+4. streams that should be merged into `main`
 
 ## Relationship to Branching
 
 Worktree policy supports the [branching strategy](branching-strategy.md):
 
-1. `main` remains stable.
-2. `dev` remains the integration branch.
-3. Disposable worktrees support parallel execution without turning every stream
+1. `main` remains stable and publishable.
+2. Disposable worktrees support parallel execution without turning every stream
    into a permanent branch.

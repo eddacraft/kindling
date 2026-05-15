@@ -2,7 +2,7 @@ name: no-ai-trailers
 
 on:
   pull_request:
-    branches: [dev, main]
+    branches: [main]
 
 permissions:
   contents: read

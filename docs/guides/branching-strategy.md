@@ -2,54 +2,51 @@
 
 ## Overview
 
-Kindling uses a two-branch model that supports active development across
-multiple parallel streams while keeping releases stable and predictable:
+Kindling uses a single permanent branch model that supports active development
+across short-lived work branches while keeping releases stable and predictable:
 
-- `main` is the stable release branch.
-- `dev` is the active integration branch.
+- `main` is the default branch, integration branch, and release branch.
 
-The key rule is cadence: `dev` is a short-horizon integration branch, not a
-long-lived alternate product line. The model only works if release promotion
-is frequent and every `main`-only fix is merged back quickly.
+The key rule is branch hygiene: all work happens on short-lived branches and
+lands through PRs to `main`. `main` must stay publishable at all times.
 
 ## Branches
 
-| Branch                                 | Purpose                                                                        | Protection                                              |
-| -------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------- |
-| `main`                                 | Stable branch for npm releases. Always publishable.                            | PRs only. Full release CI gate.                         |
-| `dev`                                  | Active integration branch for day-to-day work from multiple streams.           | PRs required. Standard CI.                              |
-| `release/x.y` or `release/x.y.z`       | Temporary release stabilisation branch cut from `dev`.                         | PRs or maintainer-only pushes during release hardening. |
-| `feat/*`, `fix/*`, `docs/*`, `chore/*` | Short-lived work branches created from `dev`.                                  | Disposable.                                             |
-| `hotfix/*`                             | Urgent production fix branch created from `main` or the active release branch. | Disposable.                                             |
+| Branch                                 | Purpose                                                                            | Protection                                              |
+| -------------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `main`                                 | Default integration branch and stable branch for npm releases. Always publishable. | PRs only. Full CI gate.                                 |
+| `release/x.y` or `release/x.y.z`       | Temporary release stabilisation branch cut from `main`.                            | PRs or maintainer-only pushes during release hardening. |
+| `feat/*`, `fix/*`, `docs/*`, `chore/*` | Short-lived work branches created from `main`.                                     | Disposable.                                             |
+| `hotfix/*`                             | Urgent production fix branch created from `main` or the active release branch.     | Disposable.                                             |
 
 ## Workflow
 
 ```text
-feat/*  ──PR──► dev ──PR──► main
-fix/*   ──PR──► dev ──PR──► main
-docs/*  ──PR──► dev ──PR──► main
+feat/*  ──PR──► main
+fix/*   ──PR──► main
+docs/*  ──PR──► main
 
-dev ──cut──► release/x.y.z ──PR──► main ──merge back──► dev
-main ──branch──► hotfix/* ──PR──► main ──merge back──► dev
+main ──cut──► release/x.y.z ──PR──► main
+main ──branch──► hotfix/* ──PR──► main
 ```
 
 ## Normal Development
 
-1. Create feature, fix, docs, and chore branches from `dev`.
-2. Merge completed work into `dev` continuously.
+1. Create feature, fix, docs, and chore branches from `main`.
+2. Merge completed work into `main` through PRs.
 3. Keep branches small and short-lived.
 4. Use APS plans (in `plans/`) and work-item IDs for planning. Branch structure
    should reflect code flow, not roadmap ownership.
 
 ## Release Flow
 
-1. Promote `dev` to `main` frequently.
-2. For low-risk releases, open a direct `dev → main` release PR.
-3. For higher-risk releases, cut `release/x.y` or `release/x.y.z` from `dev`.
+1. Keep `main` release-ready by requiring CI before merge.
+2. For low-risk releases, tag directly from `main` after version and changelog
+   updates land.
+3. For higher-risk releases, cut `release/x.y` or `release/x.y.z` from `main`.
 4. Allow only release hardening on `release/*`: bug fixes, packaging, docs,
    changelog, and version bumps.
-5. Merge `release/*` into `main`, tag the release, then merge the release branch
-   back into `dev` immediately.
+5. Merge `release/*` into `main`, then tag the release.
 6. Tagging `vX.Y.Z` on `main` and creating a GitHub Release triggers
    `.github/workflows/publish.yml`, which publishes all packages to npm.
 
@@ -60,23 +57,20 @@ See the [release runbook](release-runbook.md) for the full step-by-step.
 1. Branch `hotfix/*` from `main` or the active `release/*` branch.
 2. Merge the fix into the release target first.
 3. Tag the patch release if needed.
-4. Merge the same fix back into `dev` on the same day.
 
 ## Cadence Rules
 
-1. Promote `dev → main` at least weekly while there is active development.
-2. During heavy development, prefer promotion every 2–3 days.
+1. Keep work branches under a few days where practical.
+2. During heavy development, merge small PRs frequently rather than batching.
 3. Do not allow `release/*` branches to live for weeks.
-4. If the `dev → main` PR feels too large to review comfortably, promotion is
-   already overdue.
-5. If a fix lands on `main`, it is not complete until `dev` has it too.
+4. If a PR feels too large to review comfortably, split it before merging.
 
 ## Divergence Guardrails
 
-1. `main` and `dev` must stay close enough that promotion remains routine.
-2. Stop queuing new release work if `main...dev` grows beyond a small,
-   reviewable change set.
-3. Avoid long-lived release-only changes on `main`.
+1. Avoid long-lived release-only changes.
+2. Keep release hardening scoped to `release/*` and merge it back to `main` as
+   soon as it is stable.
+3. Rebase or recreate stale work branches before opening PRs.
 
 ## Branch Naming
 
@@ -89,19 +83,12 @@ See the [release runbook](release-runbook.md) for the full step-by-step.
 
 ## CI Tiers
 
-### PRs to `dev` (lightweight)
+### PRs to `main`
 
 - Build
 - Type check
 - Lint
 - Unit tests (Linux, current LTS Node)
-
-### PRs to `main` (release gate)
-
-All of the above plus:
-
-- Cross-platform smoke tests (macOS and Windows) — verifies prebuilt binary
-  targets before publish.
 
 ### Publish (`publish.yml`)
 
@@ -111,11 +98,9 @@ All of the above plus:
 
 ## Why this model
 
-Kindling regularly has multiple active streams in flight (DX hardening, plugin
-work, Rust port planning, adapter changes). `dev` provides a safe integration
-target before release while `main` stays publishable at any time. The process
-fails when promotion waits too long, because release fixes accumulate on `main`
-and structural work continues on `dev`.
+Kindling is maintained by a single operator, so a permanent integration branch
+adds coordination overhead without much safety. Short-lived branches preserve
+parallel work while keeping the repository's source of truth on `main`.
 
 ## Related Docs
 

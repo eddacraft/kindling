@@ -2,7 +2,7 @@ name: rust
 
 on:
   push:
-    branches: [dev, main]
+    branches: [main]
     paths:
       - 'crates/**'
       - 'Cargo.toml'
@@ -10,7 +10,7 @@ on:
       - 'rust-toolchain.toml'
       - '.github/workflows/rust.yml'
   pull_request:
-    branches: [dev, main]
+    branches: [main]
     paths:
       - 'crates/**'
       - 'Cargo.toml'

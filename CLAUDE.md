@@ -127,24 +127,20 @@ ESM-only (`"type": "module"`) with `.js` extensions in imports.
 
 ## Branching Workflow
 
-This repository uses a `main`/`dev` model that supports multiple active
-streams in parallel worktrees.
+This repository uses a single permanent branch model with short-lived work
+branches.
 
-- `main` is the stable release branch.
-- `dev` is the active integration branch.
-- normal feat, fix, docs, and chore branches are created from `dev`.
+- `main` is the default branch, integration branch, and stable release branch.
+- normal feat, fix, docs, and chore branches are created from `main`.
 - hotfix branches are created from `main` or the active `release/*` branch.
 
-Keep `main` and `dev` as the only permanent worktrees. Treat all other
-worktrees as disposable and remove them once the branch is merged, replaced,
-or paused.
+Keep `main` as the only permanent worktree. Treat all other worktrees as
+disposable and remove them once the branch is merged, replaced, or paused.
 
 Release guidance:
 
-- small releases may promote directly from `dev` to `main`
-- larger releases should use a short-lived `release/*` branch
-- any fix that lands during release stabilisation must be merged back to `dev`
-  immediately after release
+- small releases may tag directly from `main` after release prep lands
+- larger releases should use a short-lived `release/*` branch cut from `main`
 - tagging `vX.Y.Z` on `main` and creating a GitHub Release triggers
   `.github/workflows/publish.yml`, which publishes all packages to npm
 
@@ -154,7 +150,7 @@ See the detailed guides for the full policy:
 - `docs/guides/worktree-policy.md`
 - `docs/guides/release-runbook.md`
 
-Never push directly to `main` or `dev` — always use pull requests.
+Never push directly to `main` — always use pull requests.
 
 ## PocketFlow (Vendored)
 

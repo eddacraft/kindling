@@ -39,8 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Internal
 
-- Adopted the `main`/`dev` branching model: feature work merges to `dev`,
-  releases promote `dev` → `main`, GitHub Releases on `main` trigger
+- Adopted a single-`main` branching model: feature work merges to `main`,
+  releases are tagged from `main`, GitHub Releases on `main` trigger
   `publish.yml`. Documented in `docs/guides/`.
 - Replaced `prettier` with `oxfmt` for formatting.
 - Rebuilt the Claude Code plugin bundle.

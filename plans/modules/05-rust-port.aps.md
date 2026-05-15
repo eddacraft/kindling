@@ -80,7 +80,7 @@ Supersedes `02-rust-hook-binary` and `03-rust-cli`. Replaces the dual-maintain p
 - **Intent:** Cargo workspace initialised with the 10 crates and CI baseline
 - **Expected Outcome:** `crates/` directory at repo root with `Cargo.toml` workspace manifest; all 10 crate skeletons compile (`cargo build --workspace`); `.github/workflows/rust.yml` runs `cargo fmt --check`, `cargo clippy -- -D warnings`, and `cargo test --workspace` on every push
 - **Validation:** `cargo build --workspace --release` succeeds locally and in CI
-- **Status:** Done — landed on `feat/rust-port-scaffold`. Local verification: build + fmt + clippy + test all green. CI workflow runs on push/PR to dev/main.
+- **Status:** Done — landed on `feat/rust-port-scaffold`. Local verification: build + fmt + clippy + test all green. CI workflow runs on push/PR to main.
 
 #### PORT-002: kindling-types crate
 

@@ -56,24 +56,20 @@ pnpm clean
 
 ## Branching Model
 
-Kindling uses a two-branch model that supports multiple active streams in
-parallel worktrees:
+Kindling uses a single permanent branch model with short-lived work branches:
 
-- `main` is the stable release branch. Always publishable to npm.
-- `dev` is the active integration branch and the default branch.
-- normal feat, fix, docs, and chore branches are created from `dev`.
+- `main` is the default branch, integration branch, and stable release branch.
+  Always publishable to npm.
+- normal feat, fix, docs, and chore branches are created from `main`.
 - hotfix branches are created from `main` or the active `release/*` branch.
 
-Keep `main` and `dev` as the only permanent worktrees. Treat all other
-worktrees as disposable and remove them once the branch is merged, replaced,
-or paused.
+Keep `main` as the only permanent worktree. Treat all other worktrees as
+disposable and remove them once the branch is merged, replaced, or paused.
 
 Release guidance:
 
-- small releases may promote directly from `dev` to `main`
-- larger releases should use a short-lived `release/*` branch
-- any fix that lands during release stabilisation must be merged back to `dev`
-  immediately after release
+- small releases may tag directly from `main` after release prep lands
+- larger releases should use a short-lived `release/*` branch cut from `main`
 
 See the detailed guides for the full policy:
 
@@ -84,15 +80,14 @@ See the detailed guides for the full policy:
 ## Pull Request Process
 
 1. **Open an issue first** for significant changes to discuss approach
-2. **Create a branch from `dev`** for normal work, or from `main` only for
-   production hotfixes
+2. **Create a branch from `main`** for normal work and production hotfixes
 3. **Write tests** for new functionality
 4. **Update documentation** if behavior changes
 5. **Keep PRs focused** — one logical change per PR
 6. **Run the full test suite**: `pnpm build && pnpm test && pnpm lint`
 7. **Ensure CI passes** before requesting review
-8. **Target `dev`** — feature PRs should target `dev`, not `main`. Only
-   release-promotion and hotfix PRs target `main`.
+8. **Target `main`** — all PRs target `main` unless they are scoped to an
+   active `release/*` branch.
 
 ### Commit Messages
 
