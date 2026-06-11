@@ -95,7 +95,7 @@ Supersedes `02-rust-hook-binary` and `03-rust-cli`. Replaces the dual-maintain p
 - **Intent:** SQLite persistence layer in Rust against `schema/schema.sql`
 - **Expected Outcome:** `rusqlite` with `bundled` feature; reads `PRAGMA user_version` and asserts compatibility with `schema/version.json`; supports open/close capsules, append observation, attach observation to capsule, insert pin/unpin, and all FTS-indexed writes; WAL mode enabled; per-project database isolation (`~/.kindling/projects/<hash>/`)
 - **Validation:** `cargo test -p kindling-store` passes integration tests against a temp database; a database created by the existing TypeScript store is readable by the Rust store (golden file test)
-- **Status:** Ready
+- **Status:** Done — `feat/rust-port-store`. 17 integration + 7 golden-file + 6 unit tests pass. `schema/schema.sql` + `version.json` embedded via `include_str!` (drift impossible; `cargo publish` will need a copy step, noted for PORT-014). Fresh DBs get the canonical schema with seeded `schema_migrations`; existing DBs are version-gated (`SchemaTooOld` below `minCompatible` or pre-005 `user_version = 0`, `SchemaTooNew` above `version`). Golden fixture at `crates/kindling-store/tests/fixtures/ts-golden.db` (regenerate with `generate-golden-db.mjs`); covers TS→Rust reads and Rust writes firing TS-defined FTS triggers. Per-project hash verified against Node `crypto` output. `summaries.capsule_id` is UNIQUE — one summary per capsule is schema-enforced, the TS store's `ORDER BY created_at DESC` is defensive only.
 - **Dependencies:** PORT-002, schema contract (module 04, Done)
 
 #### PORT-004: kindling-filter crate
