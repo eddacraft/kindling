@@ -1,91 +1,116 @@
 # Security Policy
 
-## Reporting a Vulnerability
-
-If you discover a security vulnerability in Kindling, please report it privately rather than opening a public issue.
-
-**Email:** security@eddacraft.ai
-
-Please include:
-
-- Description of the vulnerability
-- Steps to reproduce
-- Potential impact
-- Any suggested fixes (optional)
-
-We take all security reports seriously and will respond promptly.
-
-## Response Timeline
-
-| Stage              | Timeline                                      |
-| ------------------ | --------------------------------------------- |
-| Acknowledgement    | Within 48 hours                               |
-| Initial assessment | Within 7 days                                 |
-| Resolution         | Depends on severity, typically within 30 days |
-
-## Scope
-
-This policy applies to all packages in the Kindling repository:
-
-| Package                                   | npm                                                                                                                                                       |
-| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@eddacraft/kindling`                     | [![npm](https://img.shields.io/npm/v/@eddacraft/kindling.svg)](https://www.npmjs.com/package/@eddacraft/kindling)                                         |
-| `@eddacraft/kindling-core`                | [![npm](https://img.shields.io/npm/v/@eddacraft/kindling-core.svg)](https://www.npmjs.com/package/@eddacraft/kindling-core)                               |
-| `@eddacraft/kindling-cli`                 | [![npm](https://img.shields.io/npm/v/@eddacraft/kindling-cli.svg)](https://www.npmjs.com/package/@eddacraft/kindling-cli)                                 |
-| `@eddacraft/kindling-store-sqlite`        | [![npm](https://img.shields.io/npm/v/@eddacraft/kindling-store-sqlite.svg)](https://www.npmjs.com/package/@eddacraft/kindling-store-sqlite)               |
-| `@eddacraft/kindling-store-sqljs`         | [![npm](https://img.shields.io/npm/v/@eddacraft/kindling-store-sqljs.svg)](https://www.npmjs.com/package/@eddacraft/kindling-store-sqljs)                 |
-| `@eddacraft/kindling-provider-local`      | [![npm](https://img.shields.io/npm/v/@eddacraft/kindling-provider-local.svg)](https://www.npmjs.com/package/@eddacraft/kindling-provider-local)           |
-| `@eddacraft/kindling-server`              | [![npm](https://img.shields.io/npm/v/@eddacraft/kindling-server.svg)](https://www.npmjs.com/package/@eddacraft/kindling-server)                           |
-| `@eddacraft/kindling-adapter-opencode`    | [![npm](https://img.shields.io/npm/v/@eddacraft/kindling-adapter-opencode.svg)](https://www.npmjs.com/package/@eddacraft/kindling-adapter-opencode)       |
-| `@eddacraft/kindling-adapter-pocketflow`  | [![npm](https://img.shields.io/npm/v/@eddacraft/kindling-adapter-pocketflow.svg)](https://www.npmjs.com/package/@eddacraft/kindling-adapter-pocketflow)   |
-| `@eddacraft/kindling-adapter-claude-code` | [![npm](https://img.shields.io/npm/v/@eddacraft/kindling-adapter-claude-code.svg)](https://www.npmjs.com/package/@eddacraft/kindling-adapter-claude-code) |
+eddacraft takes security reports seriously. This policy explains which versions
+of kindling are supported and how to report a vulnerability responsibly.
 
 ## Supported Versions
 
-During the v0.x development phase, only the latest version receives security updates.
+kindling is an open-source local-first memory and continuity engine. Security
+fixes are provided for the latest published package versions and the current
+`main` branch.
 
-| Version      | Supported |
-| ------------ | --------- |
-| 0.x (latest) | Yes       |
-| < latest     | No        |
+| Version / Branch                 | Supported   |
+| -------------------------------- | ----------- |
+| Latest published packages        | Yes         |
+| `main`                           | Yes         |
+| Older releases                   | Best effort |
+| Unreleased experimental branches | No          |
 
-Once we reach v1.0, we will maintain security updates for the current major version and one prior major version.
+Users should upgrade to the latest published packages when a security update is
+released.
 
-## Security Considerations
+## Reporting a Vulnerability
 
-### Local-First Architecture
+Please do not report security vulnerabilities through public GitHub issues,
+discussions, or pull requests.
 
-Kindling is designed as a local-first tool:
+To report a vulnerability, use one of the following channels:
 
-- All data is stored locally in SQLite
-- No data is sent to external services
-- No network connections are made by the core packages
+- GitHub private vulnerability reporting, if enabled for this repository
+- Email: `security@eddacraft.ai`
 
-### Data Sensitivity
+Please include as much detail as you can safely provide:
 
-Kindling captures development activity which may include:
+- Affected kindling package, version, commit, or branch
+- Affected CLI, hook, adapter, storage backend, server, or package
+- Description of the vulnerability and likely impact
+- Steps to reproduce or proof of concept
+- Relevant operating system, Node.js version, package manager, configuration,
+  logs, and database/storage details
+- Whether the issue is already public or known to be exploited
 
-- Tool call arguments and results
-- Command output
-- File diffs
-- Error messages and stack traces
+Because kindling is open source, source-level details are welcome in private
+reports. Please keep exploit details and patches private until we have triaged
+the report and agreed a disclosure path.
 
-**Automatic protections:**
+## Scope
 
-- The OpenCode adapter includes automatic secret redaction
-- Content is truncated to prevent excessive storage
-- Certain file paths are excluded by default
+This policy covers vulnerabilities in the kindling source, packages, and
+published artefacts, including:
 
-**User responsibilities:**
+- CLI commands, install paths, and agent hook integrations
+- Local storage backends, database handling, search indexes, and migrations
+- Adapters for agent tools and development workflows
+- Redaction, truncation, and capture controls for sensitive development data
+- Published npm packages, binaries, scripts, and documentation that could cause
+  unsafe use
 
-- Review captured observations periodically
-- Use redaction for accidentally captured secrets
-- Secure the SQLite database file appropriately
+kindling captures local development activity, which may include tool calls,
+commands, diffs, errors, and logs. Reports involving accidental capture,
+retention, disclosure, or inadequate redaction of sensitive data are in scope.
 
-### Database Security
+The following are generally out of scope unless they demonstrate a clear
+security impact:
 
-The SQLite database file contains all captured observations. Users should:
+- Vulnerabilities in Node.js, SQLite, package managers, or agent tools that do
+  not require a kindling-specific fix
+- Dependency version reports without a reachable exploit path
+- Denial-of-service claims without practical impact
+- Social engineering or physical attacks
+- Issues requiring compromised developer machines, leaked credentials, or
+  malicious maintainers
+- Automated scanner output without validation
 
-- Restrict file permissions appropriately
-- Consider encryption for sensitive environments
-- Include the database in backup strategies
+## What To Expect
+
+We aim to acknowledge valid reports within 3 business days.
+
+After acknowledgement, we will triage the report and may ask for additional
+information. For accepted vulnerabilities, we will work on a fix, publish
+updated packages where appropriate, and credit the reporter if they want to be
+credited.
+
+For declined reports, we will explain the reason where it is safe and practical
+to do so.
+
+We aim to provide status updates at least every 14 days while an accepted report
+remains unresolved.
+
+## Coordinated Disclosure
+
+Please give us a reasonable opportunity to investigate and fix the issue before
+publishing details publicly.
+
+We will not ask you to keep a vulnerability confidential forever, but we do ask
+that disclosure timing be coordinated to reduce harm to users.
+
+## Safe Harbour
+
+We will not pursue legal action against good-faith security research that:
+
+- Avoids privacy violations, data destruction, service disruption, or
+  unauthorised access to third-party systems
+- Uses only the minimum access necessary to demonstrate the issue
+- Reports the vulnerability promptly and privately
+- Does not use the vulnerability for extortion, persistence, or lateral
+  movement
+
+This safe harbour does not authorise testing against systems, accounts, data, or
+infrastructure you do not own or do not have permission to test.
+
+## Secrets and Sensitive Data
+
+If you accidentally discover secrets, tokens, private keys, credentials, or
+sensitive data, stop testing and report the issue immediately. Do not copy,
+reuse, disclose, or retain sensitive material beyond what is necessary to
+demonstrate the finding.
