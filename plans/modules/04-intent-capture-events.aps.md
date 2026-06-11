@@ -104,7 +104,7 @@ interface IntentEvent {
 - **Intent:** Establish a durable, versioned capture contract.
 - **Expected Outcome:** Shared schema + type definitions in core package.
 - **Validation:** `pnpm -r test --filter "*kindling-core*" -- --testNamePattern="IntentEvent schema"`
-- **Status:** Ready
+- **Status:** In Progress
 
 ### KINTENT-002: Implement hook emitters for high-signal moments
 
