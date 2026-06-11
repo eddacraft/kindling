@@ -74,7 +74,7 @@ Kindling uses [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) which
 
 ## CLI Usage
 
-The CLI is both a reader and a writer — you can capture observations manually, not just search for them.
+The CLI is both a reader and a writer and you can capture observations manually, not just search for them.
 
 ```bash
 # Initialize Kindling (creates database, optionally sets up Claude Code)
@@ -123,7 +123,7 @@ kindling serve --port 3000
 
 ## How It Works
 
-Kindling organizes memory into two layers:
+Kindling organises memory into two layers:
 
 **Observations** — atomic units of captured context (tool calls, commands, file diffs, errors, messages). These flow in automatically from adapters or manually via the CLI.
 
@@ -365,9 +365,9 @@ console.log(results.pins); // Includes the pinned error
 
 ## Kindling + Anvil
 
-**Kindling** captures what happened. **Anvil** enforces what should happen.
+**Kindling** captures what happened. **anvil** enforces what should happen.
 
-Request access to the Anvil closed beta → [eddacraft.ai](https://eddacraft.ai)
+Request access to the anvil closed beta → [eddacraft.ai](https://eddacraft.ai)
 
 ## Development
 
@@ -402,4 +402,4 @@ Apache 2.0 — See [LICENSE](LICENSE) for details.
 
 ---
 
-**Built by the [EddaCraft](https://eddacraft.ai) team**
+**Built by the [eddacraft](https://eddacraft.ai) team**
