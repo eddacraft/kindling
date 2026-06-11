@@ -253,6 +253,14 @@ version = "0.0.1"
 [[package]]
 name = "kindling-provider"
 version = "0.0.1"
+dependencies = [
+ "kindling-store",
+ "kindling-types",
+ "rusqlite",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+]
 
 [[package]]
 name = "kindling-server"
