@@ -113,7 +113,7 @@ Supersedes `02-rust-hook-binary` and `03-rust-cli`. Replaces the dual-maintain p
 - **Intent:** Local FTS retrieval provider with BM25 normalisation and tiered retrieval
 - **Expected Outcome:** FTS5 search with BM25 scoring normalised to [0, 1]; tiered retrieval (pins → current summary → ranked candidates); deterministic ordering; `RetrieveResult` shape matches the Rust types crate
 - **Validation:** `cargo test -p kindling-provider` passes; identical queries against the same database produce the same ranked results as the existing TS provider (cross-implementation parity test, retired after Phase 4)
-- **Status:** Ready
+- **Status:** In Progress — `feat/rust-port-provider`
 - **Dependencies:** PORT-003
 
 #### PORT-006: kindling-service crate (in-process API)

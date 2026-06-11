@@ -163,3 +163,7 @@ admin/
 target/
 **/*.rs.bk
 *.pdb
+
+# SQLite side-files of committed test fixtures (recreated on open)
+crates/**/tests/fixtures/*.db-wal
+crates/**/tests/fixtures/*.db-shm

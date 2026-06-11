@@ -1,0 +1,1364 @@
+{
+  "now": 1750000000000,
+  "searchCases": [
+    {
+      "name": "broad query, no scope",
+      "options": {
+        "query": "database",
+        "scopeIds": {}
+      },
+      "expected": [
+        {
+          "entity": {
+            "id": "obs-5",
+            "kind": "tool_call",
+            "content": "database xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "provenance": {
+              "tool": "Read"
+            },
+            "ts": 1749827200000,
+            "scopeIds": {
+              "sessionId": "sess-1",
+              "repoId": "repo-1"
+            },
+            "redacted": false
+          },
+          "score": 0.8551399388,
+          "matchContext": "database xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx..."
+        },
+        {
+          "entity": {
+            "id": "obs-6",
+            "kind": "message",
+            "content": "database 🔥 yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+            "provenance": {},
+            "ts": 1749740800000,
+            "scopeIds": {
+              "sessionId": "sess-1",
+              "repoId": "repo-1"
+            },
+            "redacted": false
+          },
+          "score": 0.8451399388,
+          "matchContext": "database 🔥 yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy..."
+        },
+        {
+          "entity": {
+            "id": "obs-4",
+            "kind": "message",
+            "content": "database database database heavy term frequency note",
+            "provenance": {},
+            "ts": 1746112000000,
+            "scopeIds": {
+              "sessionId": "sess-1",
+              "repoId": "repo-1"
+            },
+            "redacted": false
+          },
+          "score": 0.7,
+          "matchContext": "database database database heavy term frequency note"
+        },
+        {
+          "entity": {
+            "id": "obs-2",
+            "kind": "command",
+            "content": "database migration completed successfully",
+            "provenance": {},
+            "ts": 1749568000000,
+            "scopeIds": {
+              "sessionId": "sess-1",
+              "repoId": "repo-1"
+            },
+            "redacted": false
+          },
+          "score": 0.6084987554,
+          "matchContext": "database migration completed successfully"
+        },
+        {
+          "entity": {
+            "id": "sum-2",
+            "capsuleId": "cap-2",
+            "content": "Investigated database index performance regressions",
+            "confidence": 0.75,
+            "evidenceRefs": ["obs-8"],
+            "createdAt": 1749308800000
+          },
+          "score": 0.5629017474,
+          "matchContext": "Investigated database index performance regressions"
+        },
+        {
+          "entity": {
+            "id": "obs-1",
+            "kind": "error",
+            "content": "deploy failed with database connection timeout",
+            "provenance": {
+              "tool": "Bash",
+              "exitCode": 1
+            },
+            "ts": 1749996400000,
+            "scopeIds": {
+              "sessionId": "sess-1",
+              "repoId": "repo-1"
+            },
+            "redacted": false
+          },
+          "score": 0.5040482198,
+          "matchContext": "deploy failed with database connection timeout"
+        },
+        {
+          "entity": {
+            "id": "sum-1",
+            "capsuleId": "cap-1",
+            "content": "Session focused on database reliability and deploy fixes",
+            "confidence": 0.9,
+            "evidenceRefs": ["obs-1", "obs-2"],
+            "createdAt": 1749998200000
+          },
+          "score": 0.4614716286,
+          "matchContext": "Session focused on database reliability and deploy fixes"
+        },
+        {
+          "entity": {
+            "id": "obs-8",
+            "kind": "message",
+            "content": "database tuning notes for the other repository",
+            "provenance": {},
+            "ts": 1749913600000,
+            "scopeIds": {
+              "sessionId": "sess-2",
+              "repoId": "repo-2",
+              "agentId": "agent-9"
+            },
+            "redacted": false
+          },
+          "score": 0.433016081,
+          "matchContext": "database tuning notes for the other repository"
+        },
+        {
+          "entity": {
+            "id": "obs-3",
+            "kind": "message",
+            "content": "fixed flaky test in retrieval module near the database layer",
+            "provenance": {},
+            "ts": 1748963200000,
+            "scopeIds": {
+              "sessionId": "sess-1",
+              "repoId": "repo-1"
+            },
+            "redacted": false
+          },
+          "score": 0.18,
+          "matchContext": "fixed flaky test in retrieval module near the database layer"
+        }
+      ]
+    },
+    {
+      "name": "scoped to session",
+      "options": {
+        "query": "database",
+        "scopeIds": {
+          "sessionId": "sess-1"
+        }
+      },
+      "expected": [
+        {
+          "entity": {
+            "id": "obs-5",
+            "kind": "tool_call",
+            "content": "database xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "provenance": {
+              "tool": "Read"
+            },
+            "ts": 1749827200000,
+            "scopeIds": {
+              "sessionId": "sess-1",
+              "repoId": "repo-1"
+            },
+            "redacted": false
+          },
+          "score": 0.8551399388,
+          "matchContext": "database xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx..."
+        },
+        {
+          "entity": {
+            "id": "obs-6",
+            "kind": "message",
+            "content": "database 🔥 yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+            "provenance": {},
+            "ts": 1749740800000,
+            "scopeIds": {
+              "sessionId": "sess-1",
+              "repoId": "repo-1"
+            },
+            "redacted": false
+          },
+          "score": 0.8451399388,
+          "matchContext": "database 🔥 yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy..."
+        },
+        {
+          "entity": {
+            "id": "obs-4",
+            "kind": "message",
+            "content": "database database database heavy term frequency note",
+            "provenance": {},
+            "ts": 1746112000000,
+            "scopeIds": {
+              "sessionId": "sess-1",
+              "repoId": "repo-1"
+            },
+            "redacted": false
+          },
+          "score": 0.7,
+          "matchContext": "database database database heavy term frequency note"
+        },
+        {
+          "entity": {
+            "id": "obs-2",
+            "kind": "command",
+            "content": "database migration completed successfully",
+            "provenance": {},
+            "ts": 1749568000000,
+            "scopeIds": {
+              "sessionId": "sess-1",
+              "repoId": "repo-1"
+            },
+            "redacted": false
+          },
+          "score": 0.6084987554,
+          "matchContext": "database migration completed successfully"
+        },
+        {
+          "entity": {
+            "id": "obs-1",
+            "kind": "error",
+            "content": "deploy failed with database connection timeout",
+            "provenance": {
+              "tool": "Bash",
+              "exitCode": 1
+            },
+            "ts": 1749996400000,
+            "scopeIds": {
+              "sessionId": "sess-1",
+              "repoId": "repo-1"
+            },
+            "redacted": false
+          },
+          "score": 0.5040482198,
+          "matchContext": "deploy failed with database connection timeout"
+        },
+        {
+          "entity": {
+            "id": "sum-1",
+            "capsuleId": "cap-1",
+            "content": "Session focused on database reliability and deploy fixes",
+            "confidence": 0.9,
+            "evidenceRefs": ["obs-1", "obs-2"],
+            "createdAt": 1749998200000
+          },
+          "score": 0.4614716286,
+          "matchContext": "Session focused on database reliability and deploy fixes"
+        },
+        {
+          "entity": {
+            "id": "obs-3",
+            "kind": "message",
+            "content": "fixed flaky test in retrieval module near the database layer",
+            "provenance": {},
+            "ts": 1748963200000,
+            "scopeIds": {
+              "sessionId": "sess-1",
+              "repoId": "repo-1"
+            },
+            "redacted": false
+          },
+          "score": 0.18,
+          "matchContext": "fixed flaky test in retrieval module near the database layer"
+        }
+      ]
+    },
+    {
+      "name": "scoped to repo with maxResults",
+      "options": {
+        "query": "database",
+        "scopeIds": {
+          "repoId": "repo-1"
+        },
+        "maxResults": 3
+      },
+      "expected": [
+        {
+          "entity": {
+            "id": "obs-5",
+            "kind": "tool_call",
+            "content": "database xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "provenance": {
+              "tool": "Read"
+            },
+            "ts": 1749827200000,
+            "scopeIds": {
+              "sessionId": "sess-1",
+              "repoId": "repo-1"
+            },
+            "redacted": false
+          },
+          "score": 0.8176392543,
+          "matchContext": "database xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx..."
+        },
+        {
+          "entity": {
+            "id": "obs-6",
+            "kind": "message",
+            "content": "database 🔥 yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+            "provenance": {},
+            "ts": 1749740800000,
+            "scopeIds": {
+              "sessionId": "sess-1",
+              "repoId": "repo-1"
+            },
+            "redacted": false
+          },
+          "score": 0.8076392543,
+          "matchContext": "database 🔥 yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy..."
+        },
+        {
+          "entity": {
+            "id": "obs-4",
+            "kind": "message",
+            "content": "database database database heavy term frequency note",
+            "provenance": {},
+            "ts": 1746112000000,
+            "scopeIds": {
+              "sessionId": "sess-1",
+              "repoId": "repo-1"
+            },
+            "redacted": false
+          },
+          "score": 0.7,
+          "matchContext": "database database database heavy term frequency note"
+        }
+      ]
+    },
+    {
+      "name": "OR operator",
+      "options": {
+        "query": "deploy OR migration",
+        "scopeIds": {}
+      },
+      "expected": [
+        {
+          "entity": {
+            "id": "obs-2",
+            "kind": "command",
+            "content": "database migration completed successfully",
+            "provenance": {},
+            "ts": 1749568000000,
+            "scopeIds": {
+              "sessionId": "sess-1",
+              "repoId": "repo-1"
+            },
+            "redacted": false
+          },
+          "score": 0.95,
+          "matchContext": "database migration completed successfully"
+        },
+        {
+          "entity": {
+            "id": "obs-1",
+            "kind": "error",
+            "content": "deploy failed with database connection timeout",
+            "provenance": {
+              "tool": "Bash",
+              "exitCode": 1
+            },
+            "ts": 1749996400000,
+            "scopeIds": {
+              "sessionId": "sess-1",
+              "repoId": "repo-1"
+            },
+            "redacted": false
+          },
+          "score": 0.8984364881,
+          "matchContext": "deploy failed with database connection timeout"
+        },
+        {
+          "entity": {
+            "id": "sum-1",
+            "capsuleId": "cap-1",
+            "content": "Session focused on database reliability and deploy fixes",
+            "confidence": 0.9,
+            "evidenceRefs": ["obs-1", "obs-2"],
+            "createdAt": 1749998200000
+          },
+          "score": 0.2997916667,
+          "matchContext": "Session focused on database reliability and deploy fixes"
+        }
+      ]
+    },
+    {
+      "name": "phrase query",
+      "options": {
+        "query": "\"database migration\"",
+        "scopeIds": {}
+      },
+      "expected": [
+        {
+          "entity": {
+            "id": "obs-2",
+            "kind": "command",
+            "content": "database migration completed successfully",
+            "provenance": {},
+            "ts": 1749568000000,
+            "scopeIds": {
+              "sessionId": "sess-1",
+              "repoId": "repo-1"
+            },
+            "redacted": false
+          },
+          "score": 0.6,
+          "matchContext": "database migration completed successfully"
+        }
+      ]
+    },
+    {
+      "name": "excludeIds",
+      "options": {
+        "query": "database",
+        "scopeIds": {},
+        "excludeIds": ["obs-1", "sum-2"]
+      },
+      "expected": [
+        {
+          "entity": {
+            "id": "obs-5",
+            "kind": "tool_call",
+            "content": "database xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "provenance": {
+              "tool": "Read"
+            },
+            "ts": 1749827200000,
+            "scopeIds": {
+              "sessionId": "sess-1",
+              "repoId": "repo-1"
+            },
+            "redacted": false
+          },
+          "score": 0.8551399388,
+          "matchContext": "database xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx..."
+        },
+        {
+          "entity": {
+            "id": "obs-6",
+            "kind": "message",
+            "content": "database 🔥 yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+            "provenance": {},
+            "ts": 1749740800000,
+            "scopeIds": {
+              "sessionId": "sess-1",
+              "repoId": "repo-1"
+            },
+            "redacted": false
+          },
+          "score": 0.8451399388,
+          "matchContext": "database 🔥 yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy..."
+        },
+        {
+          "entity": {
+            "id": "obs-4",
+            "kind": "message",
+            "content": "database database database heavy term frequency note",
+            "provenance": {},
+            "ts": 1746112000000,
+            "scopeIds": {
+              "sessionId": "sess-1",
+              "repoId": "repo-1"
+            },
+            "redacted": false
+          },
+          "score": 0.7,
+          "matchContext": "database database database heavy term frequency note"
+        },
+        {
+          "entity": {
+            "id": "obs-2",
+            "kind": "command",
+            "content": "database migration completed successfully",
+            "provenance": {},
+            "ts": 1749568000000,
+            "scopeIds": {
+              "sessionId": "sess-1",
+              "repoId": "repo-1"
+            },
+            "redacted": false
+          },
+          "score": 0.6084987554,
+          "matchContext": "database migration completed successfully"
+        },
+        {
+          "entity": {
+            "id": "sum-1",
+            "capsuleId": "cap-1",
+            "content": "Session focused on database reliability and deploy fixes",
+            "confidence": 0.9,
+            "evidenceRefs": ["obs-1", "obs-2"],
+            "createdAt": 1749998200000
+          },
+          "score": 0.4614716286,
+          "matchContext": "Session focused on database reliability and deploy fixes"
+        },
+        {
+          "entity": {
+            "id": "obs-8",
+            "kind": "message",
+            "content": "database tuning notes for the other repository",
+            "provenance": {},
+            "ts": 1749913600000,
+            "scopeIds": {
+              "sessionId": "sess-2",
+              "repoId": "repo-2",
+              "agentId": "agent-9"
+            },
+            "redacted": false
+          },
+          "score": 0.433016081,
+          "matchContext": "database tuning notes for the other repository"
+        },
+        {
+          "entity": {
+            "id": "obs-3",
+            "kind": "message",
+            "content": "fixed flaky test in retrieval module near the database layer",
+            "provenance": {},
+            "ts": 1748963200000,
+            "scopeIds": {
+              "sessionId": "sess-1",
+              "repoId": "repo-1"
+            },
+            "redacted": false
+          },
+          "score": 0.18,
+          "matchContext": "fixed flaky test in retrieval module near the database layer"
+        }
+      ]
+    },
+    {
+      "name": "includeRedacted (redacted rows are not FTS-indexed)",
+      "options": {
+        "query": "database",
+        "scopeIds": {},
+        "includeRedacted": true
+      },
+      "expected": [
+        {
+          "entity": {
+            "id": "obs-5",
+            "kind": "tool_call",
+            "content": "database xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "provenance": {
+              "tool": "Read"
+            },
+            "ts": 1749827200000,
+            "scopeIds": {
+              "sessionId": "sess-1",
+              "repoId": "repo-1"
+            },
+            "redacted": false
+          },
+          "score": 0.8551399388,
+          "matchContext": "database xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx..."
+        },
+        {
+          "entity": {
+            "id": "obs-6",
+            "kind": "message",
+            "content": "database 🔥 yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+            "provenance": {},
+            "ts": 1749740800000,
+            "scopeIds": {
+              "sessionId": "sess-1",
+              "repoId": "repo-1"
+            },
+            "redacted": false
+          },
+          "score": 0.8451399388,
+          "matchContext": "database 🔥 yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy..."
+        },
+        {
+          "entity": {
+            "id": "obs-4",
+            "kind": "message",
+            "content": "database database database heavy term frequency note",
+            "provenance": {},
+            "ts": 1746112000000,
+            "scopeIds": {
+              "sessionId": "sess-1",
+              "repoId": "repo-1"
+            },
+            "redacted": false
+          },
+          "score": 0.7,
+          "matchContext": "database database database heavy term frequency note"
+        },
+        {
+          "entity": {
+            "id": "obs-2",
+            "kind": "command",
+            "content": "database migration completed successfully",
+            "provenance": {},
+            "ts": 1749568000000,
+            "scopeIds": {
+              "sessionId": "sess-1",
+              "repoId": "repo-1"
+            },
+            "redacted": false
+          },
+          "score": 0.6084987554,
+          "matchContext": "database migration completed successfully"
+        },
+        {
+          "entity": {
+            "id": "sum-2",
+            "capsuleId": "cap-2",
+            "content": "Investigated database index performance regressions",
+            "confidence": 0.75,
+            "evidenceRefs": ["obs-8"],
+            "createdAt": 1749308800000
+          },
+          "score": 0.5629017474,
+          "matchContext": "Investigated database index performance regressions"
+        },
+        {
+          "entity": {
+            "id": "obs-1",
+            "kind": "error",
+            "content": "deploy failed with database connection timeout",
+            "provenance": {
+              "tool": "Bash",
+              "exitCode": 1
+            },
+            "ts": 1749996400000,
+            "scopeIds": {
+              "sessionId": "sess-1",
+              "repoId": "repo-1"
+            },
+            "redacted": false
+          },
+          "score": 0.5040482198,
+          "matchContext": "deploy failed with database connection timeout"
+        },
+        {
+          "entity": {
+            "id": "sum-1",
+            "capsuleId": "cap-1",
+            "content": "Session focused on database reliability and deploy fixes",
+            "confidence": 0.9,
+            "evidenceRefs": ["obs-1", "obs-2"],
+            "createdAt": 1749998200000
+          },
+          "score": 0.4614716286,
+          "matchContext": "Session focused on database reliability and deploy fixes"
+        },
+        {
+          "entity": {
+            "id": "obs-8",
+            "kind": "message",
+            "content": "database tuning notes for the other repository",
+            "provenance": {},
+            "ts": 1749913600000,
+            "scopeIds": {
+              "sessionId": "sess-2",
+              "repoId": "repo-2",
+              "agentId": "agent-9"
+            },
+            "redacted": false
+          },
+          "score": 0.433016081,
+          "matchContext": "database tuning notes for the other repository"
+        },
+        {
+          "entity": {
+            "id": "obs-3",
+            "kind": "message",
+            "content": "fixed flaky test in retrieval module near the database layer",
+            "provenance": {},
+            "ts": 1748963200000,
+            "scopeIds": {
+              "sessionId": "sess-1",
+              "repoId": "repo-1"
+            },
+            "redacted": false
+          },
+          "score": 0.18,
+          "matchContext": "fixed flaky test in retrieval module near the database layer"
+        }
+      ]
+    },
+    {
+      "name": "malformed query",
+      "options": {
+        "query": "AND OR",
+        "scopeIds": {}
+      },
+      "expected": []
+    },
+    {
+      "name": "prefix query",
+      "options": {
+        "query": "datab*",
+        "scopeIds": {}
+      },
+      "expected": [
+        {
+          "entity": {
+            "id": "obs-5",
+            "kind": "tool_call",
+            "content": "database xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "provenance": {
+              "tool": "Read"
+            },
+            "ts": 1749827200000,
+            "scopeIds": {
+              "sessionId": "sess-1",
+              "repoId": "repo-1"
+            },
+            "redacted": false
+          },
+          "score": 0.8551399388,
+          "matchContext": "database xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx..."
+        },
+        {
+          "entity": {
+            "id": "obs-6",
+            "kind": "message",
+            "content": "database 🔥 yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+            "provenance": {},
+            "ts": 1749740800000,
+            "scopeIds": {
+              "sessionId": "sess-1",
+              "repoId": "repo-1"
+            },
+            "redacted": false
+          },
+          "score": 0.8451399388,
+          "matchContext": "database 🔥 yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy..."
+        },
+        {
+          "entity": {
+            "id": "obs-4",
+            "kind": "message",
+            "content": "database database database heavy term frequency note",
+            "provenance": {},
+            "ts": 1746112000000,
+            "scopeIds": {
+              "sessionId": "sess-1",
+              "repoId": "repo-1"
+            },
+            "redacted": false
+          },
+          "score": 0.7,
+          "matchContext": "database database database heavy term frequency note"
+        },
+        {
+          "entity": {
+            "id": "obs-2",
+            "kind": "command",
+            "content": "database migration completed successfully",
+            "provenance": {},
+            "ts": 1749568000000,
+            "scopeIds": {
+              "sessionId": "sess-1",
+              "repoId": "repo-1"
+            },
+            "redacted": false
+          },
+          "score": 0.6084987554,
+          "matchContext": "database migration completed successfully"
+        },
+        {
+          "entity": {
+            "id": "sum-2",
+            "capsuleId": "cap-2",
+            "content": "Investigated database index performance regressions",
+            "confidence": 0.75,
+            "evidenceRefs": ["obs-8"],
+            "createdAt": 1749308800000
+          },
+          "score": 0.5629017474,
+          "matchContext": "Investigated database index performance regressions"
+        },
+        {
+          "entity": {
+            "id": "obs-1",
+            "kind": "error",
+            "content": "deploy failed with database connection timeout",
+            "provenance": {
+              "tool": "Bash",
+              "exitCode": 1
+            },
+            "ts": 1749996400000,
+            "scopeIds": {
+              "sessionId": "sess-1",
+              "repoId": "repo-1"
+            },
+            "redacted": false
+          },
+          "score": 0.5040482198,
+          "matchContext": "deploy failed with database connection timeout"
+        },
+        {
+          "entity": {
+            "id": "sum-1",
+            "capsuleId": "cap-1",
+            "content": "Session focused on database reliability and deploy fixes",
+            "confidence": 0.9,
+            "evidenceRefs": ["obs-1", "obs-2"],
+            "createdAt": 1749998200000
+          },
+          "score": 0.4614716286,
+          "matchContext": "Session focused on database reliability and deploy fixes"
+        },
+        {
+          "entity": {
+            "id": "obs-8",
+            "kind": "message",
+            "content": "database tuning notes for the other repository",
+            "provenance": {},
+            "ts": 1749913600000,
+            "scopeIds": {
+              "sessionId": "sess-2",
+              "repoId": "repo-2",
+              "agentId": "agent-9"
+            },
+            "redacted": false
+          },
+          "score": 0.433016081,
+          "matchContext": "database tuning notes for the other repository"
+        },
+        {
+          "entity": {
+            "id": "obs-3",
+            "kind": "message",
+            "content": "fixed flaky test in retrieval module near the database layer",
+            "provenance": {},
+            "ts": 1748963200000,
+            "scopeIds": {
+              "sessionId": "sess-1",
+              "repoId": "repo-1"
+            },
+            "redacted": false
+          },
+          "score": 0.18,
+          "matchContext": "fixed flaky test in retrieval module near the database layer"
+        }
+      ]
+    },
+    {
+      "name": "no matches",
+      "options": {
+        "query": "nonexistentterm",
+        "scopeIds": {}
+      },
+      "expected": []
+    }
+  ],
+  "retrieveCases": [
+    {
+      "name": "session scope: pins + current summary + candidates",
+      "options": {
+        "query": "database",
+        "scopeIds": {
+          "sessionId": "sess-1"
+        }
+      },
+      "expected": {
+        "pins": [
+          {
+            "pin": {
+              "id": "pin-2",
+              "targetType": "summary",
+              "targetId": "sum-2",
+              "createdAt": 1749740800000,
+              "scopeIds": {
+                "sessionId": "sess-1"
+              }
+            },
+            "target": {
+              "id": "sum-2",
+              "capsuleId": "cap-2",
+              "content": "Investigated database index performance regressions",
+              "confidence": 0.75,
+              "createdAt": 1749308800000,
+              "evidenceRefs": ["obs-8"]
+            }
+          },
+          {
+            "pin": {
+              "id": "pin-1",
+              "targetType": "observation",
+              "targetId": "obs-2",
+              "reason": "migration baseline",
+              "createdAt": 1749654400000,
+              "scopeIds": {
+                "sessionId": "sess-1"
+              }
+            },
+            "target": {
+              "id": "obs-2",
+              "kind": "command",
+              "content": "database migration completed successfully",
+              "provenance": {},
+              "ts": 1749568000000,
+              "scopeIds": {
+                "sessionId": "sess-1",
+                "repoId": "repo-1"
+              },
+              "redacted": false
+            }
+          }
+        ],
+        "currentSummary": {
+          "id": "sum-1",
+          "capsuleId": "cap-1",
+          "content": "Session focused on database reliability and deploy fixes",
+          "confidence": 0.9,
+          "createdAt": 1749998200000,
+          "evidenceRefs": ["obs-1", "obs-2"]
+        },
+        "candidates": [
+          {
+            "entity": {
+              "id": "obs-5",
+              "kind": "tool_call",
+              "content": "database xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "provenance": {
+                "tool": "Read"
+              },
+              "ts": 1749827200000,
+              "scopeIds": {
+                "sessionId": "sess-1",
+                "repoId": "repo-1"
+              },
+              "redacted": false
+            },
+            "score": 0.8551399388,
+            "matchContext": "database xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx..."
+          },
+          {
+            "entity": {
+              "id": "obs-6",
+              "kind": "message",
+              "content": "database 🔥 yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+              "provenance": {},
+              "ts": 1749740800000,
+              "scopeIds": {
+                "sessionId": "sess-1",
+                "repoId": "repo-1"
+              },
+              "redacted": false
+            },
+            "score": 0.8451399388,
+            "matchContext": "database 🔥 yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy..."
+          },
+          {
+            "entity": {
+              "id": "obs-4",
+              "kind": "message",
+              "content": "database database database heavy term frequency note",
+              "provenance": {},
+              "ts": 1746112000000,
+              "scopeIds": {
+                "sessionId": "sess-1",
+                "repoId": "repo-1"
+              },
+              "redacted": false
+            },
+            "score": 0.7,
+            "matchContext": "database database database heavy term frequency note"
+          },
+          {
+            "entity": {
+              "id": "obs-1",
+              "kind": "error",
+              "content": "deploy failed with database connection timeout",
+              "provenance": {
+                "tool": "Bash",
+                "exitCode": 1
+              },
+              "ts": 1749996400000,
+              "scopeIds": {
+                "sessionId": "sess-1",
+                "repoId": "repo-1"
+              },
+              "redacted": false
+            },
+            "score": 0.5040482198,
+            "matchContext": "deploy failed with database connection timeout"
+          },
+          {
+            "entity": {
+              "id": "obs-3",
+              "kind": "message",
+              "content": "fixed flaky test in retrieval module near the database layer",
+              "provenance": {},
+              "ts": 1748963200000,
+              "scopeIds": {
+                "sessionId": "sess-1",
+                "repoId": "repo-1"
+              },
+              "redacted": false
+            },
+            "score": 0.18,
+            "matchContext": "fixed flaky test in retrieval module near the database layer"
+          }
+        ],
+        "provenance": {
+          "query": "database",
+          "scopeIds": {
+            "sessionId": "sess-1"
+          },
+          "totalCandidates": 5,
+          "returnedCandidates": 5,
+          "truncatedDueToTokenBudget": false,
+          "providerUsed": "local-fts"
+        }
+      }
+    },
+    {
+      "name": "session scope with maxCandidates",
+      "options": {
+        "query": "database",
+        "scopeIds": {
+          "sessionId": "sess-1"
+        },
+        "maxCandidates": 2
+      },
+      "expected": {
+        "pins": [
+          {
+            "pin": {
+              "id": "pin-2",
+              "targetType": "summary",
+              "targetId": "sum-2",
+              "createdAt": 1749740800000,
+              "scopeIds": {
+                "sessionId": "sess-1"
+              }
+            },
+            "target": {
+              "id": "sum-2",
+              "capsuleId": "cap-2",
+              "content": "Investigated database index performance regressions",
+              "confidence": 0.75,
+              "createdAt": 1749308800000,
+              "evidenceRefs": ["obs-8"]
+            }
+          },
+          {
+            "pin": {
+              "id": "pin-1",
+              "targetType": "observation",
+              "targetId": "obs-2",
+              "reason": "migration baseline",
+              "createdAt": 1749654400000,
+              "scopeIds": {
+                "sessionId": "sess-1"
+              }
+            },
+            "target": {
+              "id": "obs-2",
+              "kind": "command",
+              "content": "database migration completed successfully",
+              "provenance": {},
+              "ts": 1749568000000,
+              "scopeIds": {
+                "sessionId": "sess-1",
+                "repoId": "repo-1"
+              },
+              "redacted": false
+            }
+          }
+        ],
+        "currentSummary": {
+          "id": "sum-1",
+          "capsuleId": "cap-1",
+          "content": "Session focused on database reliability and deploy fixes",
+          "confidence": 0.9,
+          "createdAt": 1749998200000,
+          "evidenceRefs": ["obs-1", "obs-2"]
+        },
+        "candidates": [
+          {
+            "entity": {
+              "id": "obs-4",
+              "kind": "message",
+              "content": "database database database heavy term frequency note",
+              "provenance": {},
+              "ts": 1746112000000,
+              "scopeIds": {
+                "sessionId": "sess-1",
+                "repoId": "repo-1"
+              },
+              "redacted": false
+            },
+            "score": 0.7,
+            "matchContext": "database database database heavy term frequency note"
+          },
+          {
+            "entity": {
+              "id": "obs-5",
+              "kind": "tool_call",
+              "content": "database xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "provenance": {
+                "tool": "Read"
+              },
+              "ts": 1749827200000,
+              "scopeIds": {
+                "sessionId": "sess-1",
+                "repoId": "repo-1"
+              },
+              "redacted": false
+            },
+            "score": 0.28,
+            "matchContext": "database xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx..."
+          }
+        ],
+        "provenance": {
+          "query": "database",
+          "scopeIds": {
+            "sessionId": "sess-1"
+          },
+          "totalCandidates": 2,
+          "returnedCandidates": 2,
+          "truncatedDueToTokenBudget": false,
+          "providerUsed": "local-fts"
+        }
+      }
+    },
+    {
+      "name": "no session: pins unscoped, no current summary",
+      "options": {
+        "query": "database",
+        "scopeIds": {}
+      },
+      "expected": {
+        "pins": [
+          {
+            "pin": {
+              "id": "pin-2",
+              "targetType": "summary",
+              "targetId": "sum-2",
+              "createdAt": 1749740800000,
+              "scopeIds": {
+                "sessionId": "sess-1"
+              }
+            },
+            "target": {
+              "id": "sum-2",
+              "capsuleId": "cap-2",
+              "content": "Investigated database index performance regressions",
+              "confidence": 0.75,
+              "createdAt": 1749308800000,
+              "evidenceRefs": ["obs-8"]
+            }
+          },
+          {
+            "pin": {
+              "id": "pin-1",
+              "targetType": "observation",
+              "targetId": "obs-2",
+              "reason": "migration baseline",
+              "createdAt": 1749654400000,
+              "scopeIds": {
+                "sessionId": "sess-1"
+              }
+            },
+            "target": {
+              "id": "obs-2",
+              "kind": "command",
+              "content": "database migration completed successfully",
+              "provenance": {},
+              "ts": 1749568000000,
+              "scopeIds": {
+                "sessionId": "sess-1",
+                "repoId": "repo-1"
+              },
+              "redacted": false
+            }
+          }
+        ],
+        "candidates": [
+          {
+            "entity": {
+              "id": "obs-5",
+              "kind": "tool_call",
+              "content": "database xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "provenance": {
+                "tool": "Read"
+              },
+              "ts": 1749827200000,
+              "scopeIds": {
+                "sessionId": "sess-1",
+                "repoId": "repo-1"
+              },
+              "redacted": false
+            },
+            "score": 0.8551399388,
+            "matchContext": "database xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx..."
+          },
+          {
+            "entity": {
+              "id": "obs-6",
+              "kind": "message",
+              "content": "database 🔥 yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+              "provenance": {},
+              "ts": 1749740800000,
+              "scopeIds": {
+                "sessionId": "sess-1",
+                "repoId": "repo-1"
+              },
+              "redacted": false
+            },
+            "score": 0.8451399388,
+            "matchContext": "database 🔥 yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy..."
+          },
+          {
+            "entity": {
+              "id": "obs-4",
+              "kind": "message",
+              "content": "database database database heavy term frequency note",
+              "provenance": {},
+              "ts": 1746112000000,
+              "scopeIds": {
+                "sessionId": "sess-1",
+                "repoId": "repo-1"
+              },
+              "redacted": false
+            },
+            "score": 0.7,
+            "matchContext": "database database database heavy term frequency note"
+          },
+          {
+            "entity": {
+              "id": "obs-1",
+              "kind": "error",
+              "content": "deploy failed with database connection timeout",
+              "provenance": {
+                "tool": "Bash",
+                "exitCode": 1
+              },
+              "ts": 1749996400000,
+              "scopeIds": {
+                "sessionId": "sess-1",
+                "repoId": "repo-1"
+              },
+              "redacted": false
+            },
+            "score": 0.5040482198,
+            "matchContext": "deploy failed with database connection timeout"
+          },
+          {
+            "entity": {
+              "id": "sum-1",
+              "capsuleId": "cap-1",
+              "content": "Session focused on database reliability and deploy fixes",
+              "confidence": 0.9,
+              "evidenceRefs": ["obs-1", "obs-2"],
+              "createdAt": 1749998200000
+            },
+            "score": 0.4614716286,
+            "matchContext": "Session focused on database reliability and deploy fixes"
+          },
+          {
+            "entity": {
+              "id": "obs-8",
+              "kind": "message",
+              "content": "database tuning notes for the other repository",
+              "provenance": {},
+              "ts": 1749913600000,
+              "scopeIds": {
+                "sessionId": "sess-2",
+                "repoId": "repo-2",
+                "agentId": "agent-9"
+              },
+              "redacted": false
+            },
+            "score": 0.433016081,
+            "matchContext": "database tuning notes for the other repository"
+          },
+          {
+            "entity": {
+              "id": "obs-3",
+              "kind": "message",
+              "content": "fixed flaky test in retrieval module near the database layer",
+              "provenance": {},
+              "ts": 1748963200000,
+              "scopeIds": {
+                "sessionId": "sess-1",
+                "repoId": "repo-1"
+              },
+              "redacted": false
+            },
+            "score": 0.18,
+            "matchContext": "fixed flaky test in retrieval module near the database layer"
+          }
+        ],
+        "provenance": {
+          "query": "database",
+          "scopeIds": {},
+          "totalCandidates": 7,
+          "returnedCandidates": 7,
+          "truncatedDueToTokenBudget": false,
+          "providerUsed": "local-fts"
+        }
+      }
+    },
+    {
+      "name": "other session: scoped pins absent, own summary",
+      "options": {
+        "query": "database",
+        "scopeIds": {
+          "sessionId": "sess-2"
+        }
+      },
+      "expected": {
+        "pins": [],
+        "currentSummary": {
+          "id": "sum-2",
+          "capsuleId": "cap-2",
+          "content": "Investigated database index performance regressions",
+          "confidence": 0.75,
+          "createdAt": 1749308800000,
+          "evidenceRefs": ["obs-8"]
+        },
+        "candidates": [
+          {
+            "entity": {
+              "id": "obs-8",
+              "kind": "message",
+              "content": "database tuning notes for the other repository",
+              "provenance": {},
+              "ts": 1749913600000,
+              "scopeIds": {
+                "sessionId": "sess-2",
+                "repoId": "repo-2",
+                "agentId": "agent-9"
+              },
+              "redacted": false
+            },
+            "score": 0.64,
+            "matchContext": "database tuning notes for the other repository"
+          }
+        ],
+        "provenance": {
+          "query": "database",
+          "scopeIds": {
+            "sessionId": "sess-2"
+          },
+          "totalCandidates": 1,
+          "returnedCandidates": 1,
+          "truncatedDueToTokenBudget": false,
+          "providerUsed": "local-fts"
+        }
+      }
+    }
+  ]
+}
