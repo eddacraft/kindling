@@ -29,6 +29,28 @@ export type { PinTargetType, Pin, PinInput } from './pin.js';
 
 export { PIN_TARGET_TYPES, isPinTargetType, isPinActive } from './pin.js';
 
+// Intent event types
+export type {
+  IntentEventSchemaVersion,
+  IntentEventType,
+  IntentActorKind,
+  IntentActor,
+  IntentContext,
+  IntentPayload,
+  IntentProvenance,
+  IntentRedaction,
+  IntentEvent,
+  IntentEventInput,
+} from './intent-event.js';
+
+export {
+  INTENT_EVENT_SCHEMA_VERSION,
+  INTENT_EVENT_TYPES,
+  INTENT_ACTOR_KINDS,
+  isIntentEventType,
+  isIntentActorKind,
+} from './intent-event.js';
+
 // Retrieval types
 export type {
   RetrieveOptions,
