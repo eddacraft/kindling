@@ -21,3 +21,6 @@ export * from './export/index.js';
 
 // Re-export service orchestration
 export * from './service/index.js';
+
+// Re-export intent capture (append-only store + high-signal emitters)
+export * from './intent/index.js';
