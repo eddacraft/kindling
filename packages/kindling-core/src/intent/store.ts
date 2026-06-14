@@ -198,13 +198,14 @@ export class IntentStore {
     }
 
     const tail = existing[existing.length - 1];
-    if (tail && !HASH_PATTERN.test(tail.provenance?.integrity_hash ?? '')) {
+    const tailHash = tail?.provenance?.integrity_hash;
+    if (tail && (typeof tailHash !== 'string' || !HASH_PATTERN.test(tailHash))) {
       throw new Error(
-        `IntentStore: corrupt intent log at ${this.filePath}: tail event (sequence ${tail.sequence}) has a malformed integrity_hash`,
+        `IntentStore: corrupt intent log at ${this.filePath}: tail event (sequence ${tail.sequence}) has a missing or malformed integrity_hash`,
       );
     }
     this.nextSequence = existing.length;
-    this.lastHash = tail ? tail.provenance.integrity_hash : GENESIS_HASH;
+    this.lastHash = tailHash ?? GENESIS_HASH;
     this.lastEvent = tail;
   }
 
@@ -304,6 +305,18 @@ export class IntentStore {
     for (let i = 0; i < events.length; i += 1) {
       const event = events[i];
 
+      // A persisted line can be syntactically valid JSON yet structurally
+      // malformed (hand-edited, truncated field). Guard before touching
+      // provenance so verify() returns a Result rather than throwing.
+      const recordedHash = event.provenance?.integrity_hash;
+      if (typeof recordedHash !== 'string') {
+        return err({
+          kind: 'parse_error',
+          sequence: typeof event.sequence === 'number' ? event.sequence : undefined,
+          message: `Event at index ${i} is missing provenance.integrity_hash`,
+        });
+      }
+
       if (event.sequence !== i) {
         return err({
           kind: 'sequence_gap',
@@ -313,7 +326,7 @@ export class IntentStore {
       }
 
       const expected = computeIntegrityHash(prevHash, event);
-      if (event.provenance.integrity_hash !== expected) {
+      if (recordedHash !== expected) {
         return err({
           kind: 'hash_mismatch',
           sequence: event.sequence,
@@ -321,7 +334,7 @@ export class IntentStore {
         });
       }
 
-      prevHash = event.provenance.integrity_hash;
+      prevHash = recordedHash;
     }
 
     return ok(true);
