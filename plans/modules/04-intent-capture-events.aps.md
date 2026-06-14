@@ -104,7 +104,7 @@ interface IntentEvent {
 - **Intent:** Establish a durable, versioned capture contract.
 - **Expected Outcome:** Shared schema + type definitions in core package.
 - **Validation:** `pnpm -r test --filter "*kindling-core*" -- --testNamePattern="IntentEvent schema"`
-- **Status:** In Progress
+- **Status:** Merged (PR #59, merged 2026-06-11)
 
 ### KINTENT-002: Implement hook emitters for high-signal moments
 
@@ -112,7 +112,11 @@ interface IntentEvent {
 - **Expected Outcome:** Emitters wired for session start, prompt submit, constraint/task updates, checkpoint creation.
 - **Validation:** `pnpm test -- --testNamePattern="intent emitter"`
 - **Dependencies:** KINTENT-001
-- **Status:** Ready
+- **Status:** In Progress (`feat/intent-emitters-store`)
+- **Notes:** `IntentEmitter` in `kindling-core` (`src/intent/emitter.ts`) exposes typed
+  methods for the five high-signal moments; each shapes the `event_type`, merges base
+  context/actor with per-call overrides, and appends via `IntentStore`. Mechanism only —
+  callers supply intent payload and context (no git/session sniffing in core).
 
 ### KINTENT-003: Add append-only store with hash chaining
 
@@ -120,7 +124,14 @@ interface IntentEvent {
 - **Expected Outcome:** JSONL-backed log with rolling integrity hash and monotonic sequencing.
 - **Validation:** `pnpm test -- --testNamePattern="intent store integrity"`
 - **Dependencies:** KINTENT-001
-- **Status:** Ready
+- **Status:** In Progress (`feat/intent-emitters-store`)
+- **Notes:** `IntentStore` in `kindling-core` (`src/intent/store.ts`) owns `sequence`
+  (monotonic from 0) and `provenance.integrity_hash` (un-keyed SHA-256 chain over a
+  key-sorted canonical JSON of each event). `verify()` detects payload tampering, broken
+  links, and sequence gaps; constructor recovers torn trailing lines from a crash
+  mid-append. Single-writer per workspace (documented invariant, no file lock).
+  Canonicalization contract documented for Rust-port parity (omit absent optionals,
+  never serialize as `null`).
 
 ### KINTENT-004: Add redaction boundary and safe serialization
 
