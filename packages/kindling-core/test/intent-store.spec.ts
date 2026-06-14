@@ -238,6 +238,36 @@ describe('intent store integrity', () => {
     expect(() => newStore()).toThrow(/malformed integrity_hash/);
   });
 
+  it('refuses to open a log whose tail event is missing provenance entirely', () => {
+    const store = newStore();
+    store.append(makeDraft());
+
+    const broken = JSON.parse(readFileSync(logPath, 'utf8').trim()) as Record<string, unknown>;
+    delete broken.provenance;
+    writeFileSync(logPath, JSON.stringify(broken) + '\n');
+
+    expect(() => newStore()).toThrow(/missing or malformed integrity_hash/);
+  });
+
+  it('verify returns parse_error (not a throw) for a structurally malformed event', () => {
+    const store = newStore();
+    store.append(makeDraft());
+    store.append(makeDraft({ event_type: 'intent.prompt_submitted' }));
+
+    // Strip provenance from the FIRST event so the malformed line is not the
+    // tail (the constructor guard only inspects the tail).
+    const lines = readFileSync(logPath, 'utf8').trim().split('\n');
+    const broken = JSON.parse(lines[0]) as Record<string, unknown>;
+    delete broken.provenance;
+    lines[0] = JSON.stringify(broken);
+    writeFileSync(logPath, lines.join('\n') + '\n');
+
+    const result = store.verify();
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.kind).toBe('parse_error');
+  });
+
   it('is deterministic: same drafts + clock + ids yield identical hashes', () => {
     const storeA = newStore();
     const a = storeA.append(makeDraft());
