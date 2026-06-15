@@ -8,5 +8,14 @@ repository.workspace = true
 authors.workspace = true
 rust-version.workspace = true
 
+[dependencies]
+kindling-types = { path = "../kindling-types" }
+kindling-store = { path = "../kindling-store" }
+kindling-provider = { path = "../kindling-provider" }
+kindling-filter = { path = "../kindling-filter" }
+thiserror = "2"
+serde_json = "1"
+uuid = { version = "1", features = ["v4"] }
+
 [lints]
 workspace = true

@@ -121,7 +121,7 @@ Supersedes `02-rust-hook-binary` and `03-rust-cli`. Replaces the dual-maintain p
 - **Intent:** Full orchestration layer — `open_capsule`, `close_capsule`, `append_observation`, `retrieve`, `pin`, `unpin` — available as a Rust library for direct in-process use (Anvil headless workflows, daemon, CLI)
 - **Expected Outcome:** `KindlingService::new(config)` returns a service handle; all six methods behave identically to `@eddacraft/kindling-core`'s `KindlingService`; errors propagate via the Result type pattern; server-side filtering applied at the service boundary
 - **Validation:** `cargo test -p kindling-service` passes; contract tests comparing service outputs against the TS service for identical inputs (retired after Phase 4)
-- **Status:** Ready
+- **Status:** In Progress — `feat/rust-port-service`
 - **Dependencies:** PORT-003, PORT-004, PORT-005
 
 #### PORT-007: kindling-server crate (UDS daemon)
