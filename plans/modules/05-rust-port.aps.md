@@ -1,8 +1,8 @@
 # Rust Port
 
-| ID   | Owner  | Status |
-| ---- | ------ | ------ |
-| PORT | @aneki | Ready  |
+| ID   | Owner  | Status      |
+| ---- | ------ | ----------- |
+| PORT | @aneki | In Progress |
 
 ## Purpose
 
@@ -113,7 +113,7 @@ Supersedes `02-rust-hook-binary` and `03-rust-cli`. Replaces the dual-maintain p
 - **Intent:** Local FTS retrieval provider with BM25 normalisation and tiered retrieval
 - **Expected Outcome:** FTS5 search with BM25 scoring normalised to [0, 1]; tiered retrieval (pins → current summary → ranked candidates); deterministic ordering; `RetrieveResult` shape matches the Rust types crate
 - **Validation:** `cargo test -p kindling-provider` passes; identical queries against the same database produce the same ranked results as the existing TS provider (cross-implementation parity test, retired after Phase 4)
-- **Status:** In Progress — `feat/rust-port-provider`, PR #60. Implementation notes: BM25 normalisation runs in Rust across both entity types (matching the TS provider); `RetrievalProvider` trait takes `now` explicitly (the only API deviation from TS, for deterministic recency/pin-expiry); orchestrator ports `kindling-core`'s `retrieve` with token budgeting intentionally absent (deprecated). Parity locked by committed golden fixtures (`tests/fixtures/ts-parity.{db,json}`, regen script needs Node v25.6.0 via fnm) — 14 cases JSON-identical incl. exact scores. Match-context truncation is UTF-16 code-unit based, rounds down at surrogate pairs (kindling-filter policy). Parity tests retire after Phase 4.
+- **Status:** Done — `feat/rust-port-provider`, PR #60 (merged 2026-06-11). Implementation notes: BM25 normalisation runs in Rust across both entity types (matching the TS provider); `RetrievalProvider` trait takes `now` explicitly (the only API deviation from TS, for deterministic recency/pin-expiry); orchestrator ports `kindling-core`'s `retrieve` with token budgeting intentionally absent (deprecated). Parity locked by committed golden fixtures (`tests/fixtures/ts-parity.{db,json}`, regen script needs Node v25.6.0 via fnm) — 14 cases JSON-identical incl. exact scores. Match-context truncation is UTF-16 code-unit based, rounds down at surrogate pairs (kindling-filter policy). Parity tests retire after Phase 4.
 - **Dependencies:** PORT-003
 
 #### PORT-006: kindling-service crate (in-process API)
