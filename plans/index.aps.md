@@ -5,7 +5,7 @@
 | Status  | In Progress |
 | Owner   | @aneki      |
 | Created | 2026-03-14  |
-| Updated | 2026-05-03  |
+| Updated | 2026-06-15  |
 
 ## Problem
 
@@ -30,36 +30,36 @@ Kindling is functional (596 tests passing, 10 packages building) and the TypeScr
 
 ## Modules
 
-| Module                                                                | Purpose                                                                  | Status     | Dependencies        |
-| --------------------------------------------------------------------- | ------------------------------------------------------------------------ | ---------- | ------------------- |
-| [01-npm-publish](./modules/01-npm-publish.aps.md)                     | Package metadata, READMEs, publish scripts, CI                           | Done       | —                   |
-| [02-rust-hook-binary](./modules/02-rust-hook-binary.aps.md)           | Rust binary for Claude Code hook invocations                             | Superseded | by 05               |
-| [03-rust-cli](./modules/03-rust-cli.aps.md)                           | Full Rust CLI replacing Commander.js                                     | Superseded | by 05               |
-| [04-intent-capture-events](./modules/04-intent-capture-events.aps.md) | Kindling-native intent event primitive + export                          | Ready      | —                   |
-| [04-schema-contract](./modules/04-schema-contract.aps.md)             | Cross-language SQLite schema contract for Rust+TS                        | Done       | —                   |
-| [05-rust-port](./modules/05-rust-port.aps.md)                         | Rust-canonical Kindling + thin TS client over local daemon (UDS)         | Ready      | 04-schema-contract  |
+| Module                                                                | Purpose                                                          | Status      | Dependencies       |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------- | ----------- | ------------------ |
+| [01-npm-publish](./modules/01-npm-publish.aps.md)                     | Package metadata, READMEs, publish scripts, CI                   | Done        | —                  |
+| [02-rust-hook-binary](./modules/02-rust-hook-binary.aps.md)           | Rust binary for Claude Code hook invocations                     | Superseded  | by 05              |
+| [03-rust-cli](./modules/03-rust-cli.aps.md)                           | Full Rust CLI replacing Commander.js                             | Superseded  | by 05              |
+| [04-intent-capture-events](./modules/04-intent-capture-events.aps.md) | Kindling-native intent event primitive + export                  | In Progress | —                  |
+| [04-schema-contract](./modules/04-schema-contract.aps.md)             | Cross-language SQLite schema contract for Rust+TS                | Done        | —                  |
+| [05-rust-port](./modules/05-rust-port.aps.md)                         | Rust-canonical Kindling + thin TS client over local daemon (UDS) | In Progress | 04-schema-contract |
 
 See `plans/specs/2026-05-03-rust-canonical-thin-client-design.md` for the current design (daemon, transport, distribution, TS deprecation strategy). The earlier dual-maintain spec at `plans/specs/2026-04-15-rust-port-design.md` is superseded but retained for historical context.
 
 ## Schedule
 
-| Phase   | Modules                   | Target                                                                              |
-| ------- | ------------------------- | ----------------------------------------------------------------------------------- |
-| Now     | 05-rust-port (Phase 1)    | Foundation crates: workspace, types, store, filter                                  |
-| Next    | 05-rust-port (Phase 2)    | Service + daemon + hook + Rust client; Anvil unblocks                               |
-| Then    | 05-rust-port (Phase 3)    | CLI + umbrella binary + cross-platform builds + cargo/brew/curl distribution        |
-| Then    | 05-rust-port (Phase 4)    | Thin TS client SDK on npm; deprecate TS implementation packages and Anvil bridge    |
-| Backlog | 04-intent-capture-events  | Ship intent capture primitive + export (independent of the Rust port)               |
+| Phase   | Modules                  | Target                                                                           |
+| ------- | ------------------------ | -------------------------------------------------------------------------------- |
+| Now     | 05-rust-port (Phase 1)   | Foundation crates: workspace, types, store, filter                               |
+| Next    | 05-rust-port (Phase 2)   | Service + daemon + hook + Rust client; Anvil unblocks                            |
+| Then    | 05-rust-port (Phase 3)   | CLI + umbrella binary + cross-platform builds + cargo/brew/curl distribution     |
+| Then    | 05-rust-port (Phase 4)   | Thin TS client SDK on npm; deprecate TS implementation packages and Anvil bridge |
+| Backlog | 04-intent-capture-events | Ship intent capture primitive + export (independent of the Rust port)            |
 
 ## Risks
 
-| Risk                                                  | Impact | Mitigation                                                                          |
-| ----------------------------------------------------- | ------ | ----------------------------------------------------------------------------------- |
-| Rust cross-compilation edge cases                     | Medium | `cargo-zigbuild` from a single Linux runner; CI matrix smoke-tests every target     |
-| npm postinstall download fails behind corp proxy      | Medium | Honour `npm_config_proxy` and standard env vars; document offline binary install    |
-| Daemon process orphaned / stale PID files pile up     | Medium | PID file with stale-PID cleanup on next spawn; `kindling serve --health` for ops    |
-| Cold-spawn latency exceeds 100ms on slow disks        | Low    | Measure on dogfood; spool fallback only if measured as a real problem               |
-| Schema drift between binary and client expectations   | Medium | `/v1/health` reports schemaVersion; client checks on first call, fails loud         |
+| Risk                                                | Impact | Mitigation                                                                       |
+| --------------------------------------------------- | ------ | -------------------------------------------------------------------------------- |
+| Rust cross-compilation edge cases                   | Medium | `cargo-zigbuild` from a single Linux runner; CI matrix smoke-tests every target  |
+| npm postinstall download fails behind corp proxy    | Medium | Honour `npm_config_proxy` and standard env vars; document offline binary install |
+| Daemon process orphaned / stale PID files pile up   | Medium | PID file with stale-PID cleanup on next spawn; `kindling serve --health` for ops |
+| Cold-spawn latency exceeds 100ms on slow disks      | Low    | Measure on dogfood; spool fallback only if measured as a real problem            |
+| Schema drift between binary and client expectations | Medium | `/v1/health` reports schemaVersion; client checks on first call, fails loud      |
 
 ## Open Questions
 
