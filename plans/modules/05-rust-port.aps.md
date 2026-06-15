@@ -121,7 +121,7 @@ Supersedes `02-rust-hook-binary` and `03-rust-cli`. Replaces the dual-maintain p
 - **Intent:** Full orchestration layer — `open_capsule`, `close_capsule`, `append_observation`, `retrieve`, `pin`, `unpin` — available as a Rust library for direct in-process use (Anvil headless workflows, daemon, CLI)
 - **Expected Outcome:** `KindlingService::new(config)` returns a service handle; all six methods behave identically to `@eddacraft/kindling-core`'s `KindlingService`; errors propagate via the Result type pattern; server-side filtering applied at the service boundary
 - **Validation:** `cargo test -p kindling-service` passes; contract tests comparing service outputs against the TS service for identical inputs (retired after Phase 4)
-- **Status:** In Progress — `feat/rust-port-service`
+- **Status:** Merged — `feat/rust-port-service`, PR #63 (rebase commit `79e76ac`). 24 integration tests; 6 core methods + read accessors; `ServiceError` Result surface; service-boundary secret masking (mask_secrets on append, both validate paths; truncation deferred to PORT-009); `*_at(now)` clock seams; export/import deferred to PORT-012.
 - **Dependencies:** PORT-003, PORT-004, PORT-005
 
 #### PORT-007: kindling-server crate (UDS daemon)
@@ -129,7 +129,7 @@ Supersedes `02-rust-hook-binary` and `03-rust-cli`. Replaces the dual-maintain p
 - **Intent:** Long-running local daemon serving the v1 HTTP API over a Unix domain socket
 - **Expected Outcome:** `kindling serve` listens on `~/.kindling/kindling.sock` (mode `0600`) with TCP fallback on Windows; axum routes for `/v1/health`, `/v1/capsules`, `/v1/observations`, `/v1/retrieve`, `/v1/pins`; per-project DB routing via `X-Kindling-Project` header or body field; PID file with stale-PID cleanup; idle shutdown after configurable timeout (default 30 min)
 - **Validation:** Integration tests hit the daemon over UDS with `hyper`; concurrent writes from two clients land cleanly under WAL mode; stale-PID cleanup test verifies a previous crashed daemon doesn't block a fresh spawn
-- **Status:** Ready
+- **Status:** In Progress — `feat/rust-port-server`
 - **Dependencies:** PORT-006
 
 #### PORT-008: kindling-client crate (Rust HTTP-over-UDS client)
