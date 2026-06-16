@@ -129,7 +129,7 @@ Supersedes `02-rust-hook-binary` and `03-rust-cli`. Replaces the dual-maintain p
 - **Intent:** Long-running local daemon serving the v1 HTTP API over a Unix domain socket
 - **Expected Outcome:** `kindling serve` listens on `~/.kindling/kindling.sock` (mode `0600`) with TCP fallback on Windows; axum routes for `/v1/health`, `/v1/capsules`, `/v1/observations`, `/v1/retrieve`, `/v1/pins`; per-project DB routing via `X-Kindling-Project` header or body field; PID file with stale-PID cleanup; idle shutdown after configurable timeout (default 30 min)
 - **Validation:** Integration tests hit the daemon over UDS with `hyper`; concurrent writes from two clients land cleanly under WAL mode; stale-PID cleanup test verifies a previous crashed daemon doesn't block a fresh spawn
-- **Status:** In Progress — `feat/rust-port-server`
+- **Status:** Merged — `feat/rust-port-server`, PR #64 (rebase commit `f0c6713`). 13 hyper-over-UDS tests; axum v1 routes; per-project routing via `X-Kindling-Project` (project-root string hashed by `project_id` → dir name, no path traversal); PID stale-cleanup; idle shutdown (default 30 min); UDS 0600 + parent dir 0700. Header-only routing (not body-field). Follow-ups: 422 vs 400 for malformed bodies; PID acquire not atomic; CLI wiring is PORT-013.
 - **Dependencies:** PORT-006
 
 #### PORT-008: kindling-client crate (Rust HTTP-over-UDS client)
@@ -137,7 +137,7 @@ Supersedes `02-rust-hook-binary` and `03-rust-cli`. Replaces the dual-maintain p
 - **Intent:** Rust client library for talking to the daemon — used by the hook subcommand, optionally by the CLI, and by Anvil for concurrent-safe integration
 - **Expected Outcome:** `Client::new()` auto-detects the default socket path; on `ECONNREFUSED` or missing socket, `exec`s `kindling serve --daemonize` and polls for up to 1s; methods mirror `kindling-service` API (`open_capsule`, `append_observation`, `retrieve`, `pin`, `unpin`, plus `health`); `health` checks `schemaVersion` against the client's expected version and fails loud on mismatch
 - **Validation:** Integration tests cover cold-spawn, warm-call, schema-mismatch, and connection-refused-without-binary paths; cold-spawn latency measured under 100ms on a typical dev machine
-- **Status:** Ready
+- **Status:** In Progress — `feat/rust-port-client`
 - **Dependencies:** PORT-007
 
 #### PORT-009: kindling-hook crate
