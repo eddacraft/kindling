@@ -53,6 +53,7 @@ import type {
 } from '../types/index.js';
 import { ok, err, INTENT_EVENT_SCHEMA_VERSION } from '../types/index.js';
 import { validateIntentEvent } from '../validation/index.js';
+import type { IntentRedactor } from './redaction.js';
 
 /**
  * Predecessor hash used when computing the integrity hash of the first
@@ -89,6 +90,12 @@ export interface IntentEventDraft {
 export interface IntentStoreOptions {
   now?: () => string;
   idFactory?: () => string;
+  /**
+   * Optional redaction boundary (KINTENT-004). When set, every draft is masked
+   * before it is hashed, validated, and persisted, so the integrity chain
+   * covers the redacted form and secrets never reach disk.
+   */
+  redactor?: IntentRedactor;
 }
 
 /**
@@ -172,6 +179,7 @@ export class IntentStore {
   private readonly filePath: string;
   private readonly now: () => string;
   private readonly idFactory: () => string;
+  private readonly redactor: IntentRedactor | undefined;
 
   /** Cached tail state for O(1) appends (single-writer assumption). */
   private nextSequence: number;
@@ -182,6 +190,7 @@ export class IntentStore {
     this.filePath = filePath;
     this.now = options.now ?? (() => new Date().toISOString());
     this.idFactory = options.idFactory ?? (() => randomUUID());
+    this.redactor = options.redactor;
 
     // A complete append always ends in '\n'. A trailing line without one is a
     // torn write from a crash mid-append; truncate it so the valid prefix is
@@ -215,22 +224,26 @@ export class IntentStore {
    * validation errors (in which case nothing is written).
    */
   append(draft: IntentEventDraft): Result<IntentEvent, ValidationError[]> {
+    // Redact before hashing so the integrity chain covers the masked form and
+    // no secret is ever written to disk.
+    const effective = this.redactor ? this.redactor.redactDraft(draft) : draft;
+
     const sequence = this.nextSequence;
     const candidate: IntentEvent = {
       schema_version: INTENT_EVENT_SCHEMA_VERSION,
-      event_id: draft.event_id ?? this.idFactory(),
-      occurred_at: draft.occurred_at ?? this.now(),
+      event_id: effective.event_id ?? this.idFactory(),
+      occurred_at: effective.occurred_at ?? this.now(),
       sequence,
-      event_type: draft.event_type,
-      actor: draft.actor,
-      context: draft.context,
-      intent: draft.intent,
+      event_type: effective.event_type,
+      actor: effective.actor,
+      context: effective.context,
+      intent: effective.intent,
       provenance: {
-        parent_event_id: draft.provenance?.parent_event_id,
-        source_refs: draft.provenance?.source_refs,
+        parent_event_id: effective.provenance?.parent_event_id,
+        source_refs: effective.provenance?.source_refs,
         integrity_hash: GENESIS_HASH, // placeholder, replaced below
       },
-      redaction: draft.redaction ?? {},
+      redaction: effective.redaction ?? {},
     };
 
     candidate.provenance.integrity_hash = computeIntegrityHash(this.lastHash, candidate);

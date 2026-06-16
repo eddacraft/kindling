@@ -13,3 +13,11 @@ export type {
 
 export { IntentEmitter } from './emitter.js';
 export type { IntentEmitterConfig, EmitOptions, CheckpointOptions } from './emitter.js';
+
+export {
+  IntentRedactor,
+  DEFAULT_REDACTION_POLICY,
+  DEFAULT_REDACTION_PATTERNS,
+  DEFAULT_REDACTION_PLACEHOLDER,
+} from './redaction.js';
+export type { RedactionPolicy, RedactionPattern } from './redaction.js';
