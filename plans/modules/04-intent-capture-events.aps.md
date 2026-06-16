@@ -139,7 +139,22 @@ interface IntentEvent {
 - **Expected Outcome:** Configurable redaction on known sensitive paths before persistence/export.
 - **Validation:** `pnpm test -- --testNamePattern="intent redaction"`
 - **Dependencies:** KINTENT-001
-- **Status:** Ready
+- **Status:** In Review (`feat/intent-redaction`)
+- **Notes:** `IntentRedactor` in `kindling-core` (`src/intent/redaction.ts`) is a
+  configurable transform applied before persistence/export. Two modes: **value
+  patterns** mask only the matched substring (default set covers Anthropic/OpenAI
+  keys, AWS access key ids, GitHub classic + fine-grained tokens, Slack tokens,
+  Google API keys, bearer tokens, private-key blocks, and labeled
+  `secret:`/`password=` pairs); **path redaction** (`policy.redactPaths`, prefix
+  matched) replaces a whole field value regardless of content. Masked field paths
+  are recorded in `redaction.redacted_fields` (sorted, dotted/`[index]` syntax)
+  and `redaction.policy_version` is stamped. Wired into `IntentStore` via the
+  optional `redactor` option so redaction runs _before_ hashing — the integrity
+  chain covers the masked form and secrets never reach disk. Pure (no input
+  mutation), deterministic, and idempotent. Default patterns deliberately avoid
+  lookaround for Rust `regex`-crate portability; the pattern set, placeholder, and
+  path syntax are the parity contract owed by the Rust port. 14 tests under
+  `-t "intent redaction"`. Unblocks KINTENT-005 export.
 
 ### KINTENT-005: Implement export command for Anvil ingestion
 
