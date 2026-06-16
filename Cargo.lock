@@ -449,6 +449,19 @@ version = "0.0.1"
 [[package]]
 name = "kindling-client"
 version = "0.0.1"
+dependencies = [
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "kindling-server",
+ "kindling-store",
+ "kindling-types",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tokio",
+]
 
 [[package]]
 name = "kindling-filter"
@@ -941,6 +954,7 @@ version = "1.52.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8fc7f01b389ac15039e4dc9531aa973a135d7a4135281b12d7c1bc79fd57fffe"
 dependencies = [
+ "bytes",
  "libc",
  "mio",
  "pin-project-lite",
