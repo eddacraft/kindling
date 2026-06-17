@@ -53,6 +53,7 @@ import type {
 } from '../types/index.js';
 import { ok, err, INTENT_EVENT_SCHEMA_VERSION } from '../types/index.js';
 import { validateIntentEvent } from '../validation/index.js';
+import { canonicalize } from './canonical.js';
 import type { IntentRedactor } from './redaction.js';
 
 /**
@@ -108,39 +109,6 @@ export interface IntentIntegrityError {
   /** Sequence number of the offending event, when known. */
   sequence?: number;
   message: string;
-}
-
-/**
- * Deterministically serialize a value for hashing.
- *
- * Canonicalization contract (must be matched byte-for-byte by any other
- * implementation that recomputes these hashes, e.g. the Rust port):
- * - Object keys are sorted ascending (UTF-16 code-unit order, JS default).
- * - Keys whose value is `undefined` are omitted entirely. An optional field
- *   that is absent must hash identically to one set to `undefined` — it must
- *   NOT be serialized as `null`. (Rust `Option::None` must serialize as an
- *   omitted key, i.e. `skip_serializing_if = "Option::is_none"`.)
- * - Arrays preserve element order (it is semantically meaningful), and an
- *   empty array `[]` is "present but empty" — it hashes differently from an
- *   absent/`undefined` field. Callers must not coerce `[]` to `undefined`.
- * - Strings/numbers/booleans/`null` use `JSON.stringify`.
- */
-function canonicalize(value: unknown): string {
-  if (typeof value === 'function' || typeof value === 'symbol' || typeof value === 'bigint') {
-    throw new TypeError(`canonicalize: non-serializable value of type ${typeof value}`);
-  }
-  if (value === null || typeof value !== 'object') {
-    return JSON.stringify(value) ?? 'null';
-  }
-  if (Array.isArray(value)) {
-    return `[${value.map(canonicalize).join(',')}]`;
-  }
-  const record = value as Record<string, unknown>;
-  const keys = Object.keys(record)
-    .filter((k) => record[k] !== undefined)
-    .sort();
-  const entries = keys.map((k) => `${JSON.stringify(k)}:${canonicalize(record[k])}`);
-  return `{${entries.join(',')}}`;
 }
 
 /**
