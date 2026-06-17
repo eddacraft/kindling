@@ -162,7 +162,23 @@ interface IntentEvent {
 - **Expected Outcome:** `kindling intent export` outputs signed/hashed JSONL bundle with metadata manifest.
 - **Validation:** `pnpm test -- --testNamePattern="intent export"`
 - **Dependencies:** KINTENT-002, KINTENT-003, KINTENT-004
-- **Status:** Ready
+- **Status:** In Progress (`feat/intent-export`, stacked on unmerged `feat/intent-redaction`)
+- **Notes:** Export seals a sequence range of persisted (already-redacted) intent
+  events into a portable, signed bundle for Anvil ingestion. The store's hash
+  chain is un-keyed (tamper-_evident_); export adds the keyed authentication the
+  store deferred — an **HMAC-SHA256** over a canonical manifest that binds the
+  bundle body, the chain tip, the exported sequence range, and the event count.
+  Bundle body is canonical JSONL (one sorted-key event per line, ascending by
+  sequence) so `bundle_hash` is reproducible cross-implementation; the
+  byte-for-byte canonicalization contract is shared with the store via
+  `intent/canonical.ts` (extracted from `store.ts`). `createIntentExport` +
+  `verifyIntentExport` (+ serialize/parse round-trip) live in
+  `kindling-core/src/intent/export.ts`. `verify()` detects body tamper
+  (`bundle_hash_mismatch`), forged/wrong-key signatures (`signature_mismatch`,
+  timing-safe compare), and manifest/body disagreement (`manifest_mismatch`).
+  Core exposes `fromSequence`/`toSequence`; the `--since <ref>` CLI flag maps
+  onto these and is wired by the Rust CLI port (deferred). HMAC alg, manifest
+  field set, and canonical JSONL are the parity contract owed by the Rust port.
 
 ### KINTENT-006: Add observability + capture health command
 

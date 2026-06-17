@@ -1,7 +1,10 @@
 /**
- * Intent capture: append-only store (KINTENT-003) and high-signal emitters
- * (KINTENT-002).
+ * Intent capture: append-only store (KINTENT-003), high-signal emitters
+ * (KINTENT-002), redaction boundary (KINTENT-004), and signed export
+ * (KINTENT-005).
  */
+
+export { canonicalize } from './canonical.js';
 
 export { IntentStore, GENESIS_HASH } from './store.js';
 export type {
@@ -21,3 +24,23 @@ export {
   DEFAULT_REDACTION_PLACEHOLDER,
 } from './redaction.js';
 export type { RedactionPolicy, RedactionPattern } from './redaction.js';
+
+export {
+  createIntentExport,
+  verifyIntentExport,
+  serializeIntentExport,
+  parseIntentExport,
+  INTENT_EXPORT_BUNDLE_VERSION,
+  INTENT_EXPORT_SIGNATURE_ALG,
+} from './export.js';
+export type {
+  IntentExportBundle,
+  IntentExportManifest,
+  IntentExportSignature,
+  IntentExportSequenceRange,
+  IntentExportBundleVersion,
+  IntentExportSignatureAlg,
+  CreateIntentExportOptions,
+  IntentExportError,
+  IntentExportErrorKind,
+} from './export.js';
