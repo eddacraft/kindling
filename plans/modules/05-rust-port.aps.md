@@ -145,7 +145,7 @@ Supersedes `02-rust-hook-binary` and `03-rust-cli`. Replaces the dual-maintain p
 - **Intent:** All 7 Claude Code hook types (session-start, post-tool-use, post-tool-use-failure, user-prompt-submit, subagent-stop, pre-compact, stop) handled via stdin JSON, dispatched through `kindling-client`
 - **Expected Outcome:** `kindling hook <type>` reads Claude Code hook context from stdin, calls the daemon via `kindling-client`, returns JSON response on stdout matching the Node.js script contract exactly; SessionStart and PreCompact return injected context (pins + recent observations / pins + latest summary)
 - **Validation:** Integration tests pipe JSON fixtures through the binary and verify daemon DB state; injected context JSON byte-for-byte matches Node.js output on identical fixtures; warm-hook latency <10ms measured over the 7 hook types; cold-hook (with daemon spawn) <100ms
-- **Status:** In Progress — `feat/rust-port-hook`. Design decision (D, 2026-06-18): "daemon owns injection" — the merged daemon/client surface only exposes FTS `retrieve`, but Node injection needs recency observations + pin listing + latest-summary. So PORT-009 also adds server-side injection-context endpoints (`/v1/context/session-start`, `/v1/context/pre-compact`) that assemble + format the byte-for-byte `additionalContext` markdown (incl. the `toLocaleString` date — single place), plus kindling-service assembly methods and kindling-client methods. Hook crate then forwards. Multi-crate PR.
+- **Status:** Merged — `feat/rust-port-hook`, PR #69 (rebase commits `0a94d70`+`562da49`). Daemon-owns-injection: added `/v1/context/{session-start,pre-compact}` (server formats byte-for-byte Node markdown + toLocaleString date), service assembly methods, client methods, `GET /v1/capsules/open`. Hook crate: all 7 types, capture byte-for-byte from 24 real-Node fixtures, always exits 0, warm ~2ms/cold ~14ms. Enabled serde_json `preserve_order` (types/store/hook) — closed the key-order parity debt. Known gaps: captures not attached to session capsule; two-filter design (adapter content filter + service secret mask).
 - **Dependencies:** PORT-008
 
 #### PORT-010: Cross-platform CI hook builds
@@ -153,7 +153,7 @@ Supersedes `02-rust-hook-binary` and `03-rust-cli`. Replaces the dual-maintain p
 - **Intent:** Hook (and full binary) builds for all target platforms from Phase 2 onward
 - **Expected Outcome:** GitHub Actions produces release artefacts for Linux (x86_64, aarch64, both gnu + musl), macOS (x86_64, aarch64), Windows (x86_64); `cargo-zigbuild` handles cross-targets from a single Linux runner; artefacts attached to GitHub Releases
 - **Validation:** CI matrix green; each artefact runs `kindling --version` successfully on the target platform (smoke-test step in CI)
-- **Status:** Ready
+- **Status:** In Progress — `feat/rust-port-release-ci`. Smoke-tests the umbrella `kindling` binary (`crates/kindling` skeleton already prints version; full subcommand dispatch is PORT-013 — `--version` works now). cargo-zigbuild cross-builds all 7 targets from one Linux runner.
 - **Dependencies:** PORT-009
 
 #### PORT-011: Anvil integration proof
