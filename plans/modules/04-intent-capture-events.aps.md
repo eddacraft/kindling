@@ -186,4 +186,26 @@ interface IntentEvent {
 - **Expected Outcome:** `kindling intent status` shows emitter health, last event timestamp, backlog, and integrity state.
 - **Validation:** `pnpm test -- --testNamePattern="intent status"`
 - **Dependencies:** KINTENT-002, KINTENT-003
-- **Status:** Draft
+- **Status:** In Progress
+- **Notes:** `computeIntentStatus` + `formatIntentStatus` in `kindling-core`
+  (`src/intent/status.ts`) derive a point-in-time capture health report. The
+  report combines the four required signals into one `IntentStatusReport`:
+  **emitter health** (`initialized`, `counts_by_type` per known event type,
+  rolled-up `healthy`), **last event timestamp** (`last_event` + derived
+  `last_event_age_ms`), **backlog** (events with `sequence > exportedThrough`;
+  whole log when no watermark), and **integrity state** (`integrity` from
+  `IntentStore.verify()`). `healthy = initialized && integrity.ok && !stale`;
+  a non-zero backlog deliberately does not flip `healthy` (it reflects capture,
+  not export keep-up — documented). Pure given two seams: `now` clock (for
+  age/staleness) and `exportedThrough`. Count, last event, type tallies, and
+  backlog all come from a single `readAll()` pass so they cannot disagree;
+  `verify()` re-reads disk independently (integrity must be recomputed, not
+  trusted). Staleness is strict `>` `staleAfterMs` (omit to disable). Age uses
+  an RFC3339 guard before `Date.parse` so the `null` boundary matches a Rust
+  `chrono` port rather than V8's permissive `Date.parse` grammar — the report
+  is the parity contract owed by the Rust port (field set, `healthy` formula,
+  RFC3339/`null` boundary, strict-`>` staleness, single-pass derivation,
+  `formatIntentStatus` text). 22 tests `-t "intent status"`. The
+  `kindling intent status` CLI wiring is deferred to the Rust CLI port (as the
+  export `--since` flag was), which maps `exportedThrough`/`staleAfterMs` onto
+  flags.
