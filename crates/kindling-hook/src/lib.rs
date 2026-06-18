@@ -75,8 +75,106 @@ pub fn map_capture(hook_type: HookType, input: &HookInput) -> Option<Observation
     }
 }
 
-use kindling_client::{Client, ClientError, CloseCapsuleBody};
+use std::process::ExitCode;
+
+use kindling_client::{Client, ClientConfig, ClientError, CloseCapsuleBody};
 use kindling_types::{CapsuleType, ScopeIds};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+/// Run a Claude Code hook end-to-end, owning a current-thread Tokio runtime.
+///
+/// This is the reusable entry point shared by the `kindling-hook` binary and
+/// the umbrella `kindling hook <type>` / `kindling-hook` (symlink) dispatch. It:
+///   - parses `type_arg` (the hook type string, normally `argv[1]`),
+///   - reads the hook context JSON from stdin (empty stdin → empty object),
+///   - resolves the project root and builds a daemon [`Client`],
+///   - dispatches and writes any stdout JSON,
+///   - logs ANY error to stderr in the Node format `[kindling] <Label> error:
+///     <msg>` and **always returns [`ExitCode::SUCCESS`]** so a hook can never
+///     block Claude Code.
+///
+/// Environment read (unchanged from the original binary):
+///   - `KINDLING_REPO_ROOT` — project-root override (see [`project_root`]),
+///   - `KINDLING_MAX_CONTEXT` — recent-observation cap for SessionStart,
+///   - `KINDLING_SOCK` — daemon socket path override.
+pub fn run_hook(type_arg: Option<String>) -> ExitCode {
+    // Build a dedicated current-thread runtime. A failure here is itself
+    // logged in the hook's never-block contract and still exits 0.
+    let runtime = match tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+    {
+        Ok(rt) => rt,
+        Err(e) => {
+            eprintln!("[kindling] hook error: building runtime: {e}");
+            return ExitCode::SUCCESS;
+        }
+    };
+
+    if let Err((label, message)) = runtime.block_on(run_hook_inner(type_arg)) {
+        eprintln!("[kindling] {label} error: {message}");
+    }
+    ExitCode::SUCCESS
+}
+
+/// The fallible async body of [`run_hook`]. On error returns `(log_label,
+/// message)` for the Node-style stderr line. The label is the hook's label when
+/// known, else `"hook"`.
+async fn run_hook_inner(type_arg: Option<String>) -> Result<(), (&'static str, String)> {
+    let Some(type_arg) = type_arg else {
+        return Err(("hook", "missing hook type argument".to_string()));
+    };
+    let hook_type = HookType::parse(&type_arg).map_err(|e| ("hook", e.to_string()))?;
+    let label = hook_type.log_label();
+
+    // Read all of stdin.
+    let mut buf = Vec::new();
+    let mut stdin = tokio::io::stdin();
+    stdin
+        .read_to_end(&mut buf)
+        .await
+        .map_err(|e| (label, format!("reading stdin: {e}")))?;
+
+    // Parse the hook context. An empty stdin is treated as an empty object.
+    let input: HookInput = if buf.iter().all(u8::is_ascii_whitespace) {
+        HookInput::default()
+    } else {
+        serde_json::from_slice(&buf).map_err(|e| (label, format!("failed to parse stdin: {e}")))?
+    };
+
+    // Resolve the project root for DB routing and build the client.
+    let cwd = input.cwd_or_process();
+    let root = project_root(&cwd);
+    let client = build_client(root).map_err(|e| (label, e))?;
+
+    // Dispatch and print any returned stdout JSON.
+    let output = dispatch(hook_type, &input, &client)
+        .await
+        .map_err(|e| (label, e.to_string()))?;
+    if let Some(s) = output {
+        let mut stdout = tokio::io::stdout();
+        stdout
+            .write_all(s.as_bytes())
+            .await
+            .map_err(|e| (label, format!("writing stdout: {e}")))?;
+        stdout
+            .flush()
+            .await
+            .map_err(|e| (label, format!("flushing stdout: {e}")))?;
+    }
+    Ok(())
+}
+
+/// Build a [`Client`] routed at `project_root`, honouring the `KINDLING_SOCK`
+/// socket override when set.
+fn build_client(project_root: String) -> Result<Client, String> {
+    let mut config = ClientConfig::defaults().map_err(|e| format!("client config: {e}"))?;
+    config.project_root = project_root;
+    if let Some(sock) = std::env::var_os("KINDLING_SOCK") {
+        config.socket_path = sock.into();
+    }
+    Ok(Client::with_config(config))
+}
 
 /// The hook-event name Claude Code expects in the SessionStart injection
 /// envelope.

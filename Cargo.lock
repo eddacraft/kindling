@@ -599,6 +599,16 @@ dependencies = [
 [[package]]
 name = "kindling"
 version = "0.0.1"
+dependencies = [
+ "kindling-cli",
+ "kindling-hook",
+ "kindling-server",
+ "kindling-store",
+ "kindling-types",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
 
 [[package]]
 name = "kindling-cli"
