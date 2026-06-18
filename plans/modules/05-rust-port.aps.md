@@ -164,6 +164,8 @@ Supersedes `02-rust-hook-binary` and `03-rust-cli`. Replaces the dual-maintain p
 - **Status:** Ready
 - **Dependencies:** PORT-008
 
+> **Note (`kindling-spool`):** The reusable durable-emit layer is the `kindling-spool` crate, a thin opt-in wrapper over `kindling-client`. It keeps the daemon (SQLite) authoritative and treats a local append-only NDJSON spool as a transient write buffer: `append_observation` tries the socket and, on a connectivity failure only (`Unavailable`/`Http`), buffers to the spool; daemon-rejection errors (`Api`/`SchemaMismatch`/…) propagate and are never spooled. The spool drains on `flush()` and opportunistically on the next successful append. PORT-011's Anvil sink (and any other producer that wants outage-survivable emits, e.g. the `usage.ndjson` pattern) builds on this instead of reinventing a fallback. v1 is at-least-once on a stable observation id; exactly-once is a noted follow-up (daemon-side dedup-on-id).
+
 ### Phase 3 — CLI + Distribution
 
 #### PORT-012: kindling-cli crate
