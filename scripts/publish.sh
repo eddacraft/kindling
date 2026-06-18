@@ -11,6 +11,7 @@
 #   kindling-provider  -> store, types
 #   kindling-service   -> types, store, provider, filter
 #   kindling-client    -> types
+#   kindling-spool     -> client, types   (durable-emit layer; depends on client)
 #   kindling-server    -> types, store, service
 #   kindling-hook      -> client, types
 #   kindling-cli       -> types, store, service, client, server
@@ -47,6 +48,7 @@ kindling-store
 kindling-provider
 kindling-service
 kindling-client
+kindling-spool
 kindling-server
 kindling-hook
 kindling-cli
