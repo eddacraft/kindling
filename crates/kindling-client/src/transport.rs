@@ -5,18 +5,29 @@
 //! connect is refused, we invoke the spawner ONCE and poll the socket until a
 //! connection succeeds or the connect budget elapses.
 
+#[cfg(unix)]
 use std::io;
+#[cfg(unix)]
 use std::path::Path;
+#[cfg(unix)]
 use std::time::{Duration, Instant};
 
+#[cfg(unix)]
 use http_body_util::BodyExt;
 use hyper::body::Bytes;
+#[cfg(unix)]
 use hyper::client::conn::http1;
-use hyper::{Request, StatusCode};
+#[cfg(unix)]
+use hyper::Request;
+use hyper::StatusCode;
+#[cfg(unix)]
 use hyper_util::rt::TokioIo;
+#[cfg(unix)]
 use tokio::net::UnixStream;
 
-use crate::config::{ClientConfig, Spawner};
+use crate::config::ClientConfig;
+#[cfg(unix)]
+use crate::config::Spawner;
 use crate::error::ClientError;
 
 /// A decoded HTTP response: status plus raw body bytes.
@@ -27,6 +38,8 @@ pub(crate) struct RawResponse {
 
 /// One request to send: verb, URI, optional project header, and a
 /// pre-serialized JSON body (empty for bodyless requests).
+// On non-unix the request path is a stub that ignores these fields.
+#[cfg_attr(not(unix), allow(dead_code))]
 pub(crate) struct OutgoingRequest<'a> {
     pub method: &'a str,
     pub path: &'a str,
@@ -37,6 +50,7 @@ pub(crate) struct OutgoingRequest<'a> {
 
 /// Connect to the daemon socket (spawning + polling per `cfg` if necessary),
 /// then send one request and collect the response.
+#[cfg(unix)]
 pub(crate) async fn request(
     cfg: &ClientConfig,
     req: OutgoingRequest<'_>,
@@ -100,6 +114,7 @@ pub(crate) async fn request(
 ///    spawner ONCE, then poll-connect every `poll_interval` until success or
 ///    the `connect_timeout` budget elapses.
 /// 3. If still failing, return [`ClientError::Unavailable`].
+#[cfg(unix)]
 async fn ensure_connected(
     socket_path: &Path,
     spawner: &Spawner,
@@ -150,9 +165,26 @@ async fn ensure_connected(
 
 /// Whether a connect error means "daemon not (yet) listening": a missing socket
 /// file or a refused connection.
+#[cfg(unix)]
 fn is_absent(e: &io::Error) -> bool {
     matches!(
         e.kind(),
         io::ErrorKind::NotFound | io::ErrorKind::ConnectionRefused
     )
+}
+
+/// Windows stub. The client talks to the daemon over a Unix domain socket; the
+/// daemon's Windows transport (loopback TCP) is not yet wired end-to-end, so on
+/// Windows every request fails loud with a clear message rather than silently
+/// misbehaving. The binary still builds and ships (the release smoke-test
+/// format-verifies the Windows artefact rather than executing it); real Windows
+/// support is deferred (tracked with the daemon's Windows TCP fallback).
+#[cfg(not(unix))]
+pub(crate) async fn request(
+    _cfg: &ClientConfig,
+    _req: OutgoingRequest<'_>,
+) -> Result<RawResponse, ClientError> {
+    Err(ClientError::Unavailable(
+        "the Kindling client requires a Unix domain socket; Windows is not yet supported".into(),
+    ))
 }
