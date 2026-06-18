@@ -18,8 +18,9 @@ use clap::{Args, Parser, Subcommand};
 #[derive(Debug, Parser)]
 #[command(name = "kindling", version, about, long_about = None)]
 pub struct Cli {
-    /// Route daemon-backed verbs (log, capsule, search, pin, unpin) through the
-    /// running daemon via the UDS client instead of opening the DB in-process.
+    /// Route daemon-backed verbs (log, capsule, search, pin, unpin, forget)
+    /// through the running daemon via the UDS client instead of opening the DB
+    /// in-process.
     #[arg(long, global = true)]
     pub via_daemon: bool,
 
@@ -65,6 +66,9 @@ pub enum Command {
 
     /// Remove a pin by ID.
     Unpin(UnpinArgs),
+
+    /// Redact (forget) an observation by ID.
+    Forget(ForgetArgs),
 
     /// Export memory to file (default: kindling-export-<timestamp>.json).
     Export(ExportArgs),
@@ -235,6 +239,15 @@ pub struct PinArgs {
 #[derive(Debug, Args)]
 pub struct UnpinArgs {
     /// Pin ID to remove.
+    pub id: String,
+
+    #[command(flatten)]
+    pub common: CommonOpts,
+}
+
+#[derive(Debug, Args)]
+pub struct ForgetArgs {
+    /// Observation ID to redact (exact id; no prefix matching).
     pub id: String,
 
     #[command(flatten)]

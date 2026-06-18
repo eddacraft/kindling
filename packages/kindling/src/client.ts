@@ -183,6 +183,23 @@ export class Kindling {
   }
 
   /**
+   * `POST /v1/observations/:id/forget` — redact an observation (content replaced
+   * with `[redacted]`, `redacted` flag set). Resolves on `204`.
+   *
+   * A missing id throws {@link ApiError} with status `404` (the daemon maps the
+   * store's `ObservationNotFound`). The `observationId` must be exact — prefix
+   * resolution is a higher-layer concern.
+   */
+  async forget(observationId: string): Promise<void> {
+    await this.#callNoContent(
+      'POST',
+      `/v1/observations/${encodeURIComponent(observationId)}/forget`,
+      true,
+      [204],
+    );
+  }
+
+  /**
    * `POST /v1/context/session-start` — the assembled SessionStart injection
    * markdown, or `null` when there is nothing to inject. The project scope is
    * derived from this client's project root, mirroring the hook's

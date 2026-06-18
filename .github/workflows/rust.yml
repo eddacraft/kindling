@@ -177,3 +177,10 @@ jobs:
           --filter @eddacraft/kindling-adapter-opencode
           --filter @eddacraft/kindling-adapter-pocketflow
           run test
+      # The Claude Code plugin's /memory slash commands shell out to the same
+      # kindling binary; exercise them against the built debug binary. The suite
+      # skips itself when KINDLING_BIN is unset, so it only runs here.
+      - name: plugin /memory commands
+        env:
+          KINDLING_BIN: ${{ github.workspace }}/target/debug/kindling
+        run: pnpm --filter @eddacraft/kindling-plugin-claude-code run test

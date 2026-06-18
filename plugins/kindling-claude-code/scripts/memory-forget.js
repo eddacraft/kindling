@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-const { init, cleanup, getProjectRoot } = require('../hooks/lib/init.js');
+const { dbPath, runJson } = require('./lib/kindling.js');
+
 const cwd = process.cwd();
-const repoRoot = getProjectRoot(cwd);
+const db = dbPath(cwd);
 const obsId = process.argv[2] || '';
 
 if (!obsId) {
@@ -10,26 +11,31 @@ if (!obsId) {
   process.exit(0);
 }
 
-const { db, store } = init(cwd);
-try {
-  const obs = db
-    .prepare('SELECT id, kind, content FROM observations WHERE repo_id = ? AND id LIKE ? LIMIT 1')
-    .get(repoRoot, obsId + '%');
+// Prefix-resolve the observation id. `kindling forget` takes an exact id, so we
+// scan `list observations --json` (raw rows: { id, kind, content, ... }) for the
+// first id that starts with the supplied prefix.
+const observations = runJson([
+  'list',
+  'observations',
+  '--db',
+  db,
+  '--limit',
+  '500',
+  '--json',
+]);
+const obs = (observations || []).find((o) => String(o.id).startsWith(obsId));
 
-  if (!obs) {
-    console.log('Observation not found: ' + obsId);
-    process.exit(0);
-  }
-
-  store.redactObservation(obs.id);
-
-  const preview = (obs.content || '').substring(0, 100).replace(/\n/g, ' ');
-  console.log('Redacted observation:');
-  console.log('  ID: ' + obs.id.substring(0, 8));
-  console.log('  Kind: ' + obs.kind);
-  console.log('  Content: ' + preview + '...');
-  console.log('');
-  console.log('This observation has been removed from search results.');
-} finally {
-  cleanup(db);
+if (!obs) {
+  console.log('Observation not found: ' + obsId);
+  process.exit(0);
 }
+
+runJson(['forget', obs.id, '--db', db, '--json']);
+
+const preview = (obs.content || '').substring(0, 100).replace(/\n/g, ' ');
+console.log('Redacted observation:');
+console.log('  ID: ' + String(obs.id).substring(0, 8));
+console.log('  Kind: ' + obs.kind);
+console.log('  Content: ' + preview + '...');
+console.log('');
+console.log('This observation has been removed from search results.');

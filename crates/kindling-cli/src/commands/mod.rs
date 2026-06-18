@@ -4,6 +4,7 @@
 
 pub mod capsule;
 pub mod export;
+pub mod forget;
 pub mod init;
 pub mod list;
 pub mod log;

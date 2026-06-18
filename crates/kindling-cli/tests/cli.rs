@@ -122,6 +122,90 @@ fn pin_unpin_and_list_pins() {
 }
 
 #[test]
+fn forget_redacts_observation() {
+    let env = CliEnv::new();
+
+    // Log a searchable observation.
+    let log = env.run_db(&["log", "forgettable cli needle", "--json"]);
+    assert_success(&log);
+    let obs_id = json_stdout(&log)["id"].as_str().unwrap().to_string();
+
+    // It surfaces in search before forgetting.
+    let search = env.run_db(&["search", "needle", "--json"]);
+    assert_success(&search);
+    let before = json_stdout(&search);
+    assert!(
+        before["candidates"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|c| c["entity"]["id"] == json!(obs_id)),
+        "observation should surface before forget: {before:#}"
+    );
+
+    // Forget it (text mode).
+    let forget = env.run_db(&["forget", &obs_id]);
+    assert_success(&forget);
+    assert!(stdout(&forget).contains(&format!("Redacted observation {obs_id}")));
+
+    // It no longer surfaces in search.
+    let search2 = env.run_db(&["search", "needle", "--json"]);
+    assert_success(&search2);
+    let after = json_stdout(&search2);
+    assert!(
+        !after["candidates"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|c| c["entity"]["id"] == json!(obs_id)),
+        "redacted observation must not surface after forget: {after:#}"
+    );
+
+    // The raw row shows redacted = 1 and the placeholder content.
+    let list = env.run_db(&["list", "observations", "--json"]);
+    assert_success(&list);
+    let rows = json_stdout(&list);
+    let row = rows
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["id"] == json!(obs_id))
+        .expect("row still present after redact");
+    assert_eq!(row["redacted"], json!(1));
+    assert_eq!(row["content"], json!("[redacted]"));
+}
+
+#[test]
+fn forget_json_shape() {
+    let env = CliEnv::new();
+    let log = env.run_db(&["log", "json forget target", "--json"]);
+    let obs_id = json_stdout(&log)["id"].as_str().unwrap().to_string();
+
+    let forget = env.run_db(&["forget", &obs_id, "--json"]);
+    assert_success(&forget);
+    let v = json_stdout(&forget);
+    assert_eq!(v["redacted"], json!(true));
+    assert_eq!(v["id"], json!(obs_id));
+}
+
+#[test]
+fn forget_unknown_observation_errors() {
+    let env = CliEnv::new();
+    let out = env.run_db(&["forget", "does-not-exist", "--json"]);
+    assert!(!out.status.success());
+    let v: serde_json::Value = serde_json::from_str(support::stderr(&out).trim()).unwrap();
+    assert!(
+        v["error"].as_str().unwrap().contains("does-not-exist")
+            || v["error"]
+                .as_str()
+                .unwrap()
+                .to_lowercase()
+                .contains("not found"),
+        "error should mention the missing observation: {v}"
+    );
+}
+
+#[test]
 fn list_observations_uses_raw_row_shape() {
     let env = CliEnv::new();
     env.run_db(&["log", "row shape", "--session", "sess"]);

@@ -3,8 +3,8 @@
 //! Defines the `clap` command tree ([`Cli`]) and handlers for the 12 CLI verbs.
 //! The default execution mode is **in-process** via [`kindling_service`]; the
 //! global `--via-daemon` flag switches the daemon-backed verbs (log, capsule
-//! open/close, search, pin, unpin) to route through [`kindling_client`] for
-//! safe concurrent use alongside other Kindling tools.
+//! open/close, search, pin, unpin, forget) to route through [`kindling_client`]
+//! for safe concurrent use alongside other Kindling tools.
 //!
 //! `export`/`import`/`status`/`list`/`init` are always in-process (they operate
 //! on the DB file directly or have no daemon endpoint). `serve` starts the UDS
@@ -19,7 +19,8 @@ mod output;
 
 pub use cli::{
     CapsuleCloseArgs, CapsuleCommand, CapsuleOpenArgs, Cli, Command, CommonOpts, ExportArgs,
-    ImportArgs, InitArgs, ListArgs, LogArgs, PinArgs, SearchArgs, ServeArgs, StatusArgs, UnpinArgs,
+    ForgetArgs, ImportArgs, InitArgs, ListArgs, LogArgs, PinArgs, SearchArgs, ServeArgs,
+    StatusArgs, UnpinArgs,
 };
 
 use std::path::PathBuf;
@@ -139,6 +140,7 @@ fn json_flag(command: &Command) -> bool {
         Command::List(a) => a.common.json,
         Command::Pin(a) => a.common.json,
         Command::Unpin(a) => a.common.json,
+        Command::Forget(a) => a.common.json,
         Command::Export(a) => a.common.json,
         Command::Import(a) => a.common.json,
         Command::Serve(_) => false,
@@ -161,6 +163,7 @@ fn dispatch(cli: Cli) -> CliResult {
         Command::List(args) => commands::list::run(args),
         Command::Pin(args) => commands::pin::run_pin(args, via_daemon),
         Command::Unpin(args) => commands::pin::run_unpin(args, via_daemon),
+        Command::Forget(args) => commands::forget::run(args, via_daemon),
         Command::Export(args) => commands::export::run_export(args, via_daemon),
         Command::Import(args) => commands::export::run_import(args, via_daemon),
         Command::Serve(args) => commands::serve::run(args),

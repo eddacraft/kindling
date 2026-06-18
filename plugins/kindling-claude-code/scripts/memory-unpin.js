@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-const { init, cleanup, getProjectRoot } = require('../hooks/lib/init.js');
+const { dbPath, runJson } = require('./lib/kindling.js');
+
 const cwd = process.cwd();
-const repoRoot = getProjectRoot(cwd);
+const db = dbPath(cwd);
 const pinId = process.argv[2] || '';
 
 if (!pinId) {
@@ -10,24 +11,21 @@ if (!pinId) {
   process.exit(0);
 }
 
-const { db, store } = init(cwd);
-try {
-  const pins = store.listActivePins({ repoId: repoRoot }, Date.now());
-  const pin = pins.find((p) => p.id.startsWith(pinId));
+// Prefix-resolve the pin id from `kindling list pins --json`, then unpin the
+// full id (the CLI's `unpin` takes an exact id).
+const pins = runJson(['list', 'pins', '--db', db, '--json']);
+const pin = (pins || []).find((p) => String(p.id).startsWith(pinId));
 
-  if (!pin) {
-    console.log('Pin not found: ' + pinId);
-    console.log('Use /memory pins to see all pin IDs.');
-    process.exit(0);
-  }
-
-  store.deletePin(pin.id);
-
-  console.log('Removed pin:');
-  console.log('  ID: ' + pin.id.substring(0, 8));
-  console.log('  Note: ' + (pin.note || 'Pin'));
-  console.log('');
-  console.log('Remaining pins: ' + (pins.length - 1));
-} finally {
-  cleanup(db);
+if (!pin) {
+  console.log('Pin not found: ' + pinId);
+  console.log('Use /memory pins to see all pin IDs.');
+  process.exit(0);
 }
+
+runJson(['unpin', pin.id, '--db', db, '--json']);
+
+console.log('Removed pin:');
+console.log('  ID: ' + String(pin.id).substring(0, 8));
+console.log('  Note: ' + (pin.reason || 'Pin'));
+console.log('');
+console.log('Remaining pins: ' + (pins.length - 1));

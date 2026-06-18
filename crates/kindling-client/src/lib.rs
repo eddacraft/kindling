@@ -19,6 +19,7 @@
 //! GET    /v1/capsules/open?sessionId → 200 Capsule | null
 //! PATCH  /v1/capsules/:id/close      → 200 Capsule
 //! POST   /v1/observations            → 201 Observation
+//! POST   /v1/observations/:id/forget  → 204 (redact an observation)
 //! POST   /v1/retrieve                → 200 RetrieveResult
 //! POST   /v1/pins                    → 201 Pin
 //! DELETE /v1/pins/:id                → 204
@@ -277,6 +278,18 @@ impl Client {
     pub async fn unpin(&self, pin_id: &str) -> Result<(), ClientError> {
         let path = format!("/v1/pins/{}", pin_id);
         self.call_no_content("DELETE", &path, true, &[StatusCode::NO_CONTENT])
+            .await
+    }
+
+    /// `POST /v1/observations/:id/forget` — redact an observation (content
+    /// replaced with `[redacted]`, `redacted` flag set). Succeeds on `204`.
+    ///
+    /// A missing id surfaces as [`ClientError::Api`] with status `404` (the
+    /// daemon maps the store's `ObservationNotFound`). The `observation_id` must
+    /// be exact — prefix resolution is a higher-layer concern.
+    pub async fn forget(&self, observation_id: &str) -> Result<(), ClientError> {
+        let path = format!("/v1/observations/{}/forget", observation_id);
+        self.call_no_content("POST", &path, true, &[StatusCode::NO_CONTENT])
             .await
     }
 

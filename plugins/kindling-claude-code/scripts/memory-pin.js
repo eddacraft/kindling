@@ -1,16 +1,16 @@
 #!/usr/bin/env node
-const { init, cleanup, getProjectRoot } = require('../hooks/lib/init.js');
-const { randomUUID } = require('crypto');
+const { dbPath, runJson } = require('./lib/kindling.js');
+
 const cwd = process.cwd();
-const repoRoot = getProjectRoot(cwd);
+const db = dbPath(cwd);
 const args = process.argv.slice(2).join(' ');
 
-// Parse TTL if present (e.g., '7d', '24h', '30m')
+// Parse TTL if present (e.g., '7d', '24h', '30m').
 let note = args;
 let ttlMs = null;
 const ttlMatch = args.match(/--ttl\s+(\d+)([dhm])/);
 if (ttlMatch) {
-  const val = parseInt(ttlMatch[1]);
+  const val = parseInt(ttlMatch[1], 10);
   const unit = ttlMatch[2];
   const multipliers = { d: 86400000, h: 3600000, m: 60000 };
   ttlMs = val * multipliers[unit];
@@ -18,36 +18,31 @@ if (ttlMatch) {
 }
 if (!note) note = 'Pinned observation';
 
-const { db, store } = init(cwd);
-try {
-  const lastObs = db
-    .prepare('SELECT * FROM observations WHERE repo_id = ? ORDER BY ts DESC LIMIT 1')
-    .get(repoRoot);
-  if (!lastObs) {
-    console.log('No observations to pin yet.');
-    process.exit(0);
-  }
+// Resolve the most-recent observation: `kindling list observations --limit 1`.
+// Raw rows (snake_case): { id, kind, content, ts, scope_ids, redacted }.
+const recent = runJson(['list', 'observations', '--db', db, '--limit', '1', '--json']);
 
-  const pin = {
-    id: randomUUID(),
-    targetType: 'observation',
-    targetId: lastObs.id,
-    note: note,
-    createdAt: Date.now(),
-    expiresAt: ttlMs ? Date.now() + ttlMs : null,
-    scopeIds: { repoId: repoRoot },
-  };
-
-  store.insertPin(pin);
-
-  const preview = (lastObs.content || '').substring(0, 100).replace(/\n/g, ' ');
-  console.log('Pinned observation:');
-  console.log('  Kind: ' + lastObs.kind);
-  console.log('  Note: ' + note);
-  console.log('  Content: ' + preview + '...');
-  if (ttlMs) console.log('  Expires: ' + new Date(pin.expiresAt).toLocaleString());
-  console.log('');
-  console.log('Use /memory pins to see all pinned items.');
-} finally {
-  cleanup(db);
+const lastObs = recent && recent[0];
+if (!lastObs) {
+  console.log('No observations to pin yet.');
+  process.exit(0);
 }
+
+// Pin it: `kindling pin observation <id> --note <s> [--ttl <ms>] --json`.
+const pinArgs = ['pin', 'observation', lastObs.id, '--db', db, '--note', note];
+if (ttlMs) {
+  pinArgs.push('--ttl', String(ttlMs));
+}
+pinArgs.push('--json');
+const pin = runJson(pinArgs);
+
+const preview = (lastObs.content || '').substring(0, 100).replace(/\n/g, ' ');
+console.log('Pinned observation:');
+console.log('  Kind: ' + lastObs.kind);
+console.log('  Note: ' + note);
+console.log('  Content: ' + preview + '...');
+if (pin && pin.expiresAt) {
+  console.log('  Expires: ' + new Date(pin.expiresAt).toLocaleString());
+}
+console.log('');
+console.log('Use /memory pins to see all pinned items.');
