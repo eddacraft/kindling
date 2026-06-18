@@ -1,7 +1,7 @@
 /**
  * Intent capture: append-only store (KINTENT-003), high-signal emitters
  * (KINTENT-002), redaction boundary (KINTENT-004), and signed export
- * (KINTENT-005).
+ * (KINTENT-005), and the capture health report (KINTENT-006).
  */
 
 export { canonicalize } from './canonical.js';
@@ -44,3 +44,12 @@ export type {
   IntentExportError,
   IntentExportErrorKind,
 } from './export.js';
+
+export { computeIntentStatus, formatIntentStatus } from './status.js';
+export type {
+  IntentStatusReport,
+  IntentStatusLastEvent,
+  IntentStatusIntegrity,
+  IntentStatusOptions,
+  IntentStatusSource,
+} from './status.js';
