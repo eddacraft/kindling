@@ -69,9 +69,9 @@ importers:
 
   packages/kindling-adapter-opencode:
     dependencies:
-      '@eddacraft/kindling-core':
+      '@eddacraft/kindling':
         specifier: workspace:*
-        version: link:../kindling-core
+        version: link:../kindling
     devDependencies:
       '@types/node':
         specifier: ^20.11.0
@@ -85,9 +85,9 @@ importers:
 
   packages/kindling-adapter-pocketflow:
     dependencies:
-      '@eddacraft/kindling-core':
+      '@eddacraft/kindling':
         specifier: workspace:*
-        version: link:../kindling-core
+        version: link:../kindling
     devDependencies:
       '@types/node':
         specifier: ^20.11.0

@@ -4,7 +4,7 @@
  * Maps OpenCode events to Kindling observations with provenance.
  */
 
-import type { ObservationKind, ObservationInput } from '@eddacraft/kindling-core';
+import type { ObservationKind, ObservationInput, ScopeIds } from '@eddacraft/kindling';
 import type { OpenCodeEvent } from './events.js';
 import {
   extractToolCallProvenance,
@@ -69,7 +69,7 @@ export function mapEvent(event: OpenCodeEvent): MapEventResult {
   const provenance = extractProvenance(event);
 
   // Build scope IDs
-  const scopeIds: Record<string, string> = {
+  const scopeIds: ScopeIds = {
     sessionId: event.sessionId,
   };
 
@@ -82,7 +82,10 @@ export function mapEvent(event: OpenCodeEvent): MapEventResult {
     observation: {
       kind,
       content,
-      provenance,
+      // Provenance values come from arbitrary event payloads; they are JSON
+      // over the wire and the daemon validates. The generated `JsonValue`-keyed
+      // type is narrower than this call site can statically prove.
+      provenance: provenance as ObservationInput['provenance'],
       scopeIds,
     },
   };

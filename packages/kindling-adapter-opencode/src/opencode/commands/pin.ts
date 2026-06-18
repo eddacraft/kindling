@@ -1,18 +1,29 @@
 /**
  * /memory pin command
  *
- * Pins observations or summaries for persistent retrieval
+ * Pins observations or summaries for persistent retrieval via the daemon-backed
+ * {@link PinService} (the {@link import('@eddacraft/kindling').Kindling} thin
+ * client). The daemon owns pin id minting and target validation, so this command
+ * no longer constructs a `Pin` locally or checks target existence up front — a
+ * missing target surfaces as the daemon's error.
  */
 
-import type { Pin, ScopeIds, ID } from '@eddacraft/kindling-core';
+import type { PinTargetType, ScopeIds, Pin } from '@eddacraft/kindling';
 
 /**
- * Store interface for pin command
+ * Pin service interface.
+ *
+ * Satisfied by the {@link import('@eddacraft/kindling').Kindling} thin client —
+ * `memoryPin` only needs its `pin` method.
  */
-export interface PinStore {
-  insertPin(pin: Pin): void;
-  getObservationById(id: ID): { id: ID } | undefined;
-  getSummaryById(id: ID): { id: ID } | undefined;
+export interface PinService {
+  pin(args: {
+    targetType: PinTargetType;
+    targetId: string;
+    note?: string;
+    ttlMs?: number;
+    scopeIds?: ScopeIds;
+  }): Promise<Pin>;
 }
 
 /**
@@ -20,15 +31,15 @@ export interface PinStore {
  */
 export interface PinOptions {
   /** Type of target to pin */
-  targetType: 'observation' | 'summary';
+  targetType: PinTargetType;
   /** ID of target to pin */
-  targetId: ID;
-  /** Optional reason for pinning */
+  targetId: string;
+  /** Optional reason for pinning (sent to the daemon as the pin note) */
   reason?: string;
   /** Scope for the pin */
-  scopeIds: ScopeIds;
-  /** Optional expiry time (timestamp) */
-  expiresAt?: number;
+  scopeIds?: ScopeIds;
+  /** Optional time-to-live in milliseconds (relative) */
+  ttlMs?: number;
 }
 
 /**
@@ -36,11 +47,11 @@ export interface PinOptions {
  */
 export interface PinResult {
   /** Pin ID */
-  pinId: ID;
+  pinId: string;
   /** Target ID that was pinned */
-  targetId: ID;
+  targetId: string;
   /** Target type */
-  targetType: 'observation' | 'summary';
+  targetType: PinTargetType;
   /** Whether pin was created */
   created: boolean;
   /** Error if any */
@@ -48,52 +59,26 @@ export interface PinResult {
 }
 
 /**
- * Execute /memory pin command
+ * Execute /memory pin command.
  *
- * @param store - Pin store
+ * @param service - Pin service (the daemon client)
  * @param options - Pin options
  * @returns Pin result
  */
-export function memoryPin(store: PinStore, options: PinOptions): PinResult {
-  const { targetType, targetId, reason, scopeIds, expiresAt } = options;
-
-  // Verify target exists
-  let targetExists = false;
-
-  if (targetType === 'observation') {
-    targetExists = !!store.getObservationById(targetId);
-  } else if (targetType === 'summary') {
-    targetExists = !!store.getSummaryById(targetId);
-  }
-
-  if (!targetExists) {
-    return {
-      pinId: '',
-      targetId,
-      targetType,
-      created: false,
-      error: `${targetType} ${targetId} not found`,
-    };
-  }
-
-  // Create pin
-  const pinId = `pin-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-
-  const pin: Pin = {
-    id: pinId,
-    targetType,
-    targetId,
-    reason,
-    createdAt: Date.now(),
-    scopeIds,
-    expiresAt,
-  };
+export async function memoryPin(service: PinService, options: PinOptions): Promise<PinResult> {
+  const { targetType, targetId, reason, scopeIds, ttlMs } = options;
 
   try {
-    store.insertPin(pin);
+    const pin = await service.pin({
+      targetType,
+      targetId,
+      ...(reason !== undefined ? { note: reason } : {}),
+      ...(ttlMs !== undefined ? { ttlMs } : {}),
+      ...(scopeIds !== undefined ? { scopeIds } : {}),
+    });
 
     return {
-      pinId,
+      pinId: pin.id,
       targetId,
       targetType,
       created: true,

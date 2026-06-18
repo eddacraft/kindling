@@ -4,10 +4,13 @@
  * Searches memory and returns relevant context
  */
 
-import type { RetrieveResult, ScopeIds } from '@eddacraft/kindling-core';
+import type { RetrieveResult, ScopeIds } from '@eddacraft/kindling';
 
 /**
- * Retrieval service interface
+ * Retrieval service interface.
+ *
+ * Satisfied by the {@link import('@eddacraft/kindling').Kindling} thin client —
+ * `memorySearch` only needs its `retrieve` method.
  */
 export interface RetrievalService {
   retrieve(options: {

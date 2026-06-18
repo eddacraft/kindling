@@ -12,7 +12,6 @@ export {
   KindlingFlow,
   type KindlingNodeContext,
   type NodeMetadata,
-  type PocketFlowStore,
 } from './pocketflow/lifecycle.js';
 
 // Intent inference

@@ -10,6 +10,10 @@ on:
       - 'packages/kindling/src/generated/**'
       - 'packages/kindling/schema/**'
       - 'packages/kindling/scripts/sync-types.mjs'
+      # The live adapters consume the thin client and are exercised against the
+      # daemon by the thin-client job.
+      - 'packages/kindling-adapter-opencode/**'
+      - 'packages/kindling-adapter-pocketflow/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
       - 'rust-toolchain.toml'
@@ -23,6 +27,10 @@ on:
       - 'packages/kindling/src/generated/**'
       - 'packages/kindling/schema/**'
       - 'packages/kindling/scripts/sync-types.mjs'
+      # The live adapters consume the thin client and are exercised against the
+      # daemon by the thin-client job.
+      - 'packages/kindling-adapter-opencode/**'
+      - 'packages/kindling-adapter-pocketflow/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
       - 'rust-toolchain.toml'
@@ -134,11 +142,12 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --workspace --release
 
-  # Exercises the thin TS client (@eddacraft/kindling) against a REAL daemon.
-  # The client's integration tests skip when target/debug/kindling is absent
-  # (e.g. the TS-only `pnpm -r test`); this job builds it so they actually run.
+  # Exercises the thin TS client (@eddacraft/kindling) AND the live TS adapters
+  # (opencode, pocketflow) against a REAL daemon. Their integration tests skip
+  # when target/debug/kindling is absent (e.g. the TS-only `pnpm -r test`); this
+  # job builds it so they actually run.
   thin-client:
-    name: thin TS client vs daemon
+    name: thin TS client + adapters vs daemon
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -153,5 +162,18 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
+      # Build the thin client first so the adapters' workspace link resolves.
       - run: pnpm --filter @eddacraft/kindling run build
       - run: pnpm --filter @eddacraft/kindling run test
+      # The adapters now consume the thin client; build + exercise them against
+      # the same daemon binary.
+      - run: >-
+          pnpm
+          --filter @eddacraft/kindling-adapter-opencode
+          --filter @eddacraft/kindling-adapter-pocketflow
+          run build
+      - run: >-
+          pnpm
+          --filter @eddacraft/kindling-adapter-opencode
+          --filter @eddacraft/kindling-adapter-pocketflow
+          run test

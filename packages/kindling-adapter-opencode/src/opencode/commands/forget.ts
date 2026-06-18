@@ -1,25 +1,21 @@
 /**
  * /memory forget command
  *
- * Redacts observations to protect privacy
+ * MIGRATION NOTE (PORT-019): this command redacted observations through the
+ * in-process store's `redactObservation`. The thin
+ * {@link import('@eddacraft/kindling').Kindling} client / daemon exposes NO
+ * redaction endpoint, so the command cannot be wired to the daemon. It is kept
+ * as a clearly-marked stub (so the command surface and its formatter stay
+ * stable) that always reports the operation as unsupported. Re-enable once the
+ * daemon grows an observation-redaction endpoint.
  */
-
-import type { ID } from '@eddacraft/kindling-core';
-
-/**
- * Store interface for forget command
- */
-export interface ForgetStore {
-  redactObservation(id: ID): void;
-  getObservationById(id: ID): { id: ID; redacted: boolean } | undefined;
-}
 
 /**
  * Forget options
  */
 export interface ForgetOptions {
   /** ID of observation to forget */
-  observationId: ID;
+  observationId: string;
 }
 
 /**
@@ -27,7 +23,7 @@ export interface ForgetOptions {
  */
 export interface ForgetResult {
   /** Observation ID */
-  observationId: ID;
+  observationId: string;
   /** Whether observation was redacted */
   redacted: boolean;
   /** Error if any */
@@ -35,50 +31,20 @@ export interface ForgetResult {
 }
 
 /**
- * Execute /memory forget command
+ * Execute /memory forget command.
  *
- * @param store - Forget store
+ * STUB: the daemon does not expose a redaction endpoint, so this always returns
+ * an unsupported result. See the module note.
+ *
  * @param options - Forget options
- * @returns Forget result
+ * @returns Forget result (always unsupported)
  */
-export function memoryForget(store: ForgetStore, options: ForgetOptions): ForgetResult {
-  const { observationId } = options;
-
-  // Verify observation exists
-  const observation = store.getObservationById(observationId);
-
-  if (!observation) {
-    return {
-      observationId,
-      redacted: false,
-      error: `Observation ${observationId} not found`,
-    };
-  }
-
-  // Check if already redacted
-  if (observation.redacted) {
-    return {
-      observationId,
-      redacted: true,
-      error: 'Observation already redacted',
-    };
-  }
-
-  // Redact observation
-  try {
-    store.redactObservation(observationId);
-
-    return {
-      observationId,
-      redacted: true,
-    };
-  } catch (err) {
-    return {
-      observationId,
-      redacted: false,
-      error: err instanceof Error ? err.message : 'Unknown error',
-    };
-  }
+export function memoryForget(options: ForgetOptions): ForgetResult {
+  return {
+    observationId: options.observationId,
+    redacted: false,
+    error: 'forget is not supported by the Kindling daemon (no redaction endpoint)',
+  };
 }
 
 /**
