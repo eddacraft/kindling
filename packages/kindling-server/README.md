@@ -1,5 +1,10 @@
 # @eddacraft/kindling-server
 
+> **⚠️ Deprecated** — this package is deprecated and will be removed at v1.0.0.
+> Kindling is now a Rust daemon. Use [`@eddacraft/kindling`](https://www.npmjs.com/package/@eddacraft/kindling)
+> (the thin HTTP-over-UDS client) or the `kindling` binary instead.
+> See <https://github.com/eddacraft/kindling>.
+
 HTTP API server for Kindling - enables multi-agent concurrency and web-based access.
 
 ## When to Use

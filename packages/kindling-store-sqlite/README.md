@@ -1,5 +1,10 @@
 # @eddacraft/kindling-store-sqlite
 
+> **⚠️ Deprecated** — this package is deprecated and will be removed at v1.0.0.
+> Kindling is now a Rust daemon. Use [`@eddacraft/kindling`](https://www.npmjs.com/package/@eddacraft/kindling)
+> (the thin HTTP-over-UDS client) or the `kindling` binary instead.
+> See <https://github.com/eddacraft/kindling>.
+
 SQLite persistence layer for Kindling with FTS5 full-text search and WAL mode.
 
 [![npm version](https://img.shields.io/npm/v/@eddacraft/kindling-store-sqlite.svg)](https://www.npmjs.com/package/@eddacraft/kindling-store-sqlite)

@@ -1,7 +1,7 @@
 {
   "name": "@eddacraft/kindling-store-sqljs",
   "version": "0.1.3",
-  "description": "sql.js (WASM) persistence layer for Kindling - browser and cross-platform compatible",
+  "description": "DEPRECATED: use @eddacraft/kindling instead. sql.js (WASM) persistence layer for Kindling - browser and cross-platform compatible",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

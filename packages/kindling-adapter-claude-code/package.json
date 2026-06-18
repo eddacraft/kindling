@@ -1,7 +1,7 @@
 {
   "name": "@eddacraft/kindling-adapter-claude-code",
   "version": "0.1.3",
-  "description": "Claude Code adapter for Kindling - capture tool calls and session context via hooks for memory continuity",
+  "description": "DEPRECATED: use @eddacraft/kindling instead. Claude Code adapter for Kindling - capture tool calls and session context via hooks for memory continuity",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

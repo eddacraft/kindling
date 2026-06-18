@@ -1,5 +1,10 @@
 # @eddacraft/kindling-core
 
+> **⚠️ Deprecated** — this package is deprecated and will be removed at v1.0.0.
+> Kindling is now a Rust daemon. Use [`@eddacraft/kindling`](https://www.npmjs.com/package/@eddacraft/kindling)
+> (the thin HTTP-over-UDS client) or the `kindling` binary instead.
+> See <https://github.com/eddacraft/kindling>.
+
 Core domain model and orchestration for Kindling - local memory engine for AI-assisted development.
 
 [![npm version](https://img.shields.io/npm/v/@eddacraft/kindling-core.svg)](https://www.npmjs.com/package/@eddacraft/kindling-core)

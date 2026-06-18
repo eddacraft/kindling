@@ -1,5 +1,10 @@
 # @eddacraft/kindling-store-sqljs
 
+> **⚠️ Deprecated** — this package is deprecated and will be removed at v1.0.0.
+> Kindling is now a Rust daemon. Use [`@eddacraft/kindling`](https://www.npmjs.com/package/@eddacraft/kindling)
+> (the thin HTTP-over-UDS client) or the `kindling` binary instead.
+> See <https://github.com/eddacraft/kindling>.
+
 WASM-based SQLite persistence layer for Kindling using [sql.js](https://sql.js.org/). This package provides browser and cross-platform compatibility as a drop-in replacement for `@eddacraft/kindling-store-sqlite`.
 
 ## When to Use
