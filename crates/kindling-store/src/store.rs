@@ -357,6 +357,47 @@ impl SqliteKindlingStore {
             .transpose()
     }
 
+    /// Latest summary across every capsule in a scope, newest `created_at`
+    /// first. Joins `summaries` to `capsules` and filters by the denormalized
+    /// scope columns (the same set [`push_scope_filters`] understands).
+    ///
+    /// Ports the PreCompact query in
+    /// `plugins/kindling-claude-code/hooks/pre-compact.js`:
+    ///
+    /// ```sql
+    /// SELECT s.content, s.confidence FROM summaries s
+    ///   JOIN capsules c ON s.capsule_id = c.id
+    ///   WHERE c.repo_id = ?
+    ///   ORDER BY s.created_at DESC LIMIT 1
+    /// ```
+    ///
+    /// The Node hook filters on `repo_id` only; this method accepts a full
+    /// [`ScopeIds`] and applies a filter for each dimension that is set (so a
+    /// repo-only scope reproduces the Node behaviour exactly).
+    pub fn latest_summary_for_scope(
+        &self,
+        scope: Option<&ScopeIds>,
+    ) -> StoreResult<Option<Summary>> {
+        let mut sql = String::from(
+            "SELECT s.id, s.capsule_id, s.content, s.confidence, s.created_at, s.evidence_refs
+             FROM summaries s
+             JOIN capsules c ON s.capsule_id = c.id
+             WHERE 1 = 1",
+        );
+        let mut params: Vec<SqlValue> = Vec::new();
+        if let Some(scope) = scope {
+            // Scope columns live on `capsules`; qualify them to avoid ambiguity.
+            push_scope_filters_prefixed(&mut sql, &mut params, scope, "c.");
+        }
+        sql.push_str(" ORDER BY s.created_at DESC LIMIT 1");
+
+        let mut stmt = self.conn.prepare(&sql)?;
+        stmt.query_row(params_from_iter(params), RawSummary::from_row)
+            .optional()?
+            .map(RawSummary::into_summary)
+            .transpose()
+    }
+
     /// Summary by ID.
     pub fn get_summary_by_id(&self, summary_id: &str) -> StoreResult<Option<Summary>> {
         self.conn
@@ -500,6 +541,17 @@ fn truncate_snippet(content: &str, max_chars: usize) -> String {
 /// `task_id` has no denormalized column and is intentionally not filterable,
 /// matching the TS store.
 fn push_scope_filters(sql: &mut String, params: &mut Vec<SqlValue>, scope: &ScopeIds) {
+    push_scope_filters_prefixed(sql, params, scope, "");
+}
+
+/// [`push_scope_filters`] with a column prefix (e.g. `"c."`) so the same scope
+/// filter can target a specific table in a join.
+fn push_scope_filters_prefixed(
+    sql: &mut String,
+    params: &mut Vec<SqlValue>,
+    scope: &ScopeIds,
+    prefix: &str,
+) {
     let filters = [
         ("session_id", &scope.session_id),
         ("repo_id", &scope.repo_id),
@@ -509,6 +561,7 @@ fn push_scope_filters(sql: &mut String, params: &mut Vec<SqlValue>, scope: &Scop
     for (column, value) in filters {
         if let Some(value) = value {
             sql.push_str(" AND ");
+            sql.push_str(prefix);
             sql.push_str(column);
             sql.push_str(" = ?");
             params.push(SqlValue::Text(value.clone()));

@@ -299,6 +299,51 @@ async fn api_error_mapping_404() {
     }
 }
 
+/// `get_open_capsule` returns `None` before a capsule is open, then resolves
+/// the open session capsule once one exists.
+#[tokio::test]
+async fn get_open_capsule_resolves_session_capsule() {
+    let daemon = TestDaemon::start().await;
+    let client = daemon.client(PROJECT_A);
+
+    // No open capsule yet → None.
+    let none = client
+        .get_open_capsule("sess-x")
+        .await
+        .expect("get_open_capsule before open");
+    assert!(none.is_none(), "no capsule open yet → None");
+
+    // Open a session capsule.
+    let opened = client
+        .open_capsule(
+            CapsuleType::Session,
+            "resolve me",
+            ScopeIds {
+                session_id: Some("sess-x".to_string()),
+                ..Default::default()
+            },
+            None,
+        )
+        .await
+        .expect("open capsule");
+
+    // Now it resolves.
+    let found = client
+        .get_open_capsule("sess-x")
+        .await
+        .expect("get_open_capsule after open")
+        .expect("capsule should be open");
+    assert_eq!(found.id, opened.id);
+    assert_eq!(found.scope_ids.session_id.as_deref(), Some("sess-x"));
+
+    // A different session id resolves to None.
+    let other = client
+        .get_open_capsule("nope")
+        .await
+        .expect("get_open_capsule other session");
+    assert!(other.is_none(), "different session → None");
+}
+
 /// 5b. A 400 (empty intent) also maps to Api with a surfaced message.
 #[tokio::test]
 async fn api_error_mapping_400() {
@@ -391,6 +436,126 @@ async fn observation_provenance_round_trips() {
         obs.provenance.get("tool").unwrap(),
         &serde_json::json!("bash")
     );
+}
+
+/// SessionStart context: writes scoped observations + a pin, then asserts the
+/// daemon returns formatted markdown. The client derives the repo scope from its
+/// project root, so observations must carry `repoId == PROJECT_A`.
+#[tokio::test]
+async fn session_start_context_returns_markdown() {
+    let daemon = TestDaemon::start().await;
+    let client = daemon.client(PROJECT_A);
+
+    let repo_scope = ScopeIds {
+        repo_id: Some(PROJECT_A.to_string()),
+        ..Default::default()
+    };
+    let scoped = |content: &str| ObservationInput {
+        id: None,
+        kind: ObservationKind::Message,
+        content: content.to_string(),
+        provenance: None,
+        ts: None,
+        scope_ids: repo_scope.clone(),
+        redacted: None,
+    };
+
+    let obs = client
+        .append_observation(scoped("investigated the parser bug"), None, None)
+        .await
+        .expect("append");
+    client
+        .pin(CreatePinBody {
+            target_type: PinTargetType::Observation,
+            target_id: obs.id.clone(),
+            note: Some("parser".to_string()),
+            ttl_ms: None,
+            scope_ids: Some(repo_scope.clone()),
+        })
+        .await
+        .expect("pin");
+
+    let ctx = client
+        .session_start_context(Some(5))
+        .await
+        .expect("session start context")
+        .expect("some context");
+
+    assert!(ctx.starts_with("# Prior Context (from Kindling)"), "{ctx}");
+    assert!(ctx.contains("## Pinned Items"), "{ctx}");
+    assert!(
+        ctx.contains("- **parser**: investigated the parser bug"),
+        "{ctx}"
+    );
+    assert!(ctx.contains("## Recent Activity"), "{ctx}");
+    assert!(
+        ctx.contains("message: investigated the parser bug"),
+        "{ctx}"
+    );
+}
+
+/// SessionStart context with no data → `None`.
+#[tokio::test]
+async fn session_start_context_none_when_empty() {
+    let daemon = TestDaemon::start().await;
+    // A fresh project with nothing written.
+    let client = daemon.client("/tmp/kindling-client-test/empty-ss");
+    let ctx = client.session_start_context(None).await.expect("call ok");
+    assert!(ctx.is_none(), "expected None, got {ctx:?}");
+}
+
+/// PreCompact context: a closed capsule with a summary + a pin yields markdown.
+#[tokio::test]
+async fn pre_compact_context_returns_markdown() {
+    let daemon = TestDaemon::start().await;
+    let client = daemon.client(PROJECT_B);
+
+    let repo_scope = ScopeIds {
+        repo_id: Some(PROJECT_B.to_string()),
+        ..Default::default()
+    };
+
+    // Open a repo-scoped capsule, close with a summary.
+    let capsule = client
+        .open_capsule(
+            CapsuleType::PocketflowNode,
+            "do work",
+            repo_scope.clone(),
+            None,
+        )
+        .await
+        .expect("open");
+    client
+        .close_capsule(
+            &capsule.id,
+            CloseCapsuleBody {
+                generate_summary: Some(true),
+                summary_content: Some("delivered the change".to_string()),
+                confidence: Some(0.9),
+            },
+        )
+        .await
+        .expect("close");
+
+    let ctx = client
+        .pre_compact_context()
+        .await
+        .expect("pre compact context")
+        .expect("some context");
+
+    // No top-level Prior Context header on PreCompact.
+    assert!(!ctx.contains("# Prior Context"), "{ctx}");
+    assert!(ctx.contains("## Session Summary"), "{ctx}");
+    assert!(ctx.contains("delivered the change"), "{ctx}");
+}
+
+/// PreCompact context with no data → `None`.
+#[tokio::test]
+async fn pre_compact_context_none_when_empty() {
+    let daemon = TestDaemon::start().await;
+    let client = daemon.client("/tmp/kindling-client-test/empty-pc");
+    let ctx = client.pre_compact_context().await.expect("call ok");
+    assert!(ctx.is_none(), "expected None, got {ctx:?}");
 }
 
 // ---- small helpers on the retrieval result for terse assertions -------------

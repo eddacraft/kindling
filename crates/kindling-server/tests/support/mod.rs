@@ -142,6 +142,41 @@ impl Client {
         TestResponse { status, body }
     }
 
+    /// Send a request with optional project header, arbitrary extra headers,
+    /// and an optional JSON body.
+    pub async fn send_with_headers(
+        &mut self,
+        method: &str,
+        path: &str,
+        project: Option<&str>,
+        extra_headers: &[(&str, &str)],
+        body: Option<Value>,
+    ) -> TestResponse {
+        let body_str = body.map(|v| v.to_string()).unwrap_or_default();
+        let mut builder = Request::builder()
+            .method(method)
+            .uri(path)
+            .header("host", "kindling.local")
+            .header("content-type", "application/json");
+        if let Some(p) = project {
+            builder = builder.header(PROJECT_HEADER, p);
+        }
+        for (name, value) in extra_headers {
+            builder = builder.header(*name, *value);
+        }
+        let req = builder.body(body_str).unwrap();
+
+        let resp: Response<_> = self.sender.send_request(req).await.expect("send_request");
+        let status = resp.status();
+        let body = resp
+            .into_body()
+            .collect()
+            .await
+            .expect("collect body")
+            .to_bytes();
+        TestResponse { status, body }
+    }
+
     /// Path of the socket this client is connected to (for fresh connections).
     pub fn socket_path(&self) -> &std::path::Path {
         &self.socket_path

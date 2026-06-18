@@ -77,3 +77,21 @@ impl CreatePinBody {
         }
     }
 }
+
+/// `POST /v1/context/session-start` body. Both fields optional on the wire;
+/// the client always sends `scopeIds` (a repo scope built from the project
+/// root) to reproduce the Node hook's `{ repoId: <project root> }` filter.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SessionStartContextBody {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_results: Option<u32>,
+    pub scope_ids: ScopeIds,
+}
+
+/// `POST /v1/context/pre-compact` body.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct PreCompactContextBody {
+    pub scope_ids: ScopeIds,
+}

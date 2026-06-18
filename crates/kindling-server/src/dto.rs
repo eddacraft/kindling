@@ -55,6 +55,17 @@ impl From<CloseCapsuleRequest> for CloseCapsuleOptions {
     }
 }
 
+/// `GET /v1/capsules/open` query — the session id whose open capsule to
+/// resolve. Optional on the wire so the session id may instead arrive in the
+/// `X-Kindling-Session` header; the handler rejects the request with `400`
+/// when neither carries a non-empty value.
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenCapsuleQuery {
+    #[serde(default)]
+    pub session_id: Option<String>,
+}
+
 /// `POST /v1/observations` body — append an observation.
 ///
 /// The wire shape is the `ObservationInput` fields (flattened) plus two
@@ -107,4 +118,33 @@ impl From<CreatePinRequest> for CreatePinOptions {
             scope_ids: r.scope_ids,
         }
     }
+}
+
+/// `POST /v1/context/session-start` body. Both fields optional.
+///
+/// - `maxResults` (default 10): cap on recent observations. Mirrors the Node
+///   hook's `KINDLING_MAX_CONTEXT`.
+/// - `scopeIds` (default empty): scope to assemble context for. The hook passes
+///   `{ repoId: <project root> }`; the daemon already routes the *database* by
+///   the `X-Kindling-Project` header, so this narrows *within* that DB.
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionStartContextRequest {
+    #[serde(default)]
+    pub max_results: Option<u32>,
+    #[serde(default)]
+    pub scope_ids: ScopeIds,
+}
+
+/// Default `maxResults` for SessionStart context — matches the Node hook's
+/// `parseInt(KINDLING_MAX_CONTEXT || '10')`.
+pub const DEFAULT_MAX_RESULTS: u32 = 10;
+
+/// `POST /v1/context/pre-compact` body. The only field is the scope; an empty
+/// body is valid.
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreCompactContextRequest {
+    #[serde(default)]
+    pub scope_ids: ScopeIds,
 }

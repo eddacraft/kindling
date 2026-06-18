@@ -14,6 +14,7 @@ use kindling_types::{
     Timestamp,
 };
 
+use crate::context::{PreCompactContext, ResolvedPin, SessionStartContext};
 use crate::error::{ServiceError, ServiceResult};
 use crate::validation;
 
@@ -376,6 +377,102 @@ impl KindlingService {
         now: Timestamp,
     ) -> ServiceResult<Vec<Pin>> {
         Ok(self.store.list_active_pins(scope, Some(now))?)
+    }
+
+    // ===== injection context (hook support) =====
+
+    /// Assemble the structured data for the SessionStart injection, scored as
+    /// of the current time.
+    pub fn session_start_context(
+        &self,
+        scope: &ScopeIds,
+        max_results: u32,
+    ) -> ServiceResult<SessionStartContext> {
+        self.session_start_context_at(scope, max_results, now_ms())
+    }
+
+    /// [`Self::session_start_context`] with an explicit clock for deterministic
+    /// tests (controls active-pin expiry).
+    ///
+    /// Ports the inline queries in
+    /// `plugins/kindling-claude-code/hooks/session-start.js`:
+    /// active pins for the scope (resolved to target content) plus the most
+    /// recent non-redacted observations for the scope, capped at `max_results`.
+    pub fn session_start_context_at(
+        &self,
+        scope: &ScopeIds,
+        max_results: u32,
+        now: Timestamp,
+    ) -> ServiceResult<SessionStartContext> {
+        let pins = self.resolved_active_pins(scope, now)?;
+        // The Node hook orders by `ts DESC LIMIT maxResults`, excluding
+        // redacted rows — exactly `query_observations` with no time bounds.
+        let recent = self
+            .store
+            .query_observations(Some(scope), None, None, max_results)?;
+        Ok(SessionStartContext { pins, recent })
+    }
+
+    /// Assemble the structured data for the PreCompact injection, scored as of
+    /// the current time.
+    pub fn pre_compact_context(&self, scope: &ScopeIds) -> ServiceResult<PreCompactContext> {
+        self.pre_compact_context_at(scope, now_ms())
+    }
+
+    /// [`Self::pre_compact_context`] with an explicit clock for deterministic
+    /// tests (controls active-pin expiry).
+    ///
+    /// Ports the inline queries in
+    /// `plugins/kindling-claude-code/hooks/pre-compact.js`: active pins for the
+    /// scope (resolved to target content) plus the single latest summary across
+    /// the scope's capsules. An empty-content summary is normalised to `None`
+    /// here, matching the Node hook's `latestSummary.content` truthiness gate,
+    /// so the server never has to second-guess it.
+    pub fn pre_compact_context_at(
+        &self,
+        scope: &ScopeIds,
+        now: Timestamp,
+    ) -> ServiceResult<PreCompactContext> {
+        let pins = self.resolved_active_pins(scope, now)?;
+        let latest_summary = self
+            .store
+            .latest_summary_for_scope(Some(scope))?
+            .filter(|s| !s.content.is_empty());
+        Ok(PreCompactContext {
+            pins,
+            latest_summary,
+        })
+    }
+
+    /// Active pins for `scope` at `now`, each resolved to its target's content.
+    ///
+    /// Mirrors the TS `listActivePins` join: `note` is the pin reason, `content`
+    /// is the target observation/summary content (redacted observations carry
+    /// their `[redacted]` placeholder; missing targets resolve to `None`).
+    fn resolved_active_pins(
+        &self,
+        scope: &ScopeIds,
+        now: Timestamp,
+    ) -> ServiceResult<Vec<ResolvedPin>> {
+        let pins = self.store.list_active_pins(Some(scope), Some(now))?;
+        pins.into_iter()
+            .map(|pin| {
+                let content = match pin.target_type {
+                    PinTargetType::Observation => self
+                        .store
+                        .get_observation_by_id(&pin.target_id)?
+                        .map(|o| o.content),
+                    PinTargetType::Summary => self
+                        .store
+                        .get_summary_by_id(&pin.target_id)?
+                        .map(|s| s.content),
+                };
+                Ok(ResolvedPin {
+                    note: pin.reason,
+                    content,
+                })
+            })
+            .collect()
     }
 }
 

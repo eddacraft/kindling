@@ -601,3 +601,203 @@ fn get_summary_by_id() {
     assert_eq!(by_id.id, latest.id);
     assert_eq!(by_id.confidence, 0.5);
 }
+
+// ===== injection context =====
+
+fn repo_scope(repo: &str) -> ScopeIds {
+    ScopeIds {
+        repo_id: Some(repo.to_string()),
+        ..Default::default()
+    }
+}
+
+#[test]
+fn session_start_context_orders_recent_and_resolves_pins() {
+    let svc = service();
+    let scope = repo_scope("/r");
+
+    // Three observations at increasing ts; newest must come first.
+    let mut obs_ids = Vec::new();
+    for (i, ts) in [(1, 1000_i64), (2, 2000), (3, 3000)] {
+        let o = svc
+            .append_observation_at(
+                obs_input(&format!("obs {i}"), scope.clone()),
+                AppendObservationOptions::default(),
+                ts,
+            )
+            .expect("append");
+        obs_ids.push(o.id);
+    }
+
+    // Pin the middle observation with a note.
+    svc.pin_at(
+        CreatePinOptions {
+            target_type: PinTargetType::Observation,
+            target_id: obs_ids[1].clone(),
+            note: Some("keep this".to_string()),
+            ttl_ms: None,
+            scope_ids: Some(scope.clone()),
+        },
+        3000,
+    )
+    .expect("pin");
+
+    let ctx = svc
+        .session_start_context_at(&scope, 10, 3000)
+        .expect("session start context");
+
+    // Recent: newest first.
+    let recent: Vec<&str> = ctx.recent.iter().map(|o| o.content.as_str()).collect();
+    assert_eq!(recent, vec!["obs 3", "obs 2", "obs 1"]);
+
+    // Pin resolved to target content + note.
+    assert_eq!(ctx.pins.len(), 1);
+    assert_eq!(ctx.pins[0].note.as_deref(), Some("keep this"));
+    assert_eq!(ctx.pins[0].content.as_deref(), Some("obs 2"));
+}
+
+#[test]
+fn session_start_context_respects_max_results_and_redaction() {
+    let svc = service();
+    let scope = repo_scope("/r");
+
+    let mut ids = Vec::new();
+    for (i, ts) in [(1, 1000_i64), (2, 2000), (3, 3000)] {
+        let o = svc
+            .append_observation_at(
+                obs_input(&format!("obs {i}"), scope.clone()),
+                AppendObservationOptions::default(),
+                ts,
+            )
+            .expect("append");
+        ids.push(o.id);
+    }
+    // Redact the newest — it must drop out.
+    svc.forget(&ids[2]).expect("forget");
+
+    let ctx = svc.session_start_context_at(&scope, 1, 4000).expect("ctx");
+    // Cap of 1, redacted excluded → only "obs 2".
+    assert_eq!(ctx.recent.len(), 1);
+    assert_eq!(ctx.recent[0].content, "obs 2");
+}
+
+#[test]
+fn session_start_context_excludes_expired_pins() {
+    let svc = service();
+    let scope = repo_scope("/r");
+    let o = svc
+        .append_observation_at(
+            obs_input("target", scope.clone()),
+            AppendObservationOptions::default(),
+            1000,
+        )
+        .expect("append");
+    // Pin expires at 1000 + 500 = 1500.
+    svc.pin_at(
+        CreatePinOptions {
+            target_type: PinTargetType::Observation,
+            target_id: o.id,
+            note: None,
+            ttl_ms: Some(500),
+            scope_ids: Some(scope.clone()),
+        },
+        1000,
+    )
+    .expect("pin");
+
+    // At now=2000 the pin has expired.
+    let ctx = svc.session_start_context_at(&scope, 10, 2000).expect("ctx");
+    assert!(ctx.pins.is_empty(), "expired pin must not appear");
+}
+
+#[test]
+fn session_start_context_is_empty_when_nothing() {
+    let svc = service();
+    let ctx = svc
+        .session_start_context_at(&repo_scope("/empty"), 10, 1000)
+        .expect("ctx");
+    assert!(ctx.is_empty());
+}
+
+#[test]
+fn pre_compact_context_picks_latest_summary_and_resolves_pins() {
+    let svc = service();
+    let scope = repo_scope("/r");
+
+    // Two capsules in the repo, each with a summary; newest summary wins.
+    let cap1 = svc
+        .open_capsule(OpenCapsuleOptions {
+            kind: CapsuleType::PocketflowNode,
+            intent: "c1".to_string(),
+            scope_ids: scope.clone(),
+            id: None,
+        })
+        .expect("open c1");
+    svc.close_capsule_at(
+        &cap1.id,
+        CloseCapsuleOptions {
+            generate_summary: true,
+            summary_content: Some("older summary".to_string()),
+            confidence: Some(0.7),
+        },
+        1000,
+    )
+    .expect("close c1");
+
+    let cap2 = svc
+        .open_capsule(OpenCapsuleOptions {
+            kind: CapsuleType::PocketflowNode,
+            intent: "c2".to_string(),
+            scope_ids: scope.clone(),
+            id: None,
+        })
+        .expect("open c2");
+    svc.close_capsule_at(
+        &cap2.id,
+        CloseCapsuleOptions {
+            generate_summary: true,
+            summary_content: Some("newer summary".to_string()),
+            confidence: Some(0.9),
+        },
+        2000,
+    )
+    .expect("close c2");
+
+    // Pin a summary by id.
+    let latest = svc
+        .get_latest_summary(&cap2.id)
+        .expect("get")
+        .expect("present");
+    svc.pin_at(
+        CreatePinOptions {
+            target_type: PinTargetType::Summary,
+            target_id: latest.id.clone(),
+            note: Some("summary pin".to_string()),
+            ttl_ms: None,
+            scope_ids: Some(scope.clone()),
+        },
+        2000,
+    )
+    .expect("pin");
+
+    let ctx = svc
+        .pre_compact_context_at(&scope, 2000)
+        .expect("pre compact context");
+
+    let summary = ctx.latest_summary.expect("a summary");
+    assert_eq!(summary.content, "newer summary");
+
+    assert_eq!(ctx.pins.len(), 1);
+    assert_eq!(ctx.pins[0].note.as_deref(), Some("summary pin"));
+    assert_eq!(ctx.pins[0].content.as_deref(), Some("newer summary"));
+}
+
+#[test]
+fn pre_compact_context_is_empty_when_nothing() {
+    let svc = service();
+    let ctx = svc
+        .pre_compact_context_at(&repo_scope("/empty"), 1000)
+        .expect("ctx");
+    assert!(ctx.is_empty());
+    assert!(ctx.latest_summary.is_none());
+}

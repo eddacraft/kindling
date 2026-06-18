@@ -20,10 +20,12 @@
 //! Export/import/bundle methods from the TS service are intentionally absent;
 //! they belong to the CLI task (PORT-012).
 
+mod context;
 mod error;
 mod service;
 mod validation;
 
+pub use context::{PreCompactContext, ResolvedPin, SessionStartContext};
 pub use error::{ServiceError, ServiceResult};
 pub use service::{
     AppendObservationOptions, CloseCapsuleOptions, CreatePinOptions, KindlingService,

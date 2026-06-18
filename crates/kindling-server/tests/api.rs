@@ -316,6 +316,232 @@ async fn concurrent_writes_same_project_all_land() {
 }
 
 #[tokio::test]
+async fn session_start_context_exact_markdown() {
+    let daemon = TestDaemon::start().await;
+    let mut c = daemon.connect().await;
+    let scope = json!({ "repoId": PROJECT_A });
+
+    // The daemon renders timestamps in the *host* local zone (matching the Node
+    // hook). Rather than mutate the process `TZ` (forbidden: unsafe + races), we
+    // compute the expected dates with the same public formatter + offset the
+    // daemon uses, so the assertion is host-independent.
+    // Distinct timestamps so `ORDER BY ts DESC` is unambiguous: c < a < b.
+    let ts_c = 1_700_000_000_000_i64; // pinned message
+    let ts_a = 1_700_000_001_000_i64; // git status
+    let ts_b = 1_700_049_600_000_i64; // ran tests (newest)
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as i64;
+    let offset = kindling_server::inject::local_offset_seconds(now_ms);
+    let date_c = kindling_server::inject::format_local_datetime(ts_c, offset);
+    let date_a = kindling_server::inject::format_local_datetime(ts_a, offset);
+    let date_b = kindling_server::inject::format_local_datetime(ts_b, offset);
+
+    for (content, ts) in [("git status", ts_a), ("ran tests", ts_b)] {
+        let resp = c
+            .send(
+                "POST",
+                "/v1/observations",
+                Some(PROJECT_A),
+                Some(json!({
+                    "kind": "command",
+                    "content": content,
+                    "ts": ts,
+                    "scopeIds": { "repoId": PROJECT_A },
+                })),
+            )
+            .await;
+        assert_eq!(resp.status, StatusCode::CREATED, "seed obs");
+    }
+
+    // A pinned observation to exercise the Pinned Items block.
+    let resp = c
+        .send(
+            "POST",
+            "/v1/observations",
+            Some(PROJECT_A),
+            Some(json!({
+                "kind": "message",
+                "content": "use argon2id for hashing",
+                "ts": ts_c,
+                "scopeIds": { "repoId": PROJECT_A },
+            })),
+        )
+        .await;
+    let pin_target = resp.json()["id"].as_str().unwrap().to_string();
+    let resp = c
+        .send(
+            "POST",
+            "/v1/pins",
+            Some(PROJECT_A),
+            Some(json!({
+                "targetType": "observation",
+                "targetId": pin_target,
+                "note": "auth decision",
+                "scopeIds": { "repoId": PROJECT_A },
+            })),
+        )
+        .await;
+    assert_eq!(resp.status, StatusCode::CREATED);
+
+    // Call the endpoint.
+    let resp = c
+        .send(
+            "POST",
+            "/v1/context/session-start",
+            Some(PROJECT_A),
+            Some(json!({ "maxResults": 10, "scopeIds": scope })),
+        )
+        .await;
+    assert_eq!(resp.status, StatusCode::OK);
+    let additional = resp.json()["additionalContext"]
+        .as_str()
+        .expect("additionalContext string")
+        .to_string();
+
+    // Recent activity is newest-first (b > a > c); all three observations appear
+    // (the pinned one is NOT excluded from recent in the Node hook).
+    let expected = format!(
+        "# Prior Context (from Kindling)\n\n\
+The following is prior session context for this project:\n\
+## Pinned Items\n\
+- **auth decision**: use argon2id for hashing\n\
+## Recent Activity\n\
+- [{date_b}] command: ran tests\n\
+- [{date_a}] command: git status\n\
+- [{date_c}] message: use argon2id for hashing"
+    );
+    assert_eq!(additional, expected);
+}
+
+#[tokio::test]
+async fn session_start_context_empty_returns_null() {
+    let daemon = TestDaemon::start().await;
+    let mut c = daemon.connect().await;
+    let resp = c
+        .send(
+            "POST",
+            "/v1/context/session-start",
+            Some(PROJECT_A),
+            Some(json!({ "scopeIds": { "repoId": "/no/such/repo" } })),
+        )
+        .await;
+    assert_eq!(resp.status, StatusCode::OK);
+    assert!(resp.json()["additionalContext"].is_null());
+}
+
+#[tokio::test]
+async fn pre_compact_context_exact_markdown() {
+    let daemon = TestDaemon::start().await;
+    let mut c = daemon.connect().await;
+    let scope = json!({ "repoId": PROJECT_B });
+
+    // Open a capsule scoped to the repo, then close it with a summary.
+    let resp = c
+        .send(
+            "POST",
+            "/v1/capsules",
+            Some(PROJECT_B),
+            Some(json!({
+                "kind": "pocketflow_node",
+                "intent": "work",
+                "scopeIds": { "repoId": PROJECT_B },
+            })),
+        )
+        .await;
+    let capsule_id = resp.json()["id"].as_str().unwrap().to_string();
+    let resp = c
+        .send(
+            "PATCH",
+            &format!("/v1/capsules/{capsule_id}/close"),
+            Some(PROJECT_B),
+            Some(json!({
+                "generateSummary": true,
+                "summaryContent": "we shipped the feature",
+                "confidence": 0.9,
+            })),
+        )
+        .await;
+    assert_eq!(resp.status, StatusCode::OK);
+
+    // A pinned summary.
+    let resp = c
+        .send(
+            "POST",
+            "/v1/observations",
+            Some(PROJECT_B),
+            Some(json!({
+                "kind": "message",
+                "content": "remember the migration step",
+                "scopeIds": { "repoId": PROJECT_B },
+            })),
+        )
+        .await;
+    let obs_id = resp.json()["id"].as_str().unwrap().to_string();
+    let resp = c
+        .send(
+            "POST",
+            "/v1/pins",
+            Some(PROJECT_B),
+            Some(json!({
+                "targetType": "observation",
+                "targetId": obs_id,
+                "note": "migration",
+                "scopeIds": { "repoId": PROJECT_B },
+            })),
+        )
+        .await;
+    assert_eq!(resp.status, StatusCode::CREATED);
+
+    let resp = c
+        .send(
+            "POST",
+            "/v1/context/pre-compact",
+            Some(PROJECT_B),
+            Some(json!({ "scopeIds": scope })),
+        )
+        .await;
+    assert_eq!(resp.status, StatusCode::OK);
+    let additional = resp.json()["additionalContext"]
+        .as_str()
+        .expect("additionalContext string")
+        .to_string();
+
+    let expected = "## Pinned Items (preserve across compaction)\n\
+- **migration**: remember the migration step\n\
+## Session Summary\n\
+we shipped the feature";
+    assert_eq!(additional, expected);
+}
+
+#[tokio::test]
+async fn pre_compact_context_empty_returns_null() {
+    let daemon = TestDaemon::start().await;
+    let mut c = daemon.connect().await;
+    let resp = c
+        .send(
+            "POST",
+            "/v1/context/pre-compact",
+            Some(PROJECT_A),
+            Some(json!({ "scopeIds": { "repoId": "/no/such/repo" } })),
+        )
+        .await;
+    assert_eq!(resp.status, StatusCode::OK);
+    assert!(resp.json()["additionalContext"].is_null());
+}
+
+#[tokio::test]
+async fn context_endpoints_require_project_header() {
+    let daemon = TestDaemon::start().await;
+    let mut c = daemon.connect().await;
+    for path in ["/v1/context/session-start", "/v1/context/pre-compact"] {
+        let resp = c.send("POST", path, None, Some(json!({}))).await;
+        assert_eq!(resp.status, StatusCode::BAD_REQUEST, "{path}");
+    }
+}
+
+#[tokio::test]
 async fn error_mapping() {
     let daemon = TestDaemon::start().await;
     let mut c = daemon.connect().await;
@@ -360,4 +586,90 @@ async fn error_mapping() {
         )
         .await;
     assert_eq!(resp.status, StatusCode::BAD_REQUEST, "empty intent → 400");
+}
+
+#[tokio::test]
+async fn get_open_capsule_round_trip() {
+    let daemon = TestDaemon::start().await;
+    let mut c = daemon.connect().await;
+
+    // No open capsule for the session yet → 200 with JSON null.
+    let resp = c
+        .send(
+            "GET",
+            "/v1/capsules/open?sessionId=sess-1",
+            Some(PROJECT_A),
+            None,
+        )
+        .await;
+    assert_eq!(resp.status, StatusCode::OK, "no open capsule → 200");
+    assert!(resp.json().is_null(), "no open capsule → null body");
+
+    // Open a session capsule.
+    let opened = c
+        .send(
+            "POST",
+            "/v1/capsules",
+            Some(PROJECT_A),
+            Some(json!({
+                "kind": "session",
+                "intent": "resolve me",
+                "scopeIds": { "sessionId": "sess-1" }
+            })),
+        )
+        .await;
+    assert_eq!(opened.status, StatusCode::CREATED);
+    let opened_id = opened.json()["id"].as_str().unwrap().to_string();
+
+    // Now the open capsule resolves by session id.
+    let resp = c
+        .send(
+            "GET",
+            "/v1/capsules/open?sessionId=sess-1",
+            Some(PROJECT_A),
+            None,
+        )
+        .await;
+    assert_eq!(resp.status, StatusCode::OK);
+    let cap = resp.json();
+    assert_eq!(cap["id"], opened_id);
+    assert_eq!(cap["status"], "open");
+    assert_eq!(cap["scopeIds"]["sessionId"], "sess-1");
+
+    // The session id may also arrive via the X-Kindling-Session header.
+    let resp = c
+        .send_with_headers(
+            "GET",
+            "/v1/capsules/open",
+            Some(PROJECT_A),
+            &[("x-kindling-session", "sess-1")],
+            None,
+        )
+        .await;
+    assert_eq!(resp.status, StatusCode::OK, "header session id resolves");
+    assert_eq!(resp.json()["id"], opened_id);
+
+    // A different session has no open capsule → null.
+    let resp = c
+        .send(
+            "GET",
+            "/v1/capsules/open?sessionId=other",
+            Some(PROJECT_A),
+            None,
+        )
+        .await;
+    assert_eq!(resp.status, StatusCode::OK);
+    assert!(resp.json().is_null());
+
+    // Missing session id (neither query nor header) → 400.
+    let resp = c
+        .send("GET", "/v1/capsules/open", Some(PROJECT_A), None)
+        .await;
+    assert_eq!(resp.status, StatusCode::BAD_REQUEST, "no session id → 400");
+
+    // Missing project header → 400.
+    let resp = c
+        .send("GET", "/v1/capsules/open?sessionId=sess-1", None, None)
+        .await;
+    assert_eq!(resp.status, StatusCode::BAD_REQUEST, "no project → 400");
 }

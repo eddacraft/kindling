@@ -9,17 +9,22 @@
 //! # v1 HTTP API
 //!
 //! ```text
-//! GET    /v1/health             → 200 { version, schemaVersion, projects: [...] }
-//! POST   /v1/capsules           → 201 Capsule
-//! PATCH  /v1/capsules/:id/close → 200 Capsule
-//! POST   /v1/observations       → 201 Observation
-//! POST   /v1/retrieve           → 200 RetrieveResult
-//! POST   /v1/pins               → 201 Pin
-//! DELETE /v1/pins/:id           → 204
+//! GET    /v1/health                  → 200 { version, schemaVersion, projects: [...] }
+//! POST   /v1/capsules                → 201 Capsule
+//! GET    /v1/capsules/open?sessionId → 200 Capsule | null
+//! PATCH  /v1/capsules/:id/close      → 200 Capsule
+//! POST   /v1/observations            → 201 Observation
+//! POST   /v1/retrieve                → 200 RetrieveResult
+//! POST   /v1/pins                    → 201 Pin
+//! DELETE /v1/pins/:id                → 204
+//! POST   /v1/context/session-start   → 200 { additionalContext: string | null }
+//! POST   /v1/context/pre-compact     → 200 { additionalContext: string | null }
 //! ```
 //!
 //! Request bodies are camelCase JSON; response bodies serialize the domain
-//! types (already camelCase). See [`dto`] for the request shapes.
+//! types (already camelCase). See [`dto`] for the request shapes. The
+//! `/v1/context/*` endpoints assemble AND format the injected-context markdown
+//! server-side (the byte-for-byte date/markdown logic lives in [`inject`]).
 //!
 //! # Per-project routing
 //!
@@ -40,12 +45,13 @@ mod config;
 mod dto;
 mod error;
 mod handlers;
+pub mod inject;
 mod pid;
 mod state;
 
 pub use config::{ServerConfig, DEFAULT_IDLE_TIMEOUT};
 pub use error::{ApiError, ServerError};
-pub use handlers::PROJECT_HEADER;
+pub use handlers::{PROJECT_HEADER, SESSION_HEADER};
 pub use pid::{acquire_pid_lock, PidGuard};
 pub use state::AppState;
 
@@ -66,11 +72,23 @@ pub fn build_router(state: AppState) -> Router {
     Router::new()
         .route("/v1/health", axum::routing::get(handlers::health))
         .route("/v1/capsules", post(handlers::open_capsule))
+        .route(
+            "/v1/capsules/open",
+            axum::routing::get(handlers::get_open_capsule),
+        )
         .route("/v1/capsules/{id}/close", patch(handlers::close_capsule))
         .route("/v1/observations", post(handlers::append_observation))
         .route("/v1/retrieve", post(handlers::retrieve))
         .route("/v1/pins", post(handlers::create_pin))
         .route("/v1/pins/{id}", delete(handlers::unpin))
+        .route(
+            "/v1/context/session-start",
+            post(handlers::session_start_context),
+        )
+        .route(
+            "/v1/context/pre-compact",
+            post(handlers::pre_compact_context),
+        )
         .layer(axum::middleware::from_fn(
             move |req, next: axum::middleware::Next| {
                 let activity = Arc::clone(&activity);

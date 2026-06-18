@@ -137,7 +137,7 @@ Supersedes `02-rust-hook-binary` and `03-rust-cli`. Replaces the dual-maintain p
 - **Intent:** Rust client library for talking to the daemon — used by the hook subcommand, optionally by the CLI, and by Anvil for concurrent-safe integration
 - **Expected Outcome:** `Client::new()` auto-detects the default socket path; on `ECONNREFUSED` or missing socket, `exec`s `kindling serve --daemonize` and polls for up to 1s; methods mirror `kindling-service` API (`open_capsule`, `append_observation`, `retrieve`, `pin`, `unpin`, plus `health`); `health` checks `schemaVersion` against the client's expected version and fails loud on mismatch
 - **Validation:** Integration tests cover cold-spawn, warm-call, schema-mismatch, and connection-refused-without-binary paths; cold-spawn latency measured under 100ms on a typical dev machine
-- **Status:** In Progress — `feat/rust-port-client`
+- **Status:** Merged — `feat/rust-port-client`, PR #66 (rebase commit `fbf56d8`). Thin async hyper-over-UDS client; methods mirror service; auto-spawn (poll within budget); compile-time schema check from `schema/version.json`; 12 tests incl. ~7ms cold-spawn. Prod deps = kindling-types + http stack only.
 - **Dependencies:** PORT-007
 
 #### PORT-009: kindling-hook crate
@@ -145,7 +145,7 @@ Supersedes `02-rust-hook-binary` and `03-rust-cli`. Replaces the dual-maintain p
 - **Intent:** All 7 Claude Code hook types (session-start, post-tool-use, post-tool-use-failure, user-prompt-submit, subagent-stop, pre-compact, stop) handled via stdin JSON, dispatched through `kindling-client`
 - **Expected Outcome:** `kindling hook <type>` reads Claude Code hook context from stdin, calls the daemon via `kindling-client`, returns JSON response on stdout matching the Node.js script contract exactly; SessionStart and PreCompact return injected context (pins + recent observations / pins + latest summary)
 - **Validation:** Integration tests pipe JSON fixtures through the binary and verify daemon DB state; injected context JSON byte-for-byte matches Node.js output on identical fixtures; warm-hook latency <10ms measured over the 7 hook types; cold-hook (with daemon spawn) <100ms
-- **Status:** Ready
+- **Status:** In Progress — `feat/rust-port-hook`. Design decision (D, 2026-06-18): "daemon owns injection" — the merged daemon/client surface only exposes FTS `retrieve`, but Node injection needs recency observations + pin listing + latest-summary. So PORT-009 also adds server-side injection-context endpoints (`/v1/context/session-start`, `/v1/context/pre-compact`) that assemble + format the byte-for-byte `additionalContext` markdown (incl. the `toLocaleString` date — single place), plus kindling-service assembly methods and kindling-client methods. Hook crate then forwards. Multi-crate PR.
 - **Dependencies:** PORT-008
 
 #### PORT-010: Cross-platform CI hook builds
