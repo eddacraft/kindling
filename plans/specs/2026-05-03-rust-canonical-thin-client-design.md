@@ -1,21 +1,21 @@
-# Rust-Canonical Kindling with Thin TS Client — Design Spec
+# Rust-Canonical kindling with Thin TS Client — Design Spec
 
-| Field      | Value                                                       |
-| ---------- | ----------------------------------------------------------- |
-| Status     | Decided                                                     |
-| Owner      | @aneki                                                      |
-| Created    | 2026-05-03                                                  |
+| Field      | Value                                                        |
+| ---------- | ------------------------------------------------------------ |
+| Status     | Decided                                                      |
+| Owner      | @aneki                                                       |
+| Created    | 2026-05-03                                                   |
 | Supersedes | `plans/specs/2026-04-15-rust-port-design.md` (dual-maintain) |
-| APS Module | `plans/modules/05-rust-port.aps.md`                         |
+| APS Module | `plans/modules/05-rust-port.aps.md`                          |
 
 ## Context
 
-The previous spec (2026-04-15) committed to dual-maintaining Rust and TypeScript implementations of Kindling, with Rust as the canonical type source via `ts-rs`. That assumed the TypeScript implementation had real consumers worth keeping.
+The previous spec (2026-04-15) committed to dual-maintaining Rust and TypeScript implementations of kindling, with Rust as the canonical type source via `ts-rs`. That assumed the TypeScript implementation had real consumers worth keeping.
 
 Reassessment of the consumer set:
 
-- **Anvil** is nearly 100% Rust. Native Rust integration is the goal, no TS bridge.
-- **Other planned consumers** are TypeScript projects owned by the same operator. They need *access* to Kindling, not in-process embedding — an HTTP client over a local socket is sufficient for every realistic use case.
+- **anvil** is nearly 100% Rust. Native Rust integration is the goal, no TS bridge.
+- **Other planned consumers** are TypeScript projects owned by the same operator. They need _access_ to kindling, not in-process embedding — an HTTP client over a local socket is sufficient for every realistic use case.
 - **Browser / sql.js consumers** do not exist. The `@eddacraft/kindling-store-sqljs` package was speculative.
 - **Adapter packages** (Claude Code, OpenCode, PocketFlow) are thin wrappers — they translate framework events into observation calls. They can wrap an HTTP client just as easily as an in-process service.
 
@@ -23,7 +23,7 @@ Dual-maintain pays a real tax (schema sync, type drift risk, two test suites, tw
 
 ## Decision
 
-**Rust is the only implementation.** Non-Rust consumers reach Kindling via a long-running local daemon (`kindling serve`) over a Unix domain socket (Linux/macOS) or localhost TCP (Windows).
+**Rust is the only implementation.** Non-Rust consumers reach kindling via a long-running local daemon (`kindling serve`) over a Unix domain socket (Linux/macOS) or localhost TCP (Windows).
 
 - One binary: `kindling`. Subcommands: `serve`, `hook`, plus the CLI verbs (`search`, `list`, `pin`, …).
 - One npm package: `@eddacraft/kindling`. Postinstall downloads the platform binary; module exports a thin HTTP client.
@@ -33,11 +33,11 @@ Dual-maintain pays a real tax (schema sync, type drift risk, two test suites, tw
 
 ## Approaches Considered
 
-| Approach                                                  | TS consumer story                          | Maintenance     | Distribution                                  |
-| --------------------------------------------------------- | ------------------------------------------ | --------------- | --------------------------------------------- |
-| **(A) Rust-canonical, thin TS HTTP client** ✅            | `pnpm add @eddacraft/kindling` → daemon spawned on first call | One implementation | Single binary + thin npm wrapper |
-| (B) Dual-maintain Rust + TS (prior spec)                  | First-class TS implementation              | Two impls forever, ts-rs sync gate | Two artifacts, both first-class |
-| (C) Rust-only, no TS surface                              | TS consumers write their own HTTP client   | Cleanest        | Binary only — every TS consumer rebuilds the wheel |
+| Approach                                       | TS consumer story                                             | Maintenance                        | Distribution                                       |
+| ---------------------------------------------- | ------------------------------------------------------------- | ---------------------------------- | -------------------------------------------------- |
+| **(A) Rust-canonical, thin TS HTTP client** ✅ | `pnpm add @eddacraft/kindling` → daemon spawned on first call | One implementation                 | Single binary + thin npm wrapper                   |
+| (B) Dual-maintain Rust + TS (prior spec)       | First-class TS implementation                                 | Two impls forever, ts-rs sync gate | Two artifacts, both first-class                    |
+| (C) Rust-only, no TS surface                   | TS consumers write their own HTTP client                      | Cleanest                           | Binary only — every TS consumer rebuilds the wheel |
 
 **Why A over C:** The thin client is ~50KB of TypeScript that auto-spawns the daemon and exposes a typed API. Shipping it once eliminates per-consumer boilerplate and gives the TS adapter packages something to wrap.
 
@@ -91,28 +91,28 @@ Claude Code hooks run as subprocesses. They become thin clients:
 - Binary itself starts in microseconds. All work is in the daemon.
 - Cold session: first hook spawns daemon (~50ms). Warm: <5ms total.
 
-### Anvil integration
+### anvil integration
 
 Two equally valid integration paths; per-call site choice:
 
-- **In-process:** `use kindling_service::KindlingService;` — zero IPC. Use when Anvil owns the database lock for the session (headless, single-process workflows).
+- **In-process:** `use kindling_service::KindlingService;` — zero IPC. Use when anvil owns the database lock for the session (headless, single-process workflows).
 - **Via daemon:** `use kindling_client::Client;` — same shape. Use when Claude Code (or any other tool) might write concurrently.
 
-Default Anvil to the daemon path for any session that could overlap with interactive Claude Code.
+Default anvil to the daemon path for any session that could overlap with interactive Claude Code.
 
 ## Distribution Model
 
 One binary, multiple install channels, all converge on `~/.local/bin/kindling` (or platform equivalent):
 
-| Channel | Audience | Command |
-| --- | --- | --- |
-| crates.io | Rust devs | `cargo install kindling` |
-| Homebrew tap | macOS/Linux devs | `brew install eddacraft/tap/kindling` |
-| Install script | Anyone, CI | `curl -sSL install.kindling.dev \| sh` |
-| GitHub Releases | Manual / scripted | Raw binaries per platform |
-| **npm postinstall** | TS projects | `pnpm add @eddacraft/kindling` |
+| Channel             | Audience          | Command                                |
+| ------------------- | ----------------- | -------------------------------------- |
+| crates.io           | Rust devs         | `cargo install kindling`               |
+| Homebrew tap        | macOS/Linux devs  | `brew install eddacraft/tap/kindling`  |
+| Install script      | Anyone, CI        | `curl -sSL install.kindling.dev \| sh` |
+| GitHub Releases     | Manual / scripted | Raw binaries per platform              |
+| **npm postinstall** | TS projects       | `pnpm add @eddacraft/kindling`         |
 
-The npm postinstall is the unlock for TS consumers: one `pnpm add` installs the client SDK *and* downloads the platform binary into `node_modules/@eddacraft/kindling/bin/`. Same model as `esbuild`, `swc`, `biome`. If the binary is already on PATH, the postinstall is a no-op.
+The npm postinstall is the unlock for TS consumers: one `pnpm add` installs the client SDK _and_ downloads the platform binary into `node_modules/@eddacraft/kindling/bin/`. Same model as `esbuild`, `swc`, `biome`. If the binary is already on PATH, the postinstall is a no-op.
 
 Cross-platform release matrix:
 
@@ -135,7 +135,7 @@ Built via `cargo-zigbuild` on a single Linux runner (or matrix per OS, decide in
 - **Adds** types generated from Rust via `ts-rs`.
 - **Adds** postinstall script that downloads the platform binary if not on PATH.
 
-Public API stays roughly the same shape (`KindlingService` → `Kindling` client class with the same method names) so consumer migration is a few imports + a `new Kindling()` instead of `new KindlingService({ store, provider })`.
+Public API stays roughly the same shape (`KindlingService` → `kindling` client class with the same method names) so consumer migration is a few imports + a `new kindling()` instead of `new KindlingService({ store, provider })`.
 
 ### Deprecated packages
 
@@ -150,7 +150,7 @@ These get a `0.x.0` deprecation release with a `console.warn` on import, then re
 
 Adapters (`@eddacraft/kindling-adapter-claude-code`, `-opencode`, `-pocketflow`) get rewritten to depend on `@eddacraft/kindling` (the new thin client).
 
-The Anvil TS bridge (`@eddacraft/anvil-kindling-integration`) gets deprecated and removed once Anvil cuts over to direct Rust integration.
+The anvil TS bridge (`@eddacraft/anvil-kindling-integration`) gets deprecated and removed once anvil cuts over to direct Rust integration.
 
 ### Browser / WASM
 
@@ -160,29 +160,29 @@ Out of scope. The `kindling-store-sqljs` package goes away. If a real browser co
 
 10 crates in `crates/`:
 
-| Crate                  | Purpose |
-| ---------------------- | ------- |
-| `kindling-types`       | Domain types, `ts-rs` derives |
-| `kindling-store`       | SQLite persistence (rusqlite + bundled FTS5) |
-| `kindling-filter`      | Secret masking, truncation |
-| `kindling-provider`    | Local FTS retrieval, BM25 normalisation |
-| `kindling-service`     | In-process API (`open_capsule`, `append_observation`, `retrieve`, …) |
-| `kindling-server`      | UDS daemon (axum), auto-spawn, idle shutdown |
-| `kindling-client`      | Rust HTTP-over-UDS client (used by hook, CLI, Anvil) |
-| `kindling-hook`        | Thin hook subcommand wrapping `kindling-client` |
-| `kindling-cli`         | clap subcommands wrapping `kindling-service` or `-client` |
-| `kindling`             | Umbrella binary — dispatches to hook / CLI / server |
+| Crate               | Purpose                                                              |
+| ------------------- | -------------------------------------------------------------------- |
+| `kindling-types`    | Domain types, `ts-rs` derives                                        |
+| `kindling-store`    | SQLite persistence (rusqlite + bundled FTS5)                         |
+| `kindling-filter`   | Secret masking, truncation                                           |
+| `kindling-provider` | Local FTS retrieval, BM25 normalisation                              |
+| `kindling-service`  | In-process API (`open_capsule`, `append_observation`, `retrieve`, …) |
+| `kindling-server`   | UDS daemon (axum), auto-spawn, idle shutdown                         |
+| `kindling-client`   | Rust HTTP-over-UDS client (used by hook, CLI, anvil)                 |
+| `kindling-hook`     | Thin hook subcommand wrapping `kindling-client`                      |
+| `kindling-cli`      | clap subcommands wrapping `kindling-service` or `-client`            |
+| `kindling`          | Umbrella binary — dispatches to hook / CLI / server                  |
 
 The workspace root `Cargo.toml` lives at the repo root with `members = ["crates/*"]`; member crates live under `crates/`. Existing `packages/` directory shrinks to: `@eddacraft/kindling` (thin client) + adapter packages, all of which become consumers of the daemon.
 
 ## Migration Path
 
 1. Land Rust foundation (Phase 1) without touching `packages/`.
-2. Land daemon + hook + Anvil integration (Phase 2). At this point Anvil is unblocked and Claude Code plugin can switch to the Rust hook.
+2. Land daemon + hook + anvil integration (Phase 2). At this point anvil is unblocked and Claude Code plugin can switch to the Rust hook.
 3. Land CLI + distribution (Phase 3). `kindling` binary on cargo, brew, curl|sh.
 4. Rewrite `@eddacraft/kindling` as the thin client + postinstall package (Phase 4). Ship as `0.2.0`.
 5. Deprecate the old TS implementation packages (Phase 4). Final removal at `1.0.0`.
-6. Anvil TS bridge deprecation (Phase 4, after Anvil's cutover lands in EddaCraft repo).
+6. anvil TS bridge deprecation (Phase 4, after anvil's cutover lands in eddacraft repo).
 
 ## Open Questions
 
@@ -196,19 +196,19 @@ The workspace root `Cargo.toml` lives at the repo root with `members = ["crates/
 
 ## Risks
 
-| Risk                                                  | Impact | Mitigation                                                   |
-| ----------------------------------------------------- | ------ | ------------------------------------------------------------ |
-| npm postinstall download fails behind corp proxy      | Medium | Honour `npm_config_proxy` / standard env vars; document offline binary install path |
-| Daemon process gets orphaned / piles up               | Medium | PID file with stale-PID cleanup on next spawn; `kindling serve --health` for ops |
-| Cold-spawn latency exceeds 100ms on slow disks        | Low    | Measure on dogfood; spool fallback if needed (open question 4) |
-| Existing TS consumers (just you) need migration       | Low    | You own them; coordinate cutover with `0.2.0` release        |
-| Schema drift between binary and client expectations   | Medium | `/v1/health` reports schemaVersion; client checks on first call and fails loud |
+| Risk                                                | Impact | Mitigation                                                                          |
+| --------------------------------------------------- | ------ | ----------------------------------------------------------------------------------- |
+| npm postinstall download fails behind corp proxy    | Medium | Honour `npm_config_proxy` / standard env vars; document offline binary install path |
+| Daemon process gets orphaned / piles up             | Medium | PID file with stale-PID cleanup on next spawn; `kindling serve --health` for ops    |
+| Cold-spawn latency exceeds 100ms on slow disks      | Low    | Measure on dogfood; spool fallback if needed (open question 4)                      |
+| Existing TS consumers (just you) need migration     | Low    | You own them; coordinate cutover with `0.2.0` release                               |
+| Schema drift between binary and client expectations | Medium | `/v1/health` reports schemaVersion; client checks on first call and fails loud      |
 
 ## Success Criteria
 
 - [ ] `kindling serve` runs as a long-lived daemon with auto-spawn and idle shutdown
 - [ ] All 7 Claude Code hook types complete in <10ms warm, <100ms cold
-- [ ] Anvil emits observations directly via `kindling-client` or `kindling-service` — no TS bridge
+- [ ] anvil emits observations directly via `kindling-client` or `kindling-service` — no TS bridge
 - [ ] `pnpm add @eddacraft/kindling` installs the binary and exposes a typed client
 - [ ] Single statically-linked binary distributed via cargo, brew, curl|sh, npm
 - [ ] All deprecated TS implementation packages removed by `1.0.0`

@@ -1,6 +1,6 @@
 [package]
 name = "kindling-server"
-description = "Long-running Kindling daemon — HTTP/1 over Unix domain socket (TCP fallback on Windows). Auto-spawn, idle shutdown, per-project DB routing."
+description = "Long-running kindling daemon — HTTP/1 over Unix domain socket (TCP fallback on Windows). Auto-spawn, idle shutdown, per-project DB routing."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

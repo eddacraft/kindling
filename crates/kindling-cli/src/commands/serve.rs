@@ -1,4 +1,4 @@
-//! `serve` — start the Kindling daemon.
+//! `serve` — start the kindling daemon.
 //!
 //! **Deliberate deviation from the TS CLI.** The TS `serve` ran a Fastify HTTP
 //! server bound to `--host:--port` with optional CORS. The Rust port (D-005)
@@ -23,9 +23,9 @@ pub fn run(args: ServeArgs) -> CliResult {
     // the banner is for an interactive operator, and emitting it would corrupt
     // the stdout of whatever spawned us (e.g. a hook writing JSON to stdout).
     if !args.daemonize {
-        println!("Starting Kindling daemon...");
+        println!("Starting kindling daemon...");
         println!("Socket: {}", config.socket_path.display());
-        println!("Kindling home: {}", config.kindling_home.display());
+        println!("kindling home: {}", config.kindling_home.display());
         println!("Idle timeout: {}s", config.idle_timeout.as_secs());
         println!();
     }

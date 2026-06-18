@@ -1,6 +1,6 @@
 # @eddacraft/kindling-adapter-pocketflow
 
-PocketFlow workflow adapter for Kindling - capture node executions with intent and confidence.
+PocketFlow workflow adapter for kindling - capture node executions with intent and confidence.
 
 [![npm version](https://img.shields.io/npm/v/@eddacraft/kindling-adapter-pocketflow.svg)](https://www.npmjs.com/package/@eddacraft/kindling-adapter-pocketflow)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](../../LICENSE)
@@ -13,7 +13,7 @@ npm install @eddacraft/kindling-adapter-pocketflow
 
 ## Overview
 
-`@eddacraft/kindling-adapter-pocketflow` integrates Kindling with PocketFlow workflows:
+`@eddacraft/kindling-adapter-pocketflow` integrates kindling with PocketFlow workflows:
 
 - **Node-Level Capsules** - Each node execution creates a capsule
 - **Automatic Capture** - Records `node_start`, `node_output`, `node_error`, `node_end` events

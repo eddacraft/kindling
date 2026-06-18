@@ -1,7 +1,7 @@
 //! Claude Code hook handlers (Rust).
 //!
 //! Reads a Claude Code hook context from stdin (JSON), dispatches to the
-//! Kindling daemon via [`kindling_client`], and writes the correct stdout JSON.
+//! kindling daemon via [`kindling_client`], and writes the correct stdout JSON.
 //! Each hook is a fresh, short-lived process; the binary **always exits 0** so a
 //! hook can never block Claude Code (errors are logged to stderr instead).
 //!

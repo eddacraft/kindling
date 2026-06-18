@@ -1,4 +1,4 @@
-//! `clap` command tree for the Kindling CLI.
+//! `clap` command tree for the kindling CLI.
 //!
 //! Mirrors the Commander.js definitions in
 //! `packages/kindling-cli/src/index.ts` (flags + defaults). Two deliberate
@@ -42,7 +42,7 @@ pub struct CommonOpts {
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
-    /// Initialize Kindling (create database and configure hooks).
+    /// Initialize kindling (create database and configure hooks).
     Init(InitArgs),
 
     /// Log an observation to memory.
@@ -76,7 +76,7 @@ pub enum Command {
     /// Import memory from an export file.
     Import(ImportArgs),
 
-    /// Start the Kindling daemon (HTTP/1 over a Unix domain socket).
+    /// Start the kindling daemon (HTTP/1 over a Unix domain socket).
     Serve(ServeArgs),
 }
 
@@ -304,7 +304,7 @@ pub struct ServeArgs {
     #[arg(long, value_name = "secs", default_value_t = 1800)]
     pub idle_timeout: u64,
 
-    /// Kindling home (root of per-project databases). Defaults to ~/.kindling
+    /// kindling home (root of per-project databases). Defaults to ~/.kindling
     /// (or the parent of `--socket` when given).
     #[arg(long, value_name = "path")]
     pub kindling_home: Option<String>,

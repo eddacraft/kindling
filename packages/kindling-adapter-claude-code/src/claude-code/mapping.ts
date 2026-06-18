@@ -1,7 +1,7 @@
 /**
  * Event to observation mapping for Claude Code
  *
- * Maps Claude Code hook events to Kindling observations with provenance.
+ * Maps Claude Code hook events to kindling observations with provenance.
  */
 
 import type { ObservationKind, ObservationInput } from '@eddacraft/kindling-core';
@@ -44,7 +44,7 @@ export interface MapEventResult {
 }
 
 /**
- * Map a Claude Code event to a Kindling observation
+ * Map a Claude Code event to a kindling observation
  */
 export function mapEvent(event: ClaudeCodeEvent): MapEventResult {
   switch (event.type) {

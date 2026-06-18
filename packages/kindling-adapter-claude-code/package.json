@@ -1,7 +1,7 @@
 {
   "name": "@eddacraft/kindling-adapter-claude-code",
   "version": "0.1.3",
-  "description": "DEPRECATED: use @eddacraft/kindling instead. Claude Code adapter for Kindling - capture tool calls and session context via hooks for memory continuity",
+  "description": "DEPRECATED: use @eddacraft/kindling instead. Claude Code adapter for kindling - capture tool calls and session context via hooks for memory continuity",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -29,15 +29,15 @@
     "memory",
     "continuity"
   ],
-  "author": "EddaCraft <hello@eddacraft.ai>",
-  "homepage": "https://github.com/EddaCraft/kindling/tree/main/packages/kindling-adapter-claude-code#readme",
+  "author": "eddacraft <hello@eddacraft.ai>",
+  "homepage": "https://github.com/eddacraft/kindling/tree/main/packages/kindling-adapter-claude-code#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/EddaCraft/kindling.git",
+    "url": "git+https://github.com/eddacraft/kindling.git",
     "directory": "packages/kindling-adapter-claude-code"
   },
   "bugs": {
-    "url": "https://github.com/EddaCraft/kindling/issues"
+    "url": "https://github.com/eddacraft/kindling/issues"
   },
   "license": "Apache-2.0",
   "scripts": {

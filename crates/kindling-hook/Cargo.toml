@@ -1,6 +1,6 @@
 [package]
 name = "kindling-hook"
-description = "Claude Code hook handlers for Kindling — thin client to the daemon over UDS. All 7 hook types (session-start, post-tool-use, …) handled via stdin/stdout JSON."
+description = "Claude Code hook handlers for kindling — thin client to the daemon over UDS. All 7 hook types (session-start, post-tool-use, …) handled via stdin/stdout JSON."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

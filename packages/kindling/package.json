@@ -1,7 +1,7 @@
 {
   "name": "@eddacraft/kindling",
   "version": "0.2.0",
-  "description": "Thin TypeScript client for the Kindling daemon — local memory and continuity engine for AI-assisted development",
+  "description": "Thin TypeScript client for the kindling daemon — local memory and continuity engine for AI-assisted development",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -28,15 +28,15 @@
     "daemon",
     "client"
   ],
-  "author": "EddaCraft <hello@eddacraft.ai>",
-  "homepage": "https://github.com/EddaCraft/kindling#readme",
+  "author": "eddacraft <hello@eddacraft.ai>",
+  "homepage": "https://github.com/eddacraft/kindling#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/EddaCraft/kindling.git",
+    "url": "git+https://github.com/eddacraft/kindling.git",
     "directory": "packages/kindling"
   },
   "bugs": {
-    "url": "https://github.com/EddaCraft/kindling/issues"
+    "url": "https://github.com/eddacraft/kindling/issues"
   },
   "license": "Apache-2.0",
   "scripts": {

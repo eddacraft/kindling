@@ -9,11 +9,11 @@ description: >
 
 # Memory Retrieval Protocol
 
-You have access to Kindling — a local memory engine that captures what happens across sessions (tool calls, diffs, commands, errors). This protocol teaches you when and how to retrieve that memory.
+You have access to kindling — a local memory engine that captures what happens across sessions (tool calls, diffs, commands, errors). This protocol teaches you when and how to retrieve that memory.
 
 ## Injected Context
 
-At session start, Kindling automatically injects prior context (pins and recent observations) into the conversation. **Read it.** If anything relates to the current task, acknowledge it briefly and let it inform your approach.
+At session start, kindling automatically injects prior context (pins and recent observations) into the conversation. **Read it.** If anything relates to the current task, acknowledge it briefly and let it inform your approach.
 
 You do not need to run `/memory search` at session start unless the injected context is insufficient for the task at hand.
 

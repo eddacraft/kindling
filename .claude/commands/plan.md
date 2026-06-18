@@ -4,7 +4,7 @@ Start or continue APS planning for this project.
 
 ## Instructions
 
-You are starting an APS (Anvil Plan Spec) planning session. Follow these steps:
+You are starting an APS (anvil Plan Spec) planning session. Follow these steps:
 
 ### Step 1: Assess current state
 

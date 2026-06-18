@@ -3,11 +3,11 @@
   "version": "0.1.0",
   "description": "Memory continuity for Claude Code — remember what you worked on across sessions",
   "author": {
-    "name": "EddaCraft",
-    "url": "https://github.com/EddaCraft"
+    "name": "eddacraft",
+    "url": "https://github.com/eddacraft"
   },
-  "homepage": "https://github.com/EddaCraft/kindling",
-  "repository": "https://github.com/EddaCraft/kindling",
+  "homepage": "https://github.com/eddacraft/kindling",
+  "repository": "https://github.com/eddacraft/kindling",
   "license": "Apache-2.0",
   "keywords": ["memory", "continuity", "context", "sessions"],
   "hooks": "./hooks/hooks.json"

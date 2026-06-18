@@ -1,8 +1,8 @@
-# Kindling Release Runbook
+# kindling Release Runbook
 
-Purpose: ship Kindling's npm packages safely and consistently.
+Purpose: ship kindling's npm packages safely and consistently.
 
-Kindling publishes 9 workspace packages to the `@eddacraft/*` scope on npm. All
+kindling publishes 9 workspace packages to the `@eddacraft/*` scope on npm. All
 publishing is automated via `.github/workflows/publish.yml`, which is triggered
 by GitHub Releases.
 

@@ -1,11 +1,11 @@
 # @eddacraft/kindling-provider-local
 
 > **⚠️ Deprecated** — this package is deprecated and will be removed at v1.0.0.
-> Kindling is now a Rust daemon. Use [`@eddacraft/kindling`](https://www.npmjs.com/package/@eddacraft/kindling)
+> kindling is now a Rust daemon. Use [`@eddacraft/kindling`](https://www.npmjs.com/package/@eddacraft/kindling)
 > (the thin HTTP-over-UDS client) or the `kindling` binary instead.
 > See <https://github.com/eddacraft/kindling>.
 
-Local FTS-based retrieval provider for Kindling with deterministic, explainable ranking.
+Local FTS-based retrieval provider for kindling with deterministic, explainable ranking.
 
 [![npm version](https://img.shields.io/npm/v/@eddacraft/kindling-provider-local.svg)](https://www.npmjs.com/package/@eddacraft/kindling-provider-local)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](../../LICENSE)

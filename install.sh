@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-# Kindling installer
+# kindling installer
 # Usage: curl -fsSL https://raw.githubusercontent.com/eddacraft/kindling/main/install.sh | sh
 
 PACKAGE="@eddacraft/kindling-cli"
@@ -27,7 +27,7 @@ check_node() {
   major=$(printf '%s' "$version" | sed 's/^v//' | cut -d. -f1)
 
   if [ "$major" -lt "$MIN_NODE_MAJOR" ] 2>/dev/null; then
-    error "Node.js ${version} is too old. Kindling requires Node.js >= ${MIN_NODE_MAJOR}. Update via https://nodejs.org or your version manager"
+    error "Node.js ${version} is too old. kindling requires Node.js >= ${MIN_NODE_MAJOR}. Update via https://nodejs.org or your version manager"
   fi
 
   info "Found Node.js ${version}"
@@ -77,7 +77,7 @@ setup_claude_code() {
 
   printf '\n'
   printf '  Configure Claude Code integration?\n'
-  printf '  This adds Kindling hooks to your Claude Code config.\n'
+  printf '  This adds kindling hooks to your Claude Code config.\n'
   printf '\n'
   printf '  Enable Claude Code integration? [y/N] '
 
@@ -100,7 +100,7 @@ setup_claude_code() {
 
 main() {
   printf '\n'
-  printf '  \360\237\224\245 Kindling Installer\n'
+  printf '  \360\237\224\245 kindling Installer\n'
   printf '  Local memory for AI-assisted development\n'
   printf '\n'
 
@@ -114,7 +114,7 @@ main() {
   setup_claude_code
 
   printf '\n'
-  printf '  \342\234\223 Kindling installed successfully!\n'
+  printf '  \342\234\223 kindling installed successfully!\n'
   printf '\n'
   printf '  Get started:\n'
   printf '    kindling status          Show database status\n'

@@ -1,14 +1,14 @@
-# Kindling Use Cases
+# kindling Use Cases
 
-A development reference for understanding when Kindling might be the right fit for your project.
+A development reference for understanding when kindling might be the right fit for your project.
 
-## What is Kindling?
+## What is kindling?
 
-Kindling is a **local memory and continuity engine** for AI-assisted development. It captures observations from AI workflows (tool calls, diffs, commands, errors), organizes them into capsules (bounded units of meaning), and makes context retrievable with deterministic, explainable results.
+kindling is a **local memory and continuity engine** for AI-assisted development. It captures observations from AI workflows (tool calls, diffs, commands, errors), organizes them into capsules (bounded units of meaning), and makes context retrievable with deterministic, explainable results.
 
 All data is stored locally using embedded SQLite with FTS5—no cloud dependencies, no data leaving your machine.
 
-## When Kindling Fits
+## When kindling Fits
 
 ### 1. Building AI Coding Assistants
 
@@ -16,7 +16,7 @@ All data is stored locally using embedded SQLite with FTS5—no cloud dependenci
 
 **The problem**: LLMs have limited context windows and no memory between sessions. Your AI assistant forgets everything it learned in the previous conversation.
 
-**How Kindling helps**:
+**How kindling helps**:
 
 - Captures what tools were called, what files were changed, what errors occurred
 - Organizes context by session, repository, and user
@@ -31,7 +31,7 @@ All data is stored locally using embedded SQLite with FTS5—no cloud dependenci
 
 **The problem**: Agent A generates output that Agent B needs, but there's no standard way to share context, track what happened, or recover from failures.
 
-**How Kindling helps**:
+**How kindling helps**:
 
 - Each agent's work is captured as observations in capsules
 - Agents can retrieve context from other agents' work
@@ -46,14 +46,14 @@ All data is stored locally using embedded SQLite with FTS5—no cloud dependenci
 
 **The problem**: When an AI node fails or produces unexpected output, debugging is difficult because there's no record of what the AI "saw" or "decided."
 
-**How Kindling helps**:
+**How kindling helps**:
 
 - Automatically creates capsules for each workflow node execution
 - Records inputs, outputs, errors, and timing
 - Tracks intent (what the node was trying to do) and confidence (how reliable its output is)
 - Enables post-mortem analysis and replay debugging
 
-**Example**: A data pipeline where an LLM classifies documents—Kindling captures why each document was classified the way it was.
+**Example**: A data pipeline where an LLM classifies documents—kindling captures why each document was classified the way it was.
 
 ### 4. Development Session Continuity
 
@@ -61,7 +61,7 @@ All data is stored locally using embedded SQLite with FTS5—no cloud dependenci
 
 **The problem**: You return to a project and can't remember what you were working on, what you tried, or what was broken.
 
-**How Kindling helps**:
+**How kindling helps**:
 
 - Automatically captures your development session as you work
 - Retrieves "what was I doing?" context when you return
@@ -76,7 +76,7 @@ All data is stored locally using embedded SQLite with FTS5—no cloud dependenci
 
 **The problem**: Cloud-based memory solutions require sending potentially sensitive code, errors, and development context to third-party servers.
 
-**How Kindling helps**:
+**How kindling helps**:
 
 - All data stored locally in SQLite
 - No cloud dependencies
@@ -91,7 +91,7 @@ All data is stored locally using embedded SQLite with FTS5—no cloud dependenci
 
 **The problem**: LLMs are black boxes. When they give wrong answers, you don't know what context led to the mistake.
 
-**How Kindling helps**:
+**How kindling helps**:
 
 - Three-tiered retrieval with provenance: pins (user-controlled), current summary, provider hits (FTS results)
 - Each piece of retrieved context includes metadata about where it came from
@@ -99,23 +99,23 @@ All data is stored locally using embedded SQLite with FTS5—no cloud dependenci
 
 **Example**: "The AI suggested this refactor because it found 3 similar patterns in sessions from last month, ranked by recency and relevance."
 
-## When Kindling Does NOT Fit
+## When kindling Does NOT Fit
 
 ### Not for these use cases:
 
-1. **Stateless API calls**: If you just need to call an LLM once and throw away the response, Kindling adds unnecessary overhead.
+1. **Stateless API calls**: If you just need to call an LLM once and throw away the response, kindling adds unnecessary overhead.
 
-2. **Real-time streaming**: Kindling is designed for post-hoc analysis and retrieval, not real-time observation streams.
+2. **Real-time streaming**: kindling is designed for post-hoc analysis and retrieval, not real-time observation streams.
 
-3. **Distributed systems**: Kindling uses local SQLite. For distributed AI systems, you'd need to aggregate data from multiple Kindling instances.
+3. **Distributed systems**: kindling uses local SQLite. For distributed AI systems, you'd need to aggregate data from multiple kindling instances.
 
-4. **Non-development domains**: While Kindling could theoretically be used for any AI workflow, it's optimized for software development contexts (tool calls, diffs, commands, errors).
+4. **Non-development domains**: While kindling could theoretically be used for any AI workflow, it's optimized for software development contexts (tool calls, diffs, commands, errors).
 
-5. **Large-scale production**: Kindling is designed for individual developers or small teams, not enterprise-scale observability.
+5. **Large-scale production**: kindling is designed for individual developers or small teams, not enterprise-scale observability.
 
 ## Integration Points
 
-Kindling integrates through **adapters**:
+kindling integrates through **adapters**:
 
 | Adapter                                   | Use Case                                            |
 | ----------------------------------------- | --------------------------------------------------- |
@@ -178,7 +178,7 @@ const results = await service.retrieve({
 
 ## Summary
 
-Use Kindling when you need:
+Use kindling when you need:
 
 - **Memory** for AI systems across sessions
 - **Local** storage without cloud dependencies

@@ -1,4 +1,4 @@
-//! SQLite persistence layer for Kindling.
+//! SQLite persistence layer for kindling.
 //!
 //! Implements the cross-language schema contract from `schema/schema.sql`
 //! against `rusqlite` with bundled SQLite + FTS5. WAL mode enabled,

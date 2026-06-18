@@ -1,5 +1,5 @@
 /**
- * Kindling API Server
+ * kindling API Server
  *
  * HTTP API server for multi-agent concurrency. Holds a single database
  * connection and serializes all writes through a central coordination point.
@@ -155,7 +155,7 @@ export async function startServer(config: ServerConfig): Promise<FastifyInstance
   const { port = 8080, host = '127.0.0.1' } = config;
 
   await server.listen({ port, host });
-  console.log(`🔥 Kindling API server listening on http://${host}:${port}`);
+  console.log(`🔥 kindling API server listening on http://${host}:${port}`);
   console.log(`📊 Health check: http://${host}:${port}/health`);
 
   return server;

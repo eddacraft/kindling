@@ -1,4 +1,4 @@
-//! Canonical Kindling domain types.
+//! Canonical kindling domain types.
 //!
 //! This crate is the source of truth for the wire-format shapes shared between
 //! the Rust implementation and TypeScript consumers. Each public type

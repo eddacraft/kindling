@@ -1,6 +1,6 @@
 [package]
 name = "kindling-client"
-description = "Rust HTTP-over-UDS client for the Kindling daemon. Auto-spawns the daemon on first call. Used by the hook subcommand and by Anvil for concurrent-safe integration."
+description = "Rust HTTP-over-UDS client for the kindling daemon. Auto-spawns the daemon on first call. Used by the hook subcommand and by anvil for concurrent-safe integration."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

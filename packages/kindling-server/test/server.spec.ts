@@ -1,5 +1,5 @@
 /**
- * Tests for Kindling API Server
+ * Tests for kindling API Server
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';

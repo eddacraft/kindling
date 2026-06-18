@@ -21,7 +21,7 @@ export async function serveCommand(options: ServeOptions): Promise<void> {
   const port = options.port ? parseInt(options.port, 10) : 8080;
   const host = options.host || '127.0.0.1';
 
-  console.log(`Starting Kindling API server...`);
+  console.log(`Starting kindling API server...`);
   console.log(`Database: ${dbPath}`);
   console.log(`Listening on: http://${host}:${port}`);
   console.log();

@@ -4,7 +4,7 @@
 
 Use git worktrees as lightweight execution spaces for active branches.
 
-Kindling keeps one permanent anchor worktree and treats everything else as
+kindling keeps one permanent anchor worktree and treats everything else as
 disposable.
 
 ## Permanent Worktrees

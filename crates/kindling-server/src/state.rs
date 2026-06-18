@@ -38,7 +38,7 @@ impl AppState {
         }
     }
 
-    /// Kindling home root.
+    /// kindling home root.
     pub fn kindling_home(&self) -> &PathBuf {
         &self.kindling_home
     }

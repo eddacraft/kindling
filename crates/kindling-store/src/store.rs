@@ -1,4 +1,4 @@
-//! SQLite-backed Kindling store.
+//! SQLite-backed kindling store.
 //!
 //! Mirrors `SqliteKindlingStore` in
 //! `packages/kindling-store-sqlite/src/store/sqlite.ts` method-for-method.
@@ -31,7 +31,7 @@ pub struct EvidenceSnippet {
 /// callers that have no opinion (matches the TS default parameter).
 pub const DEFAULT_SNIPPET_MAX_CHARS: usize = 200;
 
-/// SQLite-based Kindling store.
+/// SQLite-based kindling store.
 pub struct SqliteKindlingStore {
     conn: Connection,
 }

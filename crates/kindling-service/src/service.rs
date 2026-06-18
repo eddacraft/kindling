@@ -87,7 +87,7 @@ pub struct CreatePinOptions {
     pub scope_ids: Option<ScopeIds>,
 }
 
-/// In-process Kindling orchestration service.
+/// In-process kindling orchestration service.
 ///
 /// Owns the [`SqliteKindlingStore`]. The retrieval provider borrows the store
 /// connection, so it is constructed per-retrieve rather than held as a field.

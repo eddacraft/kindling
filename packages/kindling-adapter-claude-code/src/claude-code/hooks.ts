@@ -42,7 +42,7 @@ export interface HookHandlerConfig {
 }
 
 /**
- * Creates Claude Code hook handlers connected to a Kindling store
+ * Creates Claude Code hook handlers connected to a kindling store
  *
  * Usage:
  * ```typescript

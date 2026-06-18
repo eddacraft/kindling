@@ -1,11 +1,11 @@
 # @eddacraft/kindling-core
 
 > **⚠️ Deprecated** — this package is deprecated and will be removed at v1.0.0.
-> Kindling is now a Rust daemon. Use [`@eddacraft/kindling`](https://www.npmjs.com/package/@eddacraft/kindling)
+> kindling is now a Rust daemon. Use [`@eddacraft/kindling`](https://www.npmjs.com/package/@eddacraft/kindling)
 > (the thin HTTP-over-UDS client) or the `kindling` binary instead.
 > See <https://github.com/eddacraft/kindling>.
 
-Core domain model and orchestration for Kindling - local memory engine for AI-assisted development.
+Core domain model and orchestration for kindling - local memory engine for AI-assisted development.
 
 [![npm version](https://img.shields.io/npm/v/@eddacraft/kindling-core.svg)](https://www.npmjs.com/package/@eddacraft/kindling-core)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](../../LICENSE)
@@ -18,7 +18,7 @@ npm install @eddacraft/kindling-core
 
 ## Overview
 
-`@eddacraft/kindling-core` provides the domain types, capsule lifecycle management, and retrieval orchestration for Kindling. It defines the core abstractions that other packages implement:
+`@eddacraft/kindling-core` provides the domain types, capsule lifecycle management, and retrieval orchestration for kindling. It defines the core abstractions that other packages implement:
 
 - **Observations** - Atomic records of captured events
 - **Capsules** - Bounded units of meaning that group observations
@@ -167,7 +167,7 @@ const result: RetrieveResult = {
 
 ## Result Type
 
-Kindling uses a Result type for validation:
+kindling uses a Result type for validation:
 
 ```typescript
 import { Result, ok, err } from '@eddacraft/kindling-core';

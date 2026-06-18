@@ -2,7 +2,7 @@
 description: Show memory database statistics including observation count, sessions, and pins.
 ---
 
-Show statistics about the Kindling memory database for this project.
+Show statistics about the kindling memory database for this project.
 
 Run this command:
 

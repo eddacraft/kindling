@@ -1,11 +1,11 @@
 # @eddacraft/kindling-server
 
 > **⚠️ Deprecated** — this package is deprecated and will be removed at v1.0.0.
-> Kindling is now a Rust daemon. Use [`@eddacraft/kindling`](https://www.npmjs.com/package/@eddacraft/kindling)
+> kindling is now a Rust daemon. Use [`@eddacraft/kindling`](https://www.npmjs.com/package/@eddacraft/kindling)
 > (the thin HTTP-over-UDS client) or the `kindling` binary instead.
 > See <https://github.com/eddacraft/kindling>.
 
-HTTP API server for Kindling - enables multi-agent concurrency and web-based access.
+HTTP API server for kindling - enables multi-agent concurrency and web-based access.
 
 ## When to Use
 
@@ -178,7 +178,7 @@ Web-based agents can't access local filesystem directly. Two options:
 Create a browser extension that acts as a bridge:
 
 ```
-Web Agent → Extension → localhost:8080 → Kindling DB
+Web Agent → Extension → localhost:8080 → kindling DB
 ```
 
 The extension:
@@ -192,7 +192,7 @@ The extension:
 If the web agent supports Model Context Protocol:
 
 ```typescript
-// MCP server wraps Kindling API
+// MCP server wraps kindling API
 import { Server } from '@modelcontextprotocol/sdk';
 
 const server = new Server(
@@ -208,7 +208,7 @@ const server = new Server(
   },
 );
 
-// Register Kindling tools
+// Register kindling tools
 server.tool('kindling_retrieve', async (args) => {
   const client = new KindlingApiClient('http://localhost:8080');
   return await client.retrieve(args);

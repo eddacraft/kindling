@@ -2,7 +2,7 @@
  * /memory pin command
  *
  * Pins observations or summaries for persistent retrieval via the daemon-backed
- * {@link PinService} (the {@link import('@eddacraft/kindling').Kindling} thin
+ * {@link PinService} (the {@link import('@eddacraft/kindling').kindling} thin
  * client). The daemon owns pin id minting and target validation, so this command
  * no longer constructs a `Pin` locally or checks target existence up front — a
  * missing target surfaces as the daemon's error.
@@ -13,7 +13,7 @@ import type { PinTargetType, ScopeIds, Pin } from '@eddacraft/kindling';
 /**
  * Pin service interface.
  *
- * Satisfied by the {@link import('@eddacraft/kindling').Kindling} thin client —
+ * Satisfied by the {@link import('@eddacraft/kindling').kindling} thin client —
  * `memoryPin` only needs its `pin` method.
  */
 export interface PinService {

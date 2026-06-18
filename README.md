@@ -1,8 +1,8 @@
-# Kindling
+# kindling
 
 **Local memory and continuity engine for AI-assisted development**
 
-Kindling captures what happens during AI-assisted development — tool calls, diffs, commands, errors — and makes it retrievable across sessions. All data stays local in embedded SQLite.
+kindling captures what happens during AI-assisted development — tool calls, diffs, commands, errors — and makes it retrievable across sessions. All data stays local in embedded SQLite.
 
 [![npm version](https://img.shields.io/npm/v/@eddacraft/kindling.svg)](https://www.npmjs.com/package/@eddacraft/kindling)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
@@ -11,17 +11,17 @@ Kindling captures what happens during AI-assisted development — tool calls, di
 
 ## Quick Start: Claude Code
 
-The fastest way to use Kindling — automatic memory for every Claude Code session.
+The fastest way to use kindling — automatic memory for every Claude Code session.
 
 ```bash
 # Install and set up in one step
-curl -fsSL https://raw.githubusercontent.com/EddaCraft/kindling/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/eddacraft/kindling/main/install.sh | sh
 
 # Or with npx (no global install)
 npx @eddacraft/kindling-cli init --claude-code
 ```
 
-That's it. Kindling now captures your Claude Code sessions automatically — tool calls, file edits, commands, errors — all searchable across sessions.
+That's it. kindling now captures your Claude Code sessions automatically — tool calls, file edits, commands, errors — all searchable across sessions.
 
 **Manual setup:** If you prefer to configure hooks yourself, add to `.claude/settings.json`:
 
@@ -41,7 +41,7 @@ Node.js >= 20 required. Prebuilt binaries ship for Linux (glibc), macOS (Intel +
 
 ```bash
 # Recommended: one-line installer (installs CLI + Claude Code plugin)
-curl -fsSL https://raw.githubusercontent.com/EddaCraft/kindling/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/eddacraft/kindling/main/install.sh | sh
 
 # Or install with your preferred package manager
 npm install -g @eddacraft/kindling-cli    # CLI (global)
@@ -62,7 +62,7 @@ bun add @eddacraft/kindling
 <details>
 <summary>If prebuilt binaries aren't available for your platform</summary>
 
-Kindling uses [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) which needs a C++ compiler to build from source:
+kindling uses [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) which needs a C++ compiler to build from source:
 
 - **Debian/Ubuntu:** `sudo apt-get install build-essential python3`
 - **Fedora/RHEL:** `sudo dnf groupinstall "Development Tools"`
@@ -77,7 +77,7 @@ Kindling uses [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) which
 The CLI is both a reader and a writer and you can capture observations manually, not just search for them.
 
 ```bash
-# Initialize Kindling (creates database, optionally sets up Claude Code)
+# Initialize kindling (creates database, optionally sets up Claude Code)
 kindling init
 kindling init --claude-code
 
@@ -123,13 +123,13 @@ kindling serve --port 3000
 
 ## How It Works
 
-Kindling organises memory into two layers:
+kindling organises memory into two layers:
 
 **Observations** — atomic units of captured context (tool calls, commands, file diffs, errors, messages). These flow in automatically from adapters or manually via the CLI.
 
 **Capsules** — bounded groups of observations (a session, a workflow run). Each capsule has an intent, a lifecycle (open/close), and a summary.
 
-When you search, Kindling returns results in three tiers:
+When you search, kindling returns results in three tiers:
 
 1. **Pins** — user-marked priority items (always first, non-evictable)
 2. **Current Summary** — active session context
@@ -137,7 +137,7 @@ When you search, Kindling returns results in three tiers:
 
 ## Adapters
 
-Kindling captures context automatically through adapters:
+kindling captures context automatically through adapters:
 
 | Adapter                                                | What it captures                                                      |
 | ------------------------------------------------------ | --------------------------------------------------------------------- |
@@ -164,7 +164,7 @@ Or capture manually with the CLI (`kindling log`, `kindling capsule open/close`)
 
 ## Programmatic Usage
 
-For building on Kindling as a library:
+For building on kindling as a library:
 
 ```typescript
 import { randomUUID } from 'node:crypto';
@@ -332,7 +332,7 @@ class TestRunnerNode extends KindlingNode<KindlingNodeContext> {
   }
 }
 
-// Run inside a flow with a Kindling-aware shared store
+// Run inside a flow with a kindling-aware shared store
 const node = new TestRunnerNode();
 const flow = new KindlingFlow(node);
 await flow.run({ store, scopeIds: { repoId: 'my-app' } });
@@ -363,16 +363,16 @@ console.log(results.pins); // Includes the pinned error
 4. **Privacy-Aware** — automatic redaction of secrets, bounded output capture
 5. **Provenance Always** — every piece of context points to concrete evidence
 
-## Kindling + Anvil
+## kindling + anvil
 
-**Kindling** captures what happened. **anvil** enforces what should happen.
+**kindling** captures what happened. **anvil** enforces what should happen.
 
 Request access to the anvil closed beta → [eddacraft.ai](https://eddacraft.ai)
 
 ## Development
 
 ```bash
-git clone https://github.com/EddaCraft/kindling.git
+git clone https://github.com/eddacraft/kindling.git
 cd kindling
 pnpm install
 pnpm run build
@@ -380,7 +380,7 @@ pnpm run test
 pnpm run type-check
 ```
 
-This project uses [Anvil Plan Spec (APS)](https://github.com/EddaCraft/anvil-plan-spec) for planning.
+This project uses [anvil Plan Spec (APS)](https://github.com/eddacraft/anvil-plan-spec) for planning.
 
 ## Documentation
 

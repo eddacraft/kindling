@@ -1,4 +1,4 @@
-# Kindling — Plan Index
+# kindling — Plan Index
 
 | Field   | Value       |
 | ------- | ----------- |
@@ -9,7 +9,7 @@
 
 ## Problem
 
-Kindling is functional (596 tests passing, 10 packages building) and the TypeScript packages are published to npm at v0.1.2. The remaining work is to port Kindling to Rust as the **only** implementation. Non-Rust consumers reach Kindling via a long-running local daemon (`kindling serve`) over a Unix domain socket, accessed by a thin TypeScript HTTP client distributed as `@eddacraft/kindling` on npm. The current TypeScript implementation packages are deprecated and removed after the cutover.
+kindling is functional (596 tests passing, 10 packages building) and the TypeScript packages are published to npm at v0.1.2. The remaining work is to port kindling to Rust as the **only** implementation. Non-Rust consumers reach kindling via a long-running local daemon (`kindling serve`) over a Unix domain socket, accessed by a thin TypeScript HTTP client distributed as `@eddacraft/kindling` on npm. The current TypeScript implementation packages are deprecated and removed after the cutover.
 
 ## Success Criteria
 
@@ -17,7 +17,7 @@ Kindling is functional (596 tests passing, 10 packages building) and the TypeScr
 - [ ] Single statically-linked `kindling` binary distributed via cargo, brew, curl|sh, and npm postinstall
 - [ ] `kindling serve` daemon: auto-spawn on first call, idle shutdown after 30 min default, UDS transport (TCP fallback on Windows)
 - [ ] All 7 Claude Code hook types complete in <10ms warm, <100ms cold
-- [ ] Anvil emits observations directly via `kindling-client` or `kindling-service` — no TS bridge
+- [ ] anvil emits observations directly via `kindling-client` or `kindling-service` — no TS bridge
 - [ ] `pnpm add @eddacraft/kindling` installs the binary and exposes a typed thin client with no native deps
 - [ ] All deprecated TS implementation packages removed from this repo at `1.0.0`
 
@@ -35,9 +35,9 @@ Kindling is functional (596 tests passing, 10 packages building) and the TypeScr
 | [01-npm-publish](./modules/01-npm-publish.aps.md)                     | Package metadata, READMEs, publish scripts, CI                   | Done        | —                  |
 | [02-rust-hook-binary](./modules/02-rust-hook-binary.aps.md)           | Rust binary for Claude Code hook invocations                     | Superseded  | by 05              |
 | [03-rust-cli](./modules/03-rust-cli.aps.md)                           | Full Rust CLI replacing Commander.js                             | Superseded  | by 05              |
-| [04-intent-capture-events](./modules/04-intent-capture-events.aps.md) | Kindling-native intent event primitive + export                  | Done        | —                  |
+| [04-intent-capture-events](./modules/04-intent-capture-events.aps.md) | kindling-native intent event primitive + export                  | Done        | —                  |
 | [04-schema-contract](./modules/04-schema-contract.aps.md)             | Cross-language SQLite schema contract for Rust+TS                | Done        | —                  |
-| [05-rust-port](./modules/05-rust-port.aps.md)                         | Rust-canonical Kindling + thin TS client over local daemon (UDS) | In Progress | 04-schema-contract |
+| [05-rust-port](./modules/05-rust-port.aps.md)                         | Rust-canonical kindling + thin TS client over local daemon (UDS) | In Progress | 04-schema-contract |
 
 See `plans/specs/2026-05-03-rust-canonical-thin-client-design.md` for the current design (daemon, transport, distribution, TS deprecation strategy). The earlier dual-maintain spec at `plans/specs/2026-04-15-rust-port-design.md` is superseded but retained for historical context.
 
@@ -46,9 +46,9 @@ See `plans/specs/2026-05-03-rust-canonical-thin-client-design.md` for the curren
 | Phase   | Modules                  | Target                                                                           |
 | ------- | ------------------------ | -------------------------------------------------------------------------------- |
 | Now     | 05-rust-port (Phase 1)   | Foundation crates: workspace, types, store, filter                               |
-| Next    | 05-rust-port (Phase 2)   | Service + daemon + hook + Rust client; Anvil unblocks                            |
+| Next    | 05-rust-port (Phase 2)   | Service + daemon + hook + Rust client; anvil unblocks                            |
 | Then    | 05-rust-port (Phase 3)   | CLI + umbrella binary + cross-platform builds + cargo/brew/curl distribution     |
-| Then    | 05-rust-port (Phase 4)   | Thin TS client SDK on npm; deprecate TS implementation packages and Anvil bridge |
+| Then    | 05-rust-port (Phase 4)   | Thin TS client SDK on npm; deprecate TS implementation packages and anvil bridge |
 | Backlog | 04-intent-capture-events | Ship intent capture primitive + export (independent of the Rust port)            |
 
 ## Risks
@@ -75,4 +75,4 @@ See `plans/specs/2026-05-03-rust-canonical-thin-client-design.md` for the curren
 - **D-002:** ~~Phase the Rust work (hooks first, CLI second)~~ — _superseded by D-003_
 - **D-003:** ~~Dual-maintain Rust + TypeScript with Rust-canonical types~~ — _superseded by D-005_
 - **D-004:** Supersede modules 02 and 03 with module 05 — _decided 2026-04-15_ — The hybrid phasing no longer models the work correctly. 02 and 03 remain in the repo for historical reference but are marked Superseded in this index.
-- **D-005:** Rust-canonical Kindling with thin TS HTTP client over local daemon — _decided 2026-05-03_ — Rust becomes the only implementation. Non-Rust consumers reach Kindling via `kindling serve` (long-running per-user daemon) over a Unix domain socket. `@eddacraft/kindling` is repurposed as a thin HTTP client with an npm postinstall that downloads the platform binary. All other TS implementation packages are deprecated and removed after the cutover. Driven by: sole-operator project means no external migration coordination, every realistic TS consumer can hit a localhost daemon, dual-maintain pays a real tax for a use case nobody asked for. See `plans/specs/2026-05-03-rust-canonical-thin-client-design.md`.
+- **D-005:** Rust-canonical kindling with thin TS HTTP client over local daemon — _decided 2026-05-03_ — Rust becomes the only implementation. Non-Rust consumers reach kindling via `kindling serve` (long-running per-user daemon) over a Unix domain socket. `@eddacraft/kindling` is repurposed as a thin HTTP client with an npm postinstall that downloads the platform binary. All other TS implementation packages are deprecated and removed after the cutover. Driven by: sole-operator project means no external migration coordination, every realistic TS consumer can hit a localhost daemon, dual-maintain pays a real tax for a use case nobody asked for. See `plans/specs/2026-05-03-rust-canonical-thin-client-design.md`.

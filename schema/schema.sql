@@ -1,4 +1,4 @@
--- Kindling SQLite Schema Contract
+-- kindling SQLite Schema Contract
 -- =================================
 -- Canonical DDL reflecting the state after all migrations (through 005).
 -- Both the TypeScript store (better-sqlite3) and the Rust crate MUST produce

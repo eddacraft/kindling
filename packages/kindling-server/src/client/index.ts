@@ -1,7 +1,7 @@
 /**
- * Kindling API Client
+ * kindling API Client
  *
- * TypeScript client for connecting to Kindling API server.
+ * TypeScript client for connecting to kindling API server.
  */
 
 import type {

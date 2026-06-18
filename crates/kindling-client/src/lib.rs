@@ -1,4 +1,4 @@
-//! Rust client for the Kindling daemon.
+//! Rust client for the kindling daemon.
 //!
 //! A thin, async HTTP/1-over-Unix-domain-socket client for the
 //! [`kindling-server`](../kindling_server/index.html) daemon. It speaks the v1
@@ -116,7 +116,7 @@ struct ContextBody {
     additional_context: Option<String>,
 }
 
-/// A thin async client for the Kindling daemon.
+/// A thin async client for the kindling daemon.
 ///
 /// Cheap to clone-by-config; construct once and share a reference. Each call
 /// opens a fresh connection (no pooling), so the client itself holds no live

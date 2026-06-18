@@ -1,8 +1,8 @@
-# Kindling for Claude Code
+# kindling for Claude Code
 
 **Remember what you worked on across sessions.**
 
-Kindling automatically captures your Claude Code sessions and injects prior context when you start a new one. All data is stored locally in SQLite with full-text search.
+kindling automatically captures your Claude Code sessions and injects prior context when you start a new one. All data is stored locally in SQLite with full-text search.
 
 ## Install
 
@@ -25,7 +25,7 @@ they no-op and never block your session.)
 **Add the marketplace, then install the plugin:**
 
 ```
-/plugin marketplace add EddaCraft/kindling
+/plugin marketplace add eddacraft/kindling
 /plugin install kindling@kindling-plugins
 ```
 
@@ -41,7 +41,7 @@ all you need is that binary on your `PATH` (see the prerequisite above).
 
 ## What It Does
 
-When you start a Claude Code session, Kindling:
+When you start a Claude Code session, kindling:
 
 1. **Opens a session capsule** to track all activity
 2. **Injects prior context** from previous sessions in this project

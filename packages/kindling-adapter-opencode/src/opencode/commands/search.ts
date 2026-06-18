@@ -9,7 +9,7 @@ import type { RetrieveResult, ScopeIds } from '@eddacraft/kindling';
 /**
  * Retrieval service interface.
  *
- * Satisfied by the {@link import('@eddacraft/kindling').Kindling} thin client —
+ * Satisfied by the {@link import('@eddacraft/kindling').kindling} thin client —
  * `memorySearch` only needs its `retrieve` method.
  */
 export interface RetrievalService {

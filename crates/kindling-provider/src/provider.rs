@@ -81,7 +81,7 @@ struct RawSumRow {
     recency: f64,
 }
 
-/// FTS5 + recency retrieval over a Kindling SQLite database.
+/// FTS5 + recency retrieval over a kindling SQLite database.
 pub struct LocalFtsProvider<'conn> {
     conn: &'conn Connection,
 }

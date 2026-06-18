@@ -1,5 +1,5 @@
 /**
- * Validation functions for Kindling domain types
+ * Validation functions for kindling domain types
  */
 
 export { validateObservation } from './observation.js';

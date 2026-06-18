@@ -100,9 +100,9 @@ export interface KindlingServiceConfig {
 }
 
 /**
- * Main Kindling service
+ * Main kindling service
  *
- * Provides a unified API for all Kindling operations.
+ * Provides a unified API for all kindling operations.
  */
 export class KindlingService {
   private store: KindlingStore;

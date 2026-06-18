@@ -81,7 +81,7 @@ async function initSql(locateFile?: WasmLocator): Promise<SqlJsStatic> {
 }
 
 /**
- * Open and initialize a Kindling database
+ * Open and initialize a kindling database
  *
  * Opens database with:
  * - Foreign key enforcement

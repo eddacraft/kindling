@@ -12,7 +12,7 @@
 
 ## Purpose
 
-Extend the Rust binary from a hook-only tool to a full CLI replacing the TypeScript Commander.js CLI. This consolidates all Kindling operations into a single binary: hooks, CLI commands, and the HTTP API server. Users get `kindling` as a single download with no runtime dependencies.
+Extend the Rust binary from a hook-only tool to a full CLI replacing the TypeScript Commander.js CLI. This consolidates all kindling operations into a single binary: hooks, CLI commands, and the HTTP API server. Users get `kindling` as a single download with no runtime dependencies.
 
 ## In Scope
 

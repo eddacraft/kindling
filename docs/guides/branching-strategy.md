@@ -2,7 +2,7 @@
 
 ## Overview
 
-Kindling uses a single permanent branch model that supports active development
+kindling uses a single permanent branch model that supports active development
 across short-lived work branches while keeping releases stable and predictable:
 
 - `main` is the default branch, integration branch, and release branch.
@@ -98,7 +98,7 @@ See the [release runbook](release-runbook.md) for the full step-by-step.
 
 ## Why this model
 
-Kindling is maintained by a single operator, so a permanent integration branch
+kindling is maintained by a single operator, so a permanent integration branch
 adds coordination overhead without much safety. Short-lived branches preserve
 parallel work while keeping the repository's source of truth on `main`.
 

@@ -6,7 +6,7 @@
 
 ## Purpose
 
-Get all Kindling packages published to npm so users can install them. This includes merging open PRs, adding package metadata, writing per-package READMEs, setting up publish scripts, and configuring CI for automated releases.
+Get all kindling packages published to npm so users can install them. This includes merging open PRs, adding package metadata, writing per-package READMEs, setting up publish scripts, and configuring CI for automated releases.
 
 ## In Scope
 

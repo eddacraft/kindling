@@ -1,11 +1,11 @@
 {
   "name": "kindling",
-  "displayName": "Kindling Memory",
+  "displayName": "kindling Memory",
   "description": "Local memory and continuity engine - captures tool calls, file edits, commands, and errors across Claude Code sessions",
   "version": "0.1.0",
-  "author": "EddaCraft",
+  "author": "eddacraft",
   "license": "Apache-2.0",
-  "homepage": "https://github.com/EddaCraft/kindling",
+  "homepage": "https://github.com/eddacraft/kindling",
   "hooks": {
     "SessionStart": {
       "command": "kindling-hook session-start"

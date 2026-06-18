@@ -1,26 +1,26 @@
 # Rust Port — Design Spec
 
-| Field        | Value                                                          |
-| ------------ | -------------------------------------------------------------- |
-| Status       | Superseded                                                     |
-| Owner        | @aneki                                                         |
-| Created      | 2026-04-15                                                     |
-| Superseded   | 2026-05-03                                                     |
+| Field         | Value                                                         |
+| ------------- | ------------------------------------------------------------- |
+| Status        | Superseded                                                    |
+| Owner         | @aneki                                                        |
+| Created       | 2026-04-15                                                    |
+| Superseded    | 2026-05-03                                                    |
 | Superseded by | `plans/specs/2026-05-03-rust-canonical-thin-client-design.md` |
-| Supersedes   | `02-rust-hook-binary`, `03-rust-cli`                           |
-| APS Module   | `plans/modules/05-rust-port.aps.md`                            |
+| Supersedes    | `02-rust-hook-binary`, `03-rust-cli`                          |
+| APS Module    | `plans/modules/05-rust-port.aps.md`                           |
 
-> **Note (2026-05-03):** This spec proposed *dual-maintain* Rust + TS with Rust-canonical types via `ts-rs`. After review, the plan changed: Rust becomes the **only** implementation, accessed by non-Rust consumers via a long-running local daemon (`kindling serve`) over a Unix domain socket. The TypeScript surface collapses to a single thin HTTP client package. See the superseding spec for the daemon model, transport, distribution, and TS package deprecation strategy.
+> **Note (2026-05-03):** This spec proposed _dual-maintain_ Rust + TS with Rust-canonical types via `ts-rs`. After review, the plan changed: Rust becomes the **only** implementation, accessed by non-Rust consumers via a long-running local daemon (`kindling serve`) over a Unix domain socket. The TypeScript surface collapses to a single thin HTTP client package. See the superseding spec for the daemon model, transport, distribution, and TS package deprecation strategy.
 
 ## Context
 
-Kindling's existing Rust plan (modules 02 and 03) was a **hybrid** approach: move the data plane (hooks, CLI, server) to Rust while keeping TypeScript for domain types, adapters, and the npm surface. It was sized around one assumption — **hooks are the bottleneck** — because at the time Anvil was a mixed TS/Rust system and Kindling was consumed from both.
+kindling's existing Rust plan (modules 02 and 03) was a **hybrid** approach: move the data plane (hooks, CLI, server) to Rust while keeping TypeScript for domain types, adapters, and the npm surface. It was sized around one assumption — **hooks are the bottleneck** — because at the time anvil was a mixed TS/Rust system and kindling was consumed from both.
 
-That calculus has changed. Anvil is now **nearly 100% Rust** (11+ Rust crates). The only seam between Anvil and Kindling is a TypeScript bridge package, `@eddacraft/anvil-kindling-integration`, which:
+That calculus has changed. anvil is now **nearly 100% Rust** (11+ Rust crates). The only seam between anvil and kindling is a TypeScript bridge package, `@eddacraft/anvil-kindling-integration`, which:
 
-- Maps Anvil's 11 observation kinds down to Kindling's 3 generic kinds (`message`, `command`, `error`)
+- Maps anvil's 11 observation kinds down to kindling's 3 generic kinds (`message`, `command`, `error`)
 - Writes via the TypeScript SQLite store in-process
-- Forces Anvil's Rust crates to bounce through Node.js to emit observations
+- Forces anvil's Rust crates to bounce through Node.js to emit observations
 
 That bridge is no longer an implementation detail — it is the **primary integration tax** on the production path. Replacing it is the driver for this rework.
 
@@ -28,23 +28,23 @@ That bridge is no longer an implementation detail — it is the **primary integr
 
 **Go with dual-maintain Rust + TypeScript, Rust-canonical.**
 
-- **Rust Kindling** — first-class for EddaCraft (Anvil integration, hooks, CLI, server). Production path.
-- **TS Kindling** — first-class for OSS consumers (npm, browser/WASM, adapter authors). Community path.
-- **Rust is the source of truth** for domain types. `ts-rs` generates TypeScript type definitions. Kindling's TS packages evolve to consume generated types.
+- **Rust kindling** — first-class for eddacraft (anvil integration, hooks, CLI, server). Production path.
+- **TS kindling** — first-class for OSS consumers (npm, browser/WASM, adapter authors). Community path.
+- **Rust is the source of truth** for domain types. `ts-rs` generates TypeScript type definitions. kindling's TS packages evolve to consume generated types.
 
 This **replaces** modules 02 and 03 with a single umbrella plan (module 05) that covers all four phases end-to-end.
 
 ## Approaches Considered
 
-| Approach                        | Anvil compatibility                                    | Maintenance                                       | Distribution                     |
+| Approach                        | anvil compatibility                                    | Maintenance                                       | Distribution                     |
 | ------------------------------- | ------------------------------------------------------ | ------------------------------------------------- | -------------------------------- |
-| **(A) Full Rust rewrite**       | Native `use kindling::*` from Anvil crates. No bridge. | One language. Lose npm consumers + browser store. | Single binary, no Node.js needed |
-| **(B) Dual Rust + TS** ✅       | Native Rust for Anvil, TS for npm/browser consumers    | Double surface, type drift risk                   | Two artifacts, both first-class  |
-| **(C) Existing hybrid (02/03)** | Still need the TS bridge for Anvil integration         | Moderate, but bridge stays awkward                | Mixed                            |
+| **(A) Full Rust rewrite**       | Native `use kindling::*` from anvil crates. No bridge. | One language. Lose npm consumers + browser store. | Single binary, no Node.js needed |
+| **(B) Dual Rust + TS** ✅       | Native Rust for anvil, TS for npm/browser consumers    | Double surface, type drift risk                   | Two artifacts, both first-class  |
+| **(C) Existing hybrid (02/03)** | Still need the TS bridge for anvil integration         | Moderate, but bridge stays awkward                | Mixed                            |
 
-**Why (B) and not (A):** Kindling is an open-source project. Most of the potential userbase sits in the npm/TypeScript ecosystem — adapter authors, browser/WASM consumers, developers who don't want a Rust toolchain. Walking away from that narrows the OSS audience significantly. The cost of maintaining the TS surface is bounded because Rust becomes the source of truth for types and the TS packages become mostly a thin projection.
+**Why (B) and not (A):** kindling is an open-source project. Most of the potential userbase sits in the npm/TypeScript ecosystem — adapter authors, browser/WASM consumers, developers who don't want a Rust toolchain. Walking away from that narrows the OSS audience significantly. The cost of maintaining the TS surface is bounded because Rust becomes the source of truth for types and the TS packages become mostly a thin projection.
 
-**Why (B) and not (C):** The existing hybrid keeps the TS bridge awkward forever. Anvil doesn't get to drop its Node.js dependency for observation capture without this rework.
+**Why (B) and not (C):** The existing hybrid keeps the TS bridge awkward forever. anvil doesn't get to drop its Node.js dependency for observation capture without this rework.
 
 ## Design
 
@@ -83,10 +83,10 @@ crates/
 - Adapter packages — OpenCode, PocketFlow (TS consumers of the service API)
 - npm distribution for OSS users
 
-### Anvil Integration — End State
+### anvil Integration — End State
 
 ```rust
-// Anvil crates — direct dependency, no bridge
+// anvil crates — direct dependency, no bridge
 use kindling_service::KindlingService;
 use kindling_types::{Observation, ObservationKind};
 
@@ -94,18 +94,18 @@ let svc = KindlingService::new(config)?;
 svc.append_observation(observation)?;
 ```
 
-The `@eddacraft/anvil-kindling-integration` TypeScript bridge is **deprecated after Phase 2** and removed after Anvil cuts over.
+The `@eddacraft/anvil-kindling-integration` TypeScript bridge is **deprecated after Phase 2** and removed after anvil cuts over.
 
 ## Phasing
 
 | Phase | Crates                     | Deliverable                                                   |
 | ----- | -------------------------- | ------------------------------------------------------------- |
 | **1** | types, store, filter       | Core data model + persistence. Enables everything downstream. |
-| **2** | provider, service, hook    | Anvil can `use kindling_service`. Hook binary ships.          |
+| **2** | provider, service, hook    | anvil can `use kindling_service`. Hook binary ships.          |
 | **3** | cli, server, umbrella      | Full `kindling` binary. Single download, zero deps.           |
-| **4** | ts-rs + TS package updates | TS packages consume generated types. Anvil drops TS bridge.   |
+| **4** | ts-rs + TS package updates | TS packages consume generated types. anvil drops TS bridge.   |
 
-Anvil unblocks at the end of Phase 2 (the TS bridge can start being removed). Hook latency wins ship at the end of Phase 2. Distribution wins ship at the end of Phase 3. The OSS type-drift risk is closed in Phase 4.
+anvil unblocks at the end of Phase 2 (the TS bridge can start being removed). Hook latency wins ship at the end of Phase 2. Distribution wins ship at the end of Phase 3. The OSS type-drift risk is closed in Phase 4.
 
 ## Risks
 
@@ -120,7 +120,7 @@ Anvil unblocks at the end of Phase 2 (the TS bridge can start being removed). Ho
 
 ## Trade-offs
 
-**Why dual, not single:** Committing to Rust-only means losing the browser/WASM store (sql.js runs in the browser; rusqlite does not) and making the npm surface second-class. Committing to TS-only means Anvil keeps paying the bridge tax forever.
+**Why dual, not single:** Committing to Rust-only means losing the browser/WASM store (sql.js runs in the browser; rusqlite does not) and making the npm surface second-class. Committing to TS-only means anvil keeps paying the bridge tax forever.
 
 **Why Rust-canonical, not shared IDL:** A neutral IDL (JSON Schema, Protobuf) is defensible but adds a third build step for questionable gain when Rust is already the production source of truth. Revisit if a third implementation appears.
 
@@ -128,10 +128,10 @@ Anvil unblocks at the end of Phase 2 (the TS bridge can start being removed). Ho
 
 ## Open Questions
 
-1. **Should `kindling-types` include the Anvil-specific observation kinds?** The TS bridge today maps Anvil's 11 kinds down to Kindling's 3 generic kinds (`message`, `command`, `error`). Options:
-   - **(a) Kindling stays generic** — Anvil's mapping logic moves to Anvil, now in Rust. Kindling remains a generic capture/retrieval primitive.
-   - **(b) Kindling becomes Anvil-aware** — add the 11 kinds to `ObservationKind`. Cleaner for Anvil, but bleeds Anvil semantics into an OSS project.
-   - **Leaning (a)** — keep Kindling generic. Anvil owns its mapping. Revisit if a second Rust consumer appears that wants richer kinds.
+1. **Should `kindling-types` include the anvil-specific observation kinds?** The TS bridge today maps anvil's 11 kinds down to kindling's 3 generic kinds (`message`, `command`, `error`). Options:
+   - **(a) kindling stays generic** — anvil's mapping logic moves to anvil, now in Rust. kindling remains a generic capture/retrieval primitive.
+   - **(b) kindling becomes anvil-aware** — add the 11 kinds to `ObservationKind`. Cleaner for anvil, but bleeds anvil semantics into an OSS project.
+   - **Leaning (a)** — keep kindling generic. anvil owns its mapping. Revisit if a second Rust consumer appears that wants richer kinds.
 
 2. **Build system integration.** Where does `cargo` live in the monorepo? Options:
    - **(a)** New `crates/` directory at repo root, alongside `packages/`
@@ -150,5 +150,5 @@ Both modules should be marked `Superseded` in the index; their files stay in the
 ## Related
 
 - `schema/schema.sql`, `schema/version.json` — cross-language schema contract (module 04-schema-contract, already Done)
-- `docs/system-spec.md` — moved to EddaCraft; system context lives there now
-- [Anvil repo] `@eddacraft/anvil-kindling-integration` — TS bridge this plan removes
+- `docs/system-spec.md` — moved to eddacraft; system context lives there now
+- [anvil repo] `@eddacraft/anvil-kindling-integration` — TS bridge this plan removes
