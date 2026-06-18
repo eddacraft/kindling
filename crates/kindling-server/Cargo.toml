@@ -9,9 +9,9 @@ authors.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-kindling-types = { path = "../kindling-types" }
-kindling-store = { path = "../kindling-store" }
-kindling-service = { path = "../kindling-service" }
+kindling-types = { path = "../kindling-types", version = "0.0.1" }
+kindling-store = { path = "../kindling-store", version = "0.0.1" }
+kindling-service = { path = "../kindling-service", version = "0.0.1" }
 axum = "0.8"
 tokio = { version = "1", features = [
     "rt-multi-thread",

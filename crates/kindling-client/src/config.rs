@@ -8,20 +8,18 @@ use std::time::Duration;
 
 /// The canonical schema version this client expects the daemon to report.
 ///
-/// Sourced at compile time from the repo-root `schema/version.json` — the same
-/// single source of truth `kindling-store` embeds — so the client, store, and
-/// daemon never disagree about the wire/schema contract.
+/// Sourced at compile time from a vendored copy of `schema/version.json` — the
+/// same single source of truth `kindling-store` embeds — so the client, store,
+/// and daemon never disagree about the wire/schema contract.
 ///
-/// # cargo publish caveat
-///
-/// The `include_str!` path reaches outside the crate directory
-/// (`../../../schema/version.json`). A future `cargo publish` of this crate
-/// will need a copy step that stages `schema/version.json` inside the crate
-/// before packaging (same caveat as PORT-003 in `kindling-store`). Tracked by
-/// PORT-014.
+/// The vendored copy (`crates/kindling-client/schema/version.json`) lives
+/// inside the crate directory so `cargo publish` packages it. It is kept in
+/// lock-step with the repo-root canonical `schema/version.json` by
+/// `scripts/sync-vendored-schema.sh`, enforced by the `vendored-schema` CI
+/// drift gate.
 pub const EXPECTED_SCHEMA_VERSION: u32 = parse_schema_version();
 
-const SCHEMA_VERSION_JSON: &str = include_str!("../../../schema/version.json");
+const SCHEMA_VERSION_JSON: &str = include_str!("../schema/version.json");
 
 /// Minimal compile-time-friendly extraction of the integer `"version"` field
 /// from `schema/version.json`.

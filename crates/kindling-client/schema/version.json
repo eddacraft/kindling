@@ -1,0 +1,5 @@
+{
+  "version": 5,
+  "minCompatible": 1,
+  "ftsTokenizer": "porter unicode61"
+}

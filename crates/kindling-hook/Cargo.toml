@@ -19,8 +19,8 @@ name = "kindling-hook"
 path = "src/main.rs"
 
 [dependencies]
-kindling-client = { path = "../kindling-client" }
-kindling-types = { path = "../kindling-types" }
+kindling-client = { path = "../kindling-client", version = "0.0.1" }
+kindling-types = { path = "../kindling-types", version = "0.0.1" }
 tokio = { version = "1", features = [
     "rt",
     "macros",
@@ -37,8 +37,8 @@ thiserror = "2"
 regex = "1"
 
 [dev-dependencies]
-kindling-server = { path = "../kindling-server" }
-kindling-store = { path = "../kindling-store" }
+kindling-server = { path = "../kindling-server", version = "0.0.1" }
+kindling-store = { path = "../kindling-store", version = "0.0.1" }
 tempfile = "3"
 tokio = { version = "1", features = [
     "rt-multi-thread",
