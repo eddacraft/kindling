@@ -62,7 +62,7 @@ impl From<ServiceError> for ApiError {
             ServiceError::Conflict(_) | ServiceError::AlreadyClosed(_) => {
                 ApiError::Conflict(err.to_string())
             }
-            ServiceError::Store(_) | ServiceError::Provider(_) => {
+            ServiceError::Store(_) | ServiceError::Provider(_) | ServiceError::Json(_) => {
                 ApiError::Internal(err.to_string())
             }
         }

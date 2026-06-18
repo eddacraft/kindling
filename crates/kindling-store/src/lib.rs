@@ -18,4 +18,4 @@ pub use db::{open_database, open_in_memory, StoreOptions};
 pub use error::{StoreError, StoreResult};
 pub use paths::{default_kindling_home, project_db_path, project_id, resolve_db_path};
 pub use schema::{schema_version, SchemaVersion, SCHEMA_SQL};
-pub use store::{EvidenceSnippet, SqliteKindlingStore, DEFAULT_SNIPPET_MAX_CHARS};
+pub use store::{DatabaseStats, EvidenceSnippet, SqliteKindlingStore, DEFAULT_SNIPPET_MAX_CHARS};

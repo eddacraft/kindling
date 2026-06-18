@@ -1,0 +1,97 @@
+//! `status` — database statistics. In-process only (no daemon endpoint).
+//!
+//! Ports `packages/kindling-cli/src/commands/status.ts`. The `--json` shape
+//! matches field-for-field: `{ database, counts, activity }`.
+
+use serde::Serialize;
+
+use crate::cli::StatusArgs;
+use crate::output::{format_json, iso8601_utc};
+use crate::{open_service, CliResult};
+
+#[derive(Serialize)]
+struct StatusOutput {
+    database: DatabaseSection,
+    counts: CountsSection,
+    activity: ActivitySection,
+}
+
+#[derive(Serialize)]
+struct DatabaseSection {
+    path: String,
+    size: String,
+    #[serde(rename = "sizeBytes")]
+    size_bytes: i64,
+}
+
+#[derive(Serialize)]
+struct CountsSection {
+    observations: i64,
+    capsules: i64,
+    summaries: i64,
+    pins: i64,
+    redacted: i64,
+    #[serde(rename = "openCapsules")]
+    open_capsules: i64,
+}
+
+#[derive(Serialize)]
+struct ActivitySection {
+    #[serde(rename = "latestTimestamp")]
+    latest_timestamp: Option<i64>,
+    #[serde(rename = "latestDate")]
+    latest_date: Option<String>,
+}
+
+pub fn run(args: StatusArgs) -> CliResult {
+    let (service, db_path) = open_service(args.common.db.as_deref())?;
+    let stats = service.store().database_stats()?;
+
+    // `(bytes / 1MiB).toFixed(2)` — matches the TS size string.
+    let size_mb = stats.size_bytes as f64 / (1024.0 * 1024.0);
+    let size = format!("{size_mb:.2} MB");
+
+    let latest_date = stats.latest_ts.map(iso8601_utc);
+
+    let output = StatusOutput {
+        database: DatabaseSection {
+            path: db_path.to_string_lossy().into_owned(),
+            size: size.clone(),
+            size_bytes: stats.size_bytes,
+        },
+        counts: CountsSection {
+            observations: stats.observations,
+            capsules: stats.capsules,
+            summaries: stats.summaries,
+            pins: stats.pins,
+            redacted: stats.redacted,
+            open_capsules: stats.open_capsules,
+        },
+        activity: ActivitySection {
+            latest_timestamp: stats.latest_ts,
+            latest_date: latest_date.clone(),
+        },
+    };
+
+    if args.common.json {
+        println!("{}", format_json(&output, true)?);
+    } else {
+        println!("\nKindling Database Status");
+        println!("========================\n");
+        println!("Database: {}", output.database.path);
+        println!("Size:     {size}\n");
+        println!("Entity Counts:");
+        println!("  Observations: {}", output.counts.observations);
+        println!("  Capsules:     {}", output.counts.capsules);
+        println!("  Summaries:    {}", output.counts.summaries);
+        println!("  Pins:         {}", output.counts.pins);
+        println!("  Redacted:     {}", output.counts.redacted);
+        println!("  Open Capsules: {}\n", output.counts.open_capsules);
+        println!("Latest Activity:");
+        println!(
+            "  {}\n",
+            latest_date.unwrap_or_else(|| "No activity yet".to_string())
+        );
+    }
+    Ok(())
+}

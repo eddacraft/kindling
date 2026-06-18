@@ -171,7 +171,7 @@ Supersedes `02-rust-hook-binary` and `03-rust-cli`. Replaces the dual-maintain p
 - **Intent:** All 12 CLI commands via `clap` (init, log, capsule open/close, status, search, list, pin, unpin, export, import, serve)
 - **Expected Outcome:** Commands work with both JSON and text output modes; flags and output shapes match the Commander.js CLI; commands default to in-process service (`kindling-service`) but `--via-daemon` switches to `kindling-client` for safe concurrent operation
 - **Validation:** Integration tests for each command; snapshot tests comparing JSON output against the existing TS CLI for identical inputs (retired after Phase 4)
-- **Status:** Ready
+- **Status:** In Progress — `feat/rust-port-cli` (started in parallel with PORT-010/#70; deps 006+008 met, independent of 010). Includes the export/import bundle implementation deferred from PORT-006. `serve` maps to the UDS daemon (kindling-server), not the old TS HTTP server. `sync` commands out of scope.
 - **Dependencies:** PORT-006, PORT-008
 
 #### PORT-013: Umbrella `kindling` binary

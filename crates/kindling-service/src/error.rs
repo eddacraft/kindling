@@ -20,6 +20,10 @@ pub enum ServiceError {
     #[error(transparent)]
     Provider(#[from] ProviderError),
 
+    /// JSON (de)serialization failure (export/import bundle handling).
+    #[error("json (de)serialization error: {0}")]
+    Json(#[from] serde_json::Error),
+
     /// Input validation failed. Carries every field error, matching the TS
     /// validators which collect all problems before returning.
     #[error("validation failed: {}", format_validation(.0))]

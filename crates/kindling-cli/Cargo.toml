@@ -10,3 +10,33 @@ rust-version.workspace = true
 
 [lints]
 workspace = true
+
+[lib]
+name = "kindling_cli"
+path = "src/lib.rs"
+
+[[bin]]
+name = "kindling-cli"
+path = "src/main.rs"
+
+[dependencies]
+kindling-types = { path = "../kindling-types" }
+kindling-store = { path = "../kindling-store" }
+kindling-service = { path = "../kindling-service" }
+kindling-client = { path = "../kindling-client" }
+kindling-server = { path = "../kindling-server" }
+clap = { version = "4", features = ["derive"] }
+# Raw-row reads for `list capsules`/`list observations` reproduce the TS CLI's
+# snake_case/raw-string JSON shape; rusqlite is reused from the store stack.
+rusqlite = { version = "0.40", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+# `preserve_order` keeps export-bundle/JSON key order byte-compatible with TS.
+serde_json = { version = "1", features = ["preserve_order"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "net", "time"] }
+thiserror = "2"
+anyhow = "1"
+
+[dev-dependencies]
+tempfile = "3"
+kindling-server = { path = "../kindling-server" }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time"] }
