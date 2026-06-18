@@ -308,4 +308,14 @@ pub struct ServeArgs {
     /// (or the parent of `--socket` when given).
     #[arg(long, value_name = "path")]
     pub kindling_home: Option<String>,
+
+    /// Run as a background daemon: suppress the human-readable startup banner.
+    ///
+    /// This is the flag `kindling-client` passes when it auto-spawns the daemon
+    /// on first call (`kindling serve --daemonize`). Detachment from the calling
+    /// process (its stdio and process group) is owned by the spawner; this flag
+    /// only silences the banner so it never corrupts a caller's stdout (e.g. a
+    /// Claude Code hook writing JSON to stdout).
+    #[arg(long)]
+    pub daemonize: bool,
 }

@@ -19,11 +19,16 @@ use crate::{runtime, CliError, CliResult};
 pub fn run(args: ServeArgs) -> CliResult {
     let config = build_config(&args)?;
 
-    println!("Starting Kindling daemon...");
-    println!("Socket: {}", config.socket_path.display());
-    println!("Kindling home: {}", config.kindling_home.display());
-    println!("Idle timeout: {}s", config.idle_timeout.as_secs());
-    println!();
+    // `--daemonize` (the flag the client passes on auto-spawn) runs silently:
+    // the banner is for an interactive operator, and emitting it would corrupt
+    // the stdout of whatever spawned us (e.g. a hook writing JSON to stdout).
+    if !args.daemonize {
+        println!("Starting Kindling daemon...");
+        println!("Socket: {}", config.socket_path.display());
+        println!("Kindling home: {}", config.kindling_home.display());
+        println!("Idle timeout: {}s", config.idle_timeout.as_secs());
+        println!();
+    }
 
     runtime()?.block_on(async { serve(config).await })?;
     Ok(())

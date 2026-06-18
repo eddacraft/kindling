@@ -2,7 +2,7 @@
 
 use std::io;
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -111,9 +111,25 @@ impl Spawner {
     pub(crate) fn spawn(&self) -> io::Result<()> {
         match self {
             Spawner::Command => {
-                Command::new("kindling")
-                    .args(["serve", "--daemonize"])
-                    .spawn()?;
+                let mut cmd = Command::new("kindling");
+                cmd.args(["serve", "--daemonize"])
+                    // Detach the daemon's stdio from ours. Without this the
+                    // long-lived daemon inherits the spawner's stdout — fatal
+                    // for a Claude Code hook, whose stdout must carry only the
+                    // hook's JSON response. Null also lets the spawner exit
+                    // without the pipe keeping the daemon's fds open.
+                    .stdin(Stdio::null())
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null());
+                // Put the daemon in its own process group so a signal sent to
+                // the spawner's group (e.g. Ctrl-C in an interactive shell, or
+                // the shell reaping a hook) does not also kill the daemon.
+                #[cfg(unix)]
+                {
+                    use std::os::unix::process::CommandExt;
+                    cmd.process_group(0);
+                }
+                cmd.spawn()?;
                 Ok(())
             }
             Spawner::Custom(f) => f(),
