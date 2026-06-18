@@ -194,6 +194,44 @@ pub async fn unpin(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// `POST /v1/observations/:id/forget` — redact an observation (content replaced
+/// with `[redacted]`, `redacted` flag set), returning `204 No Content`.
+///
+/// `service.forget` delegates to the store's `redact_observation`, which errors
+/// [`StoreError::ObservationNotFound`](kindling_store::StoreError::ObservationNotFound)
+/// when no row matches the id. We map that single case to `404`; any other store
+/// failure stays a `500`.
+///
+/// Note: redaction is NOT idempotent at the store layer. The `observations_fts`
+/// update trigger issues an FTS5 `'delete'` keyed on the *old* content, so a
+/// second forget on an already-redacted row tries to delete the `[redacted]`
+/// placeholder (which was never indexed) and surfaces an FTS error → `500`.
+/// Prefix-resolution / dedup of already-redacted ids is the caller's concern;
+/// this endpoint faithfully forwards whatever the store does.
+pub async fn forget_observation(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    use kindling_service::ServiceError;
+    use kindling_store::StoreError;
+
+    let root = project_root(&headers)?;
+    let svc = state.service_for(&root)?;
+    let result = {
+        let guard = svc.lock().expect("service mutex poisoned");
+        guard.forget(&id)
+    };
+    match result {
+        Ok(()) => Ok(StatusCode::NO_CONTENT),
+        // A missing observation is a 404, not an internal error.
+        Err(ServiceError::Store(StoreError::ObservationNotFound(_))) => {
+            Err(ApiError::NotFound(format!("observation {id} not found")))
+        }
+        Err(err) => Err(err.into()),
+    }
+}
+
 /// `POST /v1/context/session-start` — assemble + format the SessionStart
 /// injection. Returns `{ "additionalContext": string | null }` (null when there
 /// is nothing to inject). An empty/absent body is accepted.

@@ -131,6 +131,73 @@ async fn warm_call_round_trip_all_methods() {
     client.unpin(&pin.id).await.expect("unpin");
 }
 
+/// `forget` redacts an observation so it no longer surfaces in retrieval, and a
+/// missing id maps to an `Api { status: 404 }`.
+#[tokio::test]
+async fn forget_redacts_observation() {
+    let daemon = TestDaemon::start().await;
+    let client = daemon.client(PROJECT_A);
+
+    let obs = client
+        .append_observation(message_input("forgettable client needle"), None, None)
+        .await
+        .expect("append observation");
+
+    // Surfaces before forgetting.
+    let before = client
+        .retrieve(kindling_types::RetrieveOptions {
+            query: "needle".to_string(),
+            scope_ids: ScopeIds {
+                session_id: Some("s1".to_string()),
+                ..Default::default()
+            },
+            token_budget: None,
+            max_candidates: None,
+            include_redacted: None,
+        })
+        .await
+        .expect("retrieve before forget");
+    assert!(
+        before.candidates.iter().any(|c| c.entity_id() == obs.id),
+        "observation should surface before forget: {before:#?}"
+    );
+
+    // Forget it.
+    client.forget(&obs.id).await.expect("forget");
+
+    // No longer surfaces.
+    let after = client
+        .retrieve(kindling_types::RetrieveOptions {
+            query: "needle".to_string(),
+            scope_ids: ScopeIds {
+                session_id: Some("s1".to_string()),
+                ..Default::default()
+            },
+            token_budget: None,
+            max_candidates: None,
+            include_redacted: None,
+        })
+        .await
+        .expect("retrieve after forget");
+    assert!(
+        !after.candidates.iter().any(|c| c.entity_id() == obs.id),
+        "redacted observation must not surface after forget: {after:#?}"
+    );
+
+    // A missing observation id → Api 404.
+    let err = client
+        .forget("does-not-exist")
+        .await
+        .expect_err("forget missing → error");
+    match err {
+        ClientError::Api { status, message } => {
+            assert_eq!(status, 404);
+            assert!(!message.is_empty(), "404 message should be surfaced");
+        }
+        other => panic!("expected Api 404, got {other:?}"),
+    }
+}
+
 /// 2a. health() returns the daemon's schema version.
 #[tokio::test]
 async fn health_reports_schema_version() {

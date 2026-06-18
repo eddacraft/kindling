@@ -14,6 +14,7 @@
 //! GET    /v1/capsules/open?sessionId → 200 Capsule | null
 //! PATCH  /v1/capsules/:id/close      → 200 Capsule
 //! POST   /v1/observations            → 201 Observation
+//! POST   /v1/observations/:id/forget  → 204 (redact an observation)
 //! POST   /v1/retrieve                → 200 RetrieveResult
 //! POST   /v1/pins                    → 201 Pin
 //! DELETE /v1/pins/:id                → 204
@@ -78,6 +79,10 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route("/v1/capsules/{id}/close", patch(handlers::close_capsule))
         .route("/v1/observations", post(handlers::append_observation))
+        .route(
+            "/v1/observations/{id}/forget",
+            post(handlers::forget_observation),
+        )
         .route("/v1/retrieve", post(handlers::retrieve))
         .route("/v1/pins", post(handlers::create_pin))
         .route("/v1/pins/{id}", delete(handlers::unpin))

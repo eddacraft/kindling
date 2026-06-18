@@ -35,11 +35,9 @@ they no-op and never block your session.)
 claude --plugin-dir ./plugins/kindling-claude-code
 ```
 
-If loading from source, build the monorepo first:
-
-```bash
-pnpm install && pnpm run build
-```
+The plugin has no build step and no npm dependencies — both the capture
+hooks and the `/memory` slash commands shell out to the `kindling` binary, so
+all you need is that binary on your `PATH` (see the prerequisite above).
 
 ## What It Does
 
@@ -120,8 +118,8 @@ Each project gets its own isolated database. No data is shared between projects 
 ## Requirements
 
 - Claude Code
-- The `kindling` binary on your `PATH` (powers the capture/injection hooks — see [Install](#install))
-- Node.js >= 18 (already required by Claude Code; used by the `/memory` slash commands, which still run on the bundled engine)
+- The `kindling` binary on your `PATH` (powers both the capture/injection hooks and the `/memory` slash commands — see [Install](#install))
+- Node.js >= 18 (already required by Claude Code; the `/memory` slash commands are thin Node wrappers that shell out to the `kindling` binary)
 
 ## License
 

@@ -117,6 +117,40 @@ describe.skipIf(!HAS_BINARY)('Kindling thin client — warm round-trip', () => {
     expect(pin.targetId).toBe(observation.id);
     await expect(client.unpin(pin.id)).resolves.toBeUndefined();
 
+    // forget — append a fresh observation, redact it, and confirm it no longer
+    // surfaces in retrieval.
+    const forgettable = await client.appendObservation(
+      {
+        kind: 'message',
+        content: 'thin client forgettable phrase',
+        scopeIds: { sessionId: 's1', repoId: PROJECT_ROOT },
+      },
+      { capsuleId: capsule.id },
+    );
+    const beforeForget = await client.retrieve({
+      query: 'forgettable',
+      scopeIds: { sessionId: 's1', repoId: PROJECT_ROOT },
+    });
+    expect(beforeForget.candidates.some((c) => c.entity.id === forgettable.id)).toBe(true);
+
+    await expect(client.forget(forgettable.id)).resolves.toBeUndefined();
+
+    const afterForget = await client.retrieve({
+      query: 'forgettable',
+      scopeIds: { sessionId: 's1', repoId: PROJECT_ROOT },
+    });
+    expect(afterForget.candidates.some((c) => c.entity.id === forgettable.id)).toBe(false);
+
+    // forgetting an unknown id → ApiError 404
+    let forgetErr: unknown;
+    try {
+      await client.forget('does-not-exist');
+    } catch (err) {
+      forgetErr = err;
+    }
+    expect(forgetErr).toBeInstanceOf(ApiError);
+    expect((forgetErr as ApiError).status).toBe(404);
+
     // closeCapsule
     const closed = await client.closeCapsule(capsule.id);
     expect(closed.id).toBe(capsule.id);

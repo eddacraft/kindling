@@ -1,41 +1,33 @@
 #!/usr/bin/env node
-const { init, cleanup } = require('../hooks/lib/init.js');
+const { dbPath, runJson } = require('./lib/kindling.js');
+
 const cwd = process.cwd();
-const { db, dbPath } = init(cwd);
+const db = dbPath(cwd);
 
-try {
-  const stats = db.prepare('SELECT COUNT(*) as count FROM observations').get();
-  const capsuleStats = db
-    .prepare(
-      "SELECT COUNT(*) as total, SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END) as open_count FROM capsules",
-    )
-    .get();
-  const pinStats = db.prepare('SELECT COUNT(*) as count FROM pins').get();
-  const recentCapsules = db
-    .prepare(
-      'SELECT id, intent, status, opened_at, closed_at FROM capsules ORDER BY opened_at DESC LIMIT 5',
-    )
-    .all();
+// `kindling status --db <db> --json` →
+//   { database: { path, size, sizeBytes },
+//     counts:   { observations, capsules, summaries, pins, redacted, openCapsules },
+//     activity: { latestTimestamp, latestDate } }
+//
+// The Rust status reports aggregate counts only; the old script's per-session
+// "Recent Sessions" list (recent capsule rows) is not part of the CLI's status
+// output, so it is omitted here. Latest activity is shown instead.
+const status = runJson(['status', '--db', db, '--json']);
+const counts = (status && status.counts) || {};
+const database = (status && status.database) || {};
+const activity = (status && status.activity) || {};
 
-  console.log('=== Kindling Memory Status ===');
+console.log('=== Kindling Memory Status ===');
+console.log('');
+console.log('Observations: ' + (counts.observations || 0));
+console.log('Sessions:     ' + (counts.capsules || 0) + ' (' + (counts.openCapsules || 0) + ' open)');
+console.log('Pins:         ' + (counts.pins || 0));
+console.log('Summaries:    ' + (counts.summaries || 0));
+console.log('Redacted:     ' + (counts.redacted || 0));
+console.log('Database:     ' + (database.path || db));
+console.log('Project:      ' + cwd);
+
+if (activity.latestDate) {
   console.log('');
-  console.log('Observations: ' + stats.count);
-  console.log(
-    'Sessions:     ' + capsuleStats.total + ' (' + (capsuleStats.open_count || 0) + ' open)',
-  );
-  console.log('Pins:         ' + pinStats.count);
-  console.log('Database:     ' + dbPath);
-  console.log('Project:      ' + cwd);
-  console.log('');
-
-  if (recentCapsules.length > 0) {
-    console.log('Recent Sessions:');
-    recentCapsules.forEach((c, i) => {
-      const date = new Date(c.opened_at).toLocaleDateString();
-      const status = c.status === 'open' ? '(active)' : '';
-      console.log('  ' + (i + 1) + '. ' + date + ' ' + status);
-    });
-  }
-} finally {
-  cleanup(db);
+  console.log('Latest activity: ' + new Date(activity.latestTimestamp).toLocaleString());
 }

@@ -143,6 +143,97 @@ async fn full_round_trip_per_route() {
 }
 
 #[tokio::test]
+async fn forget_redacts_observation() {
+    let daemon = TestDaemon::start().await;
+    let mut c = daemon.connect().await;
+
+    // Append an observation that retrieve can find.
+    let resp = c
+        .send(
+            "POST",
+            "/v1/observations",
+            Some(PROJECT_A),
+            Some(json!({
+                "kind": "message",
+                "content": "forgettable needle phrase",
+                "scopeIds": { "sessionId": "fs" },
+            })),
+        )
+        .await;
+    assert_eq!(resp.status, StatusCode::CREATED, "append observation");
+    let obs_id = resp.json()["id"].as_str().unwrap().to_string();
+
+    // It surfaces in retrieval before forgetting.
+    let resp = c
+        .send(
+            "POST",
+            "/v1/retrieve",
+            Some(PROJECT_A),
+            Some(json!({ "query": "needle", "scopeIds": { "sessionId": "fs" } })),
+        )
+        .await;
+    assert_eq!(resp.status, StatusCode::OK);
+    let before = resp.json()["candidates"].as_array().unwrap().clone();
+    assert!(
+        before.iter().any(|c| c["entity"]["id"] == obs_id),
+        "observation should surface before forget: {before:#?}"
+    );
+
+    // Forget it → 204 No Content.
+    let resp = c
+        .send(
+            "POST",
+            &format!("/v1/observations/{obs_id}/forget"),
+            Some(PROJECT_A),
+            None,
+        )
+        .await;
+    assert_eq!(resp.status, StatusCode::NO_CONTENT, "forget → 204");
+
+    // It no longer surfaces in retrieval (the redact trigger drops it from FTS).
+    let resp = c
+        .send(
+            "POST",
+            "/v1/retrieve",
+            Some(PROJECT_A),
+            Some(json!({ "query": "needle", "scopeIds": { "sessionId": "fs" } })),
+        )
+        .await;
+    assert_eq!(resp.status, StatusCode::OK);
+    let after = resp.json()["candidates"].as_array().unwrap().clone();
+    assert!(
+        !after.iter().any(|c| c["entity"]["id"] == obs_id),
+        "redacted observation must not surface in retrieval: {after:#?}"
+    );
+
+    // Forgetting an unknown observation → 404.
+    let resp = c
+        .send(
+            "POST",
+            "/v1/observations/does-not-exist/forget",
+            Some(PROJECT_A),
+            None,
+        )
+        .await;
+    assert_eq!(
+        resp.status,
+        StatusCode::NOT_FOUND,
+        "forget missing observation → 404"
+    );
+
+    // Missing project header → 400.
+    let resp = c
+        .send(
+            "POST",
+            &format!("/v1/observations/{obs_id}/forget"),
+            None,
+            None,
+        )
+        .await;
+    assert_eq!(resp.status, StatusCode::BAD_REQUEST, "no project → 400");
+}
+
+#[tokio::test]
 async fn health_reports_version_and_schema() {
     let daemon = TestDaemon::start().await;
     let mut c = daemon.connect().await;
