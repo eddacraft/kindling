@@ -187,6 +187,116 @@ fn serve_binds_and_idle_shuts_down() {
     assert!(status.unwrap().success(), "serve exited non-zero");
 }
 
+/// `kindling serve --daemonize` — the exact invocation `kindling-client` uses
+/// when it auto-spawns the daemon on first call — is accepted by clap, binds
+/// the socket, and prints nothing to stdout (the banner is suppressed so a
+/// caller's stdout, e.g. a hook's JSON, is never corrupted). Regression guard
+/// for the bug where the client passed a `--daemonize` flag `serve` did not
+/// define, so the spawned daemon exited immediately and cold-spawn failed.
+#[test]
+fn serve_daemonize_flag_binds_silently() {
+    let home = tempfile::tempdir().unwrap();
+    let socket = home.path().join("k.sock");
+
+    let child = Command::new(kindling_bin())
+        .args([
+            "serve",
+            "--daemonize",
+            "--socket",
+            socket.to_string_lossy().as_ref(),
+            "--kindling-home",
+            home.path().to_string_lossy().as_ref(),
+            "--idle-timeout",
+            "1",
+        ])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn kindling serve --daemonize");
+
+    let mut bound = false;
+    for _ in 0..400 {
+        if socket.exists() {
+            bound = true;
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert!(bound, "daemon never bound the socket under --daemonize");
+
+    let out = child.wait_with_output().expect("wait for daemonized serve");
+    assert!(out.status.success(), "daemonized serve exited non-zero");
+    assert!(
+        out.stdout.is_empty(),
+        "--daemonize must suppress the startup banner, got stdout: {:?}",
+        String::from_utf8_lossy(&out.stdout)
+    );
+}
+
+/// The actual production cold-spawn path: replicate `kindling-client`'s
+/// `Spawner::Command` byte-for-byte — null stdio, own process group, fire and
+/// forget (drop the `Child` immediately) — and confirm the daemon survives the
+/// detached spawner and binds the socket on its own. The silent-banner test
+/// above keeps the child supervised; this one proves detach-and-survive, which
+/// is the other half of the original failure mode.
+#[cfg(unix)]
+#[test]
+// Fire-and-forget is the whole point: we replicate the client spawner, which
+// drops the `Child` without `wait`. The idle-timeout makes the daemon self-exit
+// and the OS reaps it, so no zombie actually lingers.
+#[allow(clippy::zombie_processes)]
+fn serve_daemonize_detaches_and_survives() {
+    use std::os::unix::process::CommandExt;
+
+    let home = tempfile::tempdir().unwrap();
+    let socket = home.path().join("k.sock");
+
+    {
+        let mut cmd = Command::new(kindling_bin());
+        cmd.args([
+            "serve",
+            "--daemonize",
+            "--socket",
+            socket.to_string_lossy().as_ref(),
+            "--kindling-home",
+            home.path().to_string_lossy().as_ref(),
+            "--idle-timeout",
+            "1",
+        ])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .process_group(0);
+        // Fire and forget: the returned `Child` is dropped at the end of this
+        // block without `wait`, exactly as the client spawner does.
+        cmd.spawn()
+            .expect("spawn detached kindling serve --daemonize");
+    }
+
+    let mut bound = false;
+    for _ in 0..400 {
+        if socket.exists() {
+            bound = true;
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert!(
+        bound,
+        "detached daemon did not survive the dropped spawner to bind the socket"
+    );
+
+    // With idle-timeout 1s the orphaned daemon self-exits; the OS reaps the
+    // (now-parentless) process. Wait for the socket file to disappear so the
+    // test does not leak a lingering daemon into sibling tests.
+    for _ in 0..400 {
+        if !socket.exists() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Harness
 // ---------------------------------------------------------------------------
