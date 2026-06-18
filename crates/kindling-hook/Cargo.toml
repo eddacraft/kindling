@@ -22,8 +22,10 @@ path = "src/main.rs"
 kindling-client = { path = "../kindling-client" }
 kindling-types = { path = "../kindling-types" }
 tokio = { version = "1", features = [
-    "rt-multi-thread",
+    "rt",
     "macros",
+    "net",
+    "time",
     "io-std",
     "io-util",
 ] }

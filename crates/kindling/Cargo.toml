@@ -12,5 +12,20 @@ rust-version.workspace = true
 name = "kindling"
 path = "src/main.rs"
 
+[dependencies]
+# The umbrella reuses the CLI's clap dispatch and the hook's self-contained
+# `run_hook` (which owns its own current-thread Tokio runtime). The umbrella
+# `main` is a plain `fn main() -> ExitCode` — no second Tokio runtime macro.
+kindling-cli = { path = "../kindling-cli" }
+kindling-hook = { path = "../kindling-hook" }
+
+[dev-dependencies]
+kindling-server = { path = "../kindling-server" }
+kindling-store = { path = "../kindling-store" }
+kindling-types = { path = "../kindling-types" }
+serde_json = { version = "1", features = ["preserve_order"] }
+tempfile = "3"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time"] }
+
 [lints]
 workspace = true

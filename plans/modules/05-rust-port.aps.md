@@ -153,7 +153,7 @@ Supersedes `02-rust-hook-binary` and `03-rust-cli`. Replaces the dual-maintain p
 - **Intent:** Hook (and full binary) builds for all target platforms from Phase 2 onward
 - **Expected Outcome:** GitHub Actions produces release artefacts for Linux (x86_64, aarch64, both gnu + musl), macOS (x86_64, aarch64), Windows (x86_64); `cargo-zigbuild` handles cross-targets from a single Linux runner; artefacts attached to GitHub Releases
 - **Validation:** CI matrix green; each artefact runs `kindling --version` successfully on the target platform (smoke-test step in CI)
-- **Status:** In Progress — `feat/rust-port-release-ci`. Smoke-tests the umbrella `kindling` binary (`crates/kindling` skeleton already prints version; full subcommand dispatch is PORT-013 — `--version` works now). cargo-zigbuild cross-builds all 7 targets from one Linux runner.
+- **Status:** Merged — `feat/rust-port-release-ci`, PR #70 (rebase `89df01b`+`bb77090`). `.github/workflows/release.yml`: cargo-zigbuild 7-target cross-build from one Linux runner; smoke `kindling --version` (native + QEMU arm64 via `docker/setup-qemu-action`, format-verify macOS/windows); tar.gz/zip + sha256 packaging; release-asset upload. QEMU binfmt fix (`docker/setup-qemu-action@v3`) added after first run hit `exec format error`.
 - **Dependencies:** PORT-009
 
 #### PORT-011: Anvil integration proof
@@ -171,7 +171,7 @@ Supersedes `02-rust-hook-binary` and `03-rust-cli`. Replaces the dual-maintain p
 - **Intent:** All 12 CLI commands via `clap` (init, log, capsule open/close, status, search, list, pin, unpin, export, import, serve)
 - **Expected Outcome:** Commands work with both JSON and text output modes; flags and output shapes match the Commander.js CLI; commands default to in-process service (`kindling-service`) but `--via-daemon` switches to `kindling-client` for safe concurrent operation
 - **Validation:** Integration tests for each command; snapshot tests comparing JSON output against the existing TS CLI for identical inputs (retired after Phase 4)
-- **Status:** In Progress — `feat/rust-port-cli` (started in parallel with PORT-010/#70; deps 006+008 met, independent of 010). Includes the export/import bundle implementation deferred from PORT-006. `serve` maps to the UDS daemon (kindling-server), not the old TS HTTP server. `sync` commands out of scope.
+- **Status:** Merged — `feat/rust-port-cli`, PR #71 (rebase `b8be23f`). 12 clap commands; dual-mode (in-process default / `--via-daemon` → client); export/import bundle impl (deferred from PORT-006) in kindling-service + store, byte-compatible with TS bundle; `serve`→UDS daemon; `init` Claude-Code step stubbed → PORT-015. Snapshot goldens hand-derived (TS CLI unrunnable on Node v26).
 - **Dependencies:** PORT-006, PORT-008
 
 #### PORT-013: Umbrella `kindling` binary
@@ -179,7 +179,7 @@ Supersedes `02-rust-hook-binary` and `03-rust-cli`. Replaces the dual-maintain p
 - **Intent:** Single binary entry point that dispatches to hook, CLI, or server based on subcommand
 - **Expected Outcome:** One artefact: `kindling serve`, `kindling hook <type>`, `kindling <cli-command>`; symlink-aware so `kindling-hook` continues to work as a drop-in name for hook scripts if needed
 - **Validation:** Single binary size under 20 MB stripped; all three surfaces tested via the umbrella binary
-- **Status:** Ready
+- **Status:** In Progress — `feat/rust-port-umbrella`. Umbrella `crates/kindling/src/main.rs` dispatches: `hook` (+ `kindling-hook` argv[0] symlink) → kindling-hook; everything else → kindling-cli (which already has serve + 11 verbs). Refactors hook bin logic into a reusable lib entry.
 - **Dependencies:** PORT-009, PORT-012
 
 #### PORT-014: Native distribution channels
