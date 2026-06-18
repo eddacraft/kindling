@@ -108,6 +108,8 @@ impl Spawner {
     }
 
     /// Run the spawn action once.
+    // Only the unix transport auto-spawns; the non-unix request path is a stub.
+    #[cfg_attr(not(unix), allow(dead_code))]
     pub(crate) fn spawn(&self) -> io::Result<()> {
         match self {
             Spawner::Command => {
