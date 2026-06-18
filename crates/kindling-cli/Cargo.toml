@@ -20,11 +20,11 @@ name = "kindling-cli"
 path = "src/main.rs"
 
 [dependencies]
-kindling-types = { path = "../kindling-types", version = "0.0.1" }
-kindling-store = { path = "../kindling-store", version = "0.0.1" }
-kindling-service = { path = "../kindling-service", version = "0.0.1" }
-kindling-client = { path = "../kindling-client", version = "0.0.1" }
-kindling-server = { path = "../kindling-server", version = "0.0.1" }
+kindling-types = { path = "../kindling-types", version = "0.1.0" }
+kindling-store = { path = "../kindling-store", version = "0.1.0" }
+kindling-service = { path = "../kindling-service", version = "0.1.0" }
+kindling-client = { path = "../kindling-client", version = "0.1.0" }
+kindling-server = { path = "../kindling-server", version = "0.1.0" }
 clap = { version = "4", features = ["derive"] }
 # Raw-row reads for `list capsules`/`list observations` reproduce the TS CLI's
 # snake_case/raw-string JSON shape; rusqlite is reused from the store stack.
@@ -38,5 +38,5 @@ anyhow = "1"
 
 [dev-dependencies]
 tempfile = "3"
-kindling-server = { path = "../kindling-server", version = "0.0.1" }
+kindling-server = { path = "../kindling-server", version = "0.1.0" }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time"] }

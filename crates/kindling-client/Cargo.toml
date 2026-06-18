@@ -9,7 +9,7 @@ authors.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-kindling-types = { path = "../kindling-types", version = "0.0.1" }
+kindling-types = { path = "../kindling-types", version = "0.1.0" }
 tokio = { version = "1", features = ["rt", "macros", "net", "time", "process"] }
 hyper = { version = "1", features = ["client", "http1"] }
 hyper-util = { version = "0.1", features = ["client", "http1", "tokio"] }
@@ -19,8 +19,8 @@ serde_json = "1"
 thiserror = "2"
 
 [dev-dependencies]
-kindling-server = { path = "../kindling-server", version = "0.0.1" }
-kindling-store = { path = "../kindling-store", version = "0.0.1" }
+kindling-server = { path = "../kindling-server", version = "0.1.0" }
+kindling-store = { path = "../kindling-store", version = "0.1.0" }
 tempfile = "3"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time"] }
 
