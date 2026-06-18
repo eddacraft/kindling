@@ -719,6 +719,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "kindling-spool"
+version = "0.0.1"
+dependencies = [
+ "kindling-client",
+ "kindling-server",
+ "kindling-store",
+ "kindling-types",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "kindling-store"
 version = "0.0.1"
 dependencies = [

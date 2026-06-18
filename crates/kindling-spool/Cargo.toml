@@ -1,0 +1,27 @@
+[package]
+name = "kindling-spool"
+description = "Opt-in durable-emit layer over kindling-client. Buffers observations to a local append-only NDJSON spool when the daemon is unreachable, and drains them into the daemon on flush. The daemon (SQLite) is always authoritative; the spool is a transient write buffer, never a parallel source of truth."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+kindling-client = { path = "../kindling-client", version = "0.0.1" }
+kindling-types = { path = "../kindling-types", version = "0.0.1" }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+tokio = { version = "1", features = ["rt", "macros", "time", "sync"] }
+thiserror = "2"
+uuid = { version = "1", features = ["v4"] }
+
+[dev-dependencies]
+kindling-server = { path = "../kindling-server", version = "0.0.1" }
+kindling-store = { path = "../kindling-store", version = "0.0.1" }
+tempfile = "3"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
+
+[lints]
+workspace = true
