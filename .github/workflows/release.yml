@@ -171,6 +171,16 @@ jobs:
           echo "$OUT" | grep -Eq 'kindling [0-9]+\.[0-9]+\.[0-9]+' \
             || { echo "::error::version line not found in: $OUT"; exit 1; }
 
+      # Register arm64 binfmt handlers (qemu-user-static) so the Docker run
+      # below can execute the aarch64 binary on this x86_64 runner. Without
+      # this, `docker run --platform linux/arm64 ... /kindling` fails with
+      # "exec format error".
+      - name: Set up QEMU (arm64 emulation)
+        if: matrix.exec_smoke == 'qemu'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
       # Linux aarch64 targets: execute under QEMU arm64 emulation via Docker.
       - name: Smoke test (QEMU arm64 exec)
         if: matrix.exec_smoke == 'qemu'
