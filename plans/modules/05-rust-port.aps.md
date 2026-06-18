@@ -195,7 +195,7 @@ Supersedes `02-rust-hook-binary` and `03-rust-cli`. Replaces the dual-maintain p
 - **Intent:** `plugins/kindling-claude-code` invokes the Rust binary instead of the Node.js hook scripts
 - **Expected Outcome:** Plugin `hooks.json` calls `kindling hook <type>` (resolved via PATH or bundled binary location); Node.js hook scripts removed from the plugin; plugin install instructions updated
 - **Validation:** Fresh plugin install on a clean machine: hooks fire end-to-end via the Rust binary; observation rows present in the per-project DB
-- **Status:** Draft
+- **Status:** In Progress — `feat/rust-port-plugin-cutover`. hooks.json's 7 commands now `kindling hook <type>` (PATH-resolved); the 7 Node hook scripts removed. `hooks/lib/{init,filter}.js` KEPT — `init.js` is shared by the `/memory` slash-command scripts (separate surface, still TS-bundle-backed; their cutover is a later/Phase-4 step), `filter.js` is the canonical PORT-004 reference. README now lists the `kindling` binary as a prerequisite. End-to-end fresh-install validation needs the published binary (user, post-release).
 - **Dependencies:** PORT-014
 
 ### Phase 4 — Thin TS Client + Deprecation
