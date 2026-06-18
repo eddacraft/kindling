@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - 'crates/**'
+      - 'schema/**'
+      - 'scripts/sync-vendored-schema.sh'
       - 'Cargo.toml'
       - 'Cargo.lock'
       - 'rust-toolchain.toml'
@@ -13,6 +15,8 @@ on:
     branches: [main]
     paths:
       - 'crates/**'
+      - 'schema/**'
+      - 'scripts/sync-vendored-schema.sh'
       - 'Cargo.toml'
       - 'Cargo.lock'
       - 'rust-toolchain.toml'
@@ -72,6 +76,22 @@ jobs:
         run: |
           if ! git diff --exit-code -- crates/kindling-types/bindings; then
             echo "::error::TypeScript bindings are out of date. Run: cargo test -p kindling-types --features ts-rs"
+            exit 1
+          fi
+
+  vendored-schema:
+    name: vendored schema up to date
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Re-sync vendored schema copies
+        run: ./scripts/sync-vendored-schema.sh
+      - name: Fail if vendored schema drifted
+        run: |
+          if ! git diff --exit-code -- \
+            crates/kindling-store/schema \
+            crates/kindling-client/schema; then
+            echo "::error::Vendored schema copies are out of date. A change to the canonical schema/ was not re-synced. Run: ./scripts/sync-vendored-schema.sh"
             exit 1
           fi
 

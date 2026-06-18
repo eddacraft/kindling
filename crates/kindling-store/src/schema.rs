@@ -1,22 +1,28 @@
 //! Embedded copies of the cross-language schema contract.
 //!
 //! `schema/schema.sql` and `schema/version.json` at the repo root are the
-//! canonical contract shared with the TypeScript store. Embedding them with
-//! `include_str!` means this crate can never drift from the contract — any
-//! contract change recompiles into the crate on the next build.
+//! canonical contract shared with the TypeScript store. This crate vendors a
+//! COMMITTED copy of them under `crates/kindling-store/schema/` and embeds the
+//! vendored copy with `include_str!`. Vendoring keeps the files inside the
+//! crate directory so `cargo publish` packages them (the repo-root canonical
+//! source is outside the crate dir and would not be in the published tarball).
 //!
-//! NOTE: the `include_str!` paths reach outside the crate directory, which is
-//! fine for workspace builds but not for `cargo publish`. Packaging for
-//! crates.io (PORT-014) will need a build-time copy step.
+//! The vendored copy is kept in lock-step with the canonical source by
+//! `scripts/sync-vendored-schema.sh`; a CI drift gate (the `vendored-schema`
+//! job in `.github/workflows/rust.yml`) re-runs the sync and fails on any
+//! uncommitted diff, so the crate can never silently drift from the contract.
 
 use std::sync::OnceLock;
 
 use serde::Deserialize;
 
 /// Canonical DDL — the state of the schema after all migrations.
-pub const SCHEMA_SQL: &str = include_str!("../../../schema/schema.sql");
+///
+/// Embedded from the vendored copy (`crates/kindling-store/schema/schema.sql`),
+/// kept in sync with the repo-root canonical `schema/schema.sql`.
+pub const SCHEMA_SQL: &str = include_str!("../schema/schema.sql");
 
-const VERSION_JSON: &str = include_str!("../../../schema/version.json");
+const VERSION_JSON: &str = include_str!("../schema/version.json");
 
 /// Machine-readable schema version metadata from `schema/version.json`.
 #[derive(Debug, Clone, Deserialize)]

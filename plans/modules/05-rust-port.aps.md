@@ -179,7 +179,7 @@ Supersedes `02-rust-hook-binary` and `03-rust-cli`. Replaces the dual-maintain p
 - **Intent:** Single binary entry point that dispatches to hook, CLI, or server based on subcommand
 - **Expected Outcome:** One artefact: `kindling serve`, `kindling hook <type>`, `kindling <cli-command>`; symlink-aware so `kindling-hook` continues to work as a drop-in name for hook scripts if needed
 - **Validation:** Single binary size under 20 MB stripped; all three surfaces tested via the umbrella binary
-- **Status:** In Progress — `feat/rust-port-umbrella`. Umbrella `crates/kindling/src/main.rs` dispatches: `hook` (+ `kindling-hook` argv[0] symlink) → kindling-hook; everything else → kindling-cli (which already has serve + 11 verbs). Refactors hook bin logic into a reusable lib entry.
+- **Status:** Merged — `feat/rust-port-umbrella`, PR #73 (`fd2f438`+`8e46094`). Umbrella dispatches all 3 surfaces (hook + symlink / serve / cli verbs); `run_hook` lib refactor; `kindling --version`→`kindling 0.0.1` exit 0; 6.9 MB stripped; 7 umbrella tests. Windows fix: cfg-gated kindling-client UDS transport (UnixStream unavailable on windows) with a loud stub.
 - **Dependencies:** PORT-009, PORT-012
 
 #### PORT-014: Native distribution channels
@@ -187,7 +187,7 @@ Supersedes `02-rust-hook-binary` and `03-rust-cli`. Replaces the dual-maintain p
 - **Intent:** Install paths for Rust-native and platform-native consumers
 - **Expected Outcome:** `cargo install kindling` publishes to crates.io; Homebrew tap at `eddacraft/tap` with formula; `curl -sSL install.kindling.dev | sh` installs the latest release binary for the detected platform (Linux/macOS); install script verifies SHA256 against the GitHub Release manifest
 - **Validation:** Fresh install on Linux, macOS, and Windows via each method; post-install Claude Code session exercises all 7 hook types end-to-end
-- **Status:** Draft
+- **Status:** In Progress (autonomous slice) — `feat/rust-port-distribution`. In-repo parts only: cargo-publish readiness (vendor schema into crates to fix the `include_str!` outside-crate-dir blocker + path-dep versions + drift gate), `install.sh`, Homebrew formula template, `cargo publish --dry-run`. CREDENTIAL-GATED steps deferred to user: actual `cargo publish` (crates.io token), `eddacraft/tap` repo, `install.kindling.dev` domain, a real GitHub Release, cross-platform fresh-install validation.
 - **Dependencies:** PORT-010, PORT-013
 
 #### PORT-015: Plugin hook cutover
