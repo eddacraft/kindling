@@ -11,16 +11,24 @@
 //! to the same per-project DB the Node hooks used and the injection
 //! `scopeIds.repoId` matches.
 
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// Resolve the project root for `cwd`, matching the Node `getProjectRoot`.
 pub fn project_root(cwd: &str) -> String {
+    project_root_with(cwd, std::env::var_os("KINDLING_REPO_ROOT"))
+}
+
+/// Inner resolution with the `KINDLING_REPO_ROOT` value injected, so tests can
+/// exercise the env-guard branch without mutating the (process-global, and
+/// therefore racy under parallel tests) environment.
+fn project_root_with(cwd: &str, env_root: Option<OsString>) -> String {
     let resolved = resolve(cwd);
 
     // (1) KINDLING_REPO_ROOT, only if cwd is under it (prevents cross-project
     //     contamination, exactly as the Node guard does).
-    if let Some(cached) = std::env::var_os("KINDLING_REPO_ROOT") {
+    if let Some(cached) = env_root {
         let cached = cached.to_string_lossy().into_owned();
         if !cached.is_empty() && resolved.starts_with(&cached) {
             return cached;
@@ -105,40 +113,31 @@ mod tests {
 
     #[test]
     fn env_root_used_when_cwd_is_under_it() {
-        // Use a scoped guard so we don't leak env into other tests.
-        temp_env("KINDLING_REPO_ROOT", Some("/home/u/proj"), || {
-            assert_eq!(project_root("/home/u/proj/sub/dir"), "/home/u/proj");
-        });
+        // Inject the env value directly — no process-env mutation, so this is
+        // race-free under cargo's parallel test runner.
+        assert_eq!(
+            project_root_with("/home/u/proj/sub/dir", Some("/home/u/proj".into())),
+            "/home/u/proj"
+        );
     }
 
     #[test]
     fn env_root_ignored_when_cwd_outside_it() {
-        temp_env("KINDLING_REPO_ROOT", Some("/home/u/proj"), || {
-            // cwd is NOT under the cached root → falls through (git or resolved
-            // cwd). In a non-git temp path this lands on the resolved cwd.
-            let root = project_root("/tmp/elsewhere/x");
-            assert_ne!(root, "/home/u/proj");
-        });
+        // cwd is NOT under the cached root → the env guard does not fire. With a
+        // non-git temp path the git step also fails, landing on the resolved cwd.
+        let root = project_root_with("/tmp/elsewhere/x", Some("/home/u/proj".into()));
+        assert_ne!(root, "/home/u/proj");
+    }
+
+    #[test]
+    fn env_root_ignored_when_empty() {
+        // An empty env value is treated as unset (matches the `!is_empty` guard).
+        let root = project_root_with("/tmp/elsewhere/x", Some(OsString::new()));
+        assert_ne!(root, "");
     }
 
     #[test]
     fn normalize_collapses_dot_segments() {
         assert_eq!(normalize(Path::new("/a/b/../c/./d")), "/a/c/d");
-    }
-
-    /// Set/clear an env var for the duration of `f`, restoring the prior value.
-    /// Single-threaded within a test; the crate's tests do not run env-mutating
-    /// cases in parallel against the same key.
-    fn temp_env(key: &str, value: Option<&str>, f: impl FnOnce()) {
-        let prior = std::env::var_os(key);
-        match value {
-            Some(v) => std::env::set_var(key, v),
-            None => std::env::remove_var(key),
-        }
-        f();
-        match prior {
-            Some(v) => std::env::set_var(key, v),
-            None => std::env::remove_var(key),
-        }
     }
 }
