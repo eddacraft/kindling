@@ -9,8 +9,8 @@ authors.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-kindling-client = { path = "../kindling-client", version = "0.0.1" }
-kindling-types = { path = "../kindling-types", version = "0.0.1" }
+kindling-client = { path = "../kindling-client", version = "0.1.0" }
+kindling-types = { path = "../kindling-types", version = "0.1.0" }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 tokio = { version = "1", features = ["rt", "macros", "time", "sync"] }
@@ -18,8 +18,8 @@ thiserror = "2"
 uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
-kindling-server = { path = "../kindling-server", version = "0.0.1" }
-kindling-store = { path = "../kindling-store", version = "0.0.1" }
+kindling-server = { path = "../kindling-server", version = "0.1.0" }
+kindling-store = { path = "../kindling-store", version = "0.1.0" }
 tempfile = "3"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
 

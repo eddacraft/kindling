@@ -19,13 +19,13 @@ path = "src/main.rs"
 # The umbrella reuses the CLI's clap dispatch and the hook's self-contained
 # `run_hook` (which owns its own current-thread Tokio runtime). The umbrella
 # `main` is a plain `fn main() -> ExitCode` — no second Tokio runtime macro.
-kindling-cli = { path = "../kindling-cli", version = "0.0.1" }
-kindling-hook = { path = "../kindling-hook", version = "0.0.1" }
+kindling-cli = { path = "../kindling-cli", version = "0.1.0" }
+kindling-hook = { path = "../kindling-hook", version = "0.1.0" }
 
 [dev-dependencies]
-kindling-server = { path = "../kindling-server", version = "0.0.1" }
-kindling-store = { path = "../kindling-store", version = "0.0.1" }
-kindling-types = { path = "../kindling-types", version = "0.0.1" }
+kindling-server = { path = "../kindling-server", version = "0.1.0" }
+kindling-store = { path = "../kindling-store", version = "0.1.0" }
+kindling-types = { path = "../kindling-types", version = "0.1.0" }
 serde_json = { version = "1", features = ["preserve_order"] }
 tempfile = "3"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time"] }

@@ -598,7 +598,7 @@ dependencies = [
 
 [[package]]
 name = "kindling"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "kindling-cli",
  "kindling-hook",
@@ -612,7 +612,7 @@ dependencies = [
 
 [[package]]
 name = "kindling-cli"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -631,7 +631,7 @@ dependencies = [
 
 [[package]]
 name = "kindling-client"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "http-body-util",
  "hyper",
@@ -648,7 +648,7 @@ dependencies = [
 
 [[package]]
 name = "kindling-filter"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "regex",
  "serde",
@@ -657,7 +657,7 @@ dependencies = [
 
 [[package]]
 name = "kindling-hook"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "kindling-client",
  "kindling-server",
@@ -673,7 +673,7 @@ dependencies = [
 
 [[package]]
 name = "kindling-provider"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "kindling-store",
  "kindling-types",
@@ -685,7 +685,7 @@ dependencies = [
 
 [[package]]
 name = "kindling-server"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "axum",
  "chrono",
@@ -706,7 +706,7 @@ dependencies = [
 
 [[package]]
 name = "kindling-service"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "kindling-filter",
  "kindling-provider",
@@ -720,7 +720,7 @@ dependencies = [
 
 [[package]]
 name = "kindling-spool"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "kindling-client",
  "kindling-server",
@@ -736,7 +736,7 @@ dependencies = [
 
 [[package]]
 name = "kindling-store"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "kindling-types",
  "rusqlite",
@@ -749,7 +749,7 @@ dependencies = [
 
 [[package]]
 name = "kindling-types"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",

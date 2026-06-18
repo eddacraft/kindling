@@ -9,10 +9,10 @@ authors.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-kindling-types = { path = "../kindling-types", version = "0.0.1" }
-kindling-store = { path = "../kindling-store", version = "0.0.1" }
-kindling-provider = { path = "../kindling-provider", version = "0.0.1" }
-kindling-filter = { path = "../kindling-filter", version = "0.0.1" }
+kindling-types = { path = "../kindling-types", version = "0.1.0" }
+kindling-store = { path = "../kindling-store", version = "0.1.0" }
+kindling-provider = { path = "../kindling-provider", version = "0.1.0" }
+kindling-filter = { path = "../kindling-filter", version = "0.1.0" }
 thiserror = "2"
 serde = { version = "1", features = ["derive"] }
 # `preserve_order` keeps map/struct key order on (de)serialization so exported
