@@ -145,6 +145,9 @@ vite.config.ts.timestamp-*
 .anvil/*.log
 .anvil/first-run
 
+# clawpatch review tool state (machine + commit specific, regenerated)
+.clawpatch/
+
 # Agents files
 settings.local.json
 
