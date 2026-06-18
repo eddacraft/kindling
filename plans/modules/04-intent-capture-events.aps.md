@@ -1,8 +1,8 @@
 # Intent Capture Events (Kindling)
 
-| ID      | Owner  | Status      |
-| ------- | ------ | ----------- |
-| KINTENT | @aneki | In Progress |
+| ID      | Owner  | Status |
+| ------- | ------ | ------ |
+| KINTENT | @aneki | Done   |
 
 ## Purpose
 
@@ -186,7 +186,7 @@ interface IntentEvent {
 - **Expected Outcome:** `kindling intent status` shows emitter health, last event timestamp, backlog, and integrity state.
 - **Validation:** `pnpm test -- --testNamePattern="intent status"`
 - **Dependencies:** KINTENT-002, KINTENT-003
-- **Status:** In Progress
+- **Status:** Merged (PR #74, merged 2026-06-18)
 - **Notes:** `computeIntentStatus` + `formatIntentStatus` in `kindling-core`
   (`src/intent/status.ts`) derive a point-in-time capture health report. The
   report combines the four required signals into one `IntentStatusReport`:

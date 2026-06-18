@@ -5,7 +5,7 @@
 | Status  | In Progress |
 | Owner   | @aneki      |
 | Created | 2026-03-14  |
-| Updated | 2026-06-15  |
+| Updated | 2026-06-18  |
 
 ## Problem
 
@@ -35,7 +35,7 @@ Kindling is functional (596 tests passing, 10 packages building) and the TypeScr
 | [01-npm-publish](./modules/01-npm-publish.aps.md)                     | Package metadata, READMEs, publish scripts, CI                   | Done        | —                  |
 | [02-rust-hook-binary](./modules/02-rust-hook-binary.aps.md)           | Rust binary for Claude Code hook invocations                     | Superseded  | by 05              |
 | [03-rust-cli](./modules/03-rust-cli.aps.md)                           | Full Rust CLI replacing Commander.js                             | Superseded  | by 05              |
-| [04-intent-capture-events](./modules/04-intent-capture-events.aps.md) | Kindling-native intent event primitive + export                  | In Progress | —                  |
+| [04-intent-capture-events](./modules/04-intent-capture-events.aps.md) | Kindling-native intent event primitive + export                  | Done        | —                  |
 | [04-schema-contract](./modules/04-schema-contract.aps.md)             | Cross-language SQLite schema contract for Rust+TS                | Done        | —                  |
 | [05-rust-port](./modules/05-rust-port.aps.md)                         | Rust-canonical Kindling + thin TS client over local daemon (UDS) | In Progress | 04-schema-contract |
 
