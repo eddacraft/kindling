@@ -18,6 +18,17 @@ import { exportCommand, importCommand } from './commands/export.js';
 import { serveCommand } from './commands/serve.js';
 import { syncInitCommand, syncAddSubmoduleCommand, syncPushCommand } from './commands/sync.js';
 
+// --- Deprecation notice (once per process, to stderr) ---
+const DEPRECATION_KEY = '__kindling_deprecation_warned_cli';
+if (!(globalThis as Record<string, unknown>)[DEPRECATION_KEY]) {
+  (globalThis as Record<string, unknown>)[DEPRECATION_KEY] = true;
+  process.stderr.write(
+    '[DEPRECATED] @eddacraft/kindling-cli is deprecated and will be removed at v1.0.0. ' +
+      'Kindling is now a Rust daemon; use @eddacraft/kindling (thin client) or the `kindling` binary. ' +
+      'See https://github.com/eddacraft/kindling.\n',
+  );
+}
+
 const program = new Command();
 
 program
