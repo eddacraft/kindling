@@ -139,7 +139,7 @@ interface IntentEvent {
 - **Expected Outcome:** Configurable redaction on known sensitive paths before persistence/export.
 - **Validation:** `pnpm test -- --testNamePattern="intent redaction"`
 - **Dependencies:** KINTENT-001
-- **Status:** In Review (`feat/intent-redaction`)
+- **Status:** Merged (PR #67, merged 2026-06-18)
 - **Notes:** `IntentRedactor` in `kindling-core` (`src/intent/redaction.ts`) is a
   configurable transform applied before persistence/export. Two modes: **value
   patterns** mask only the matched substring (default set covers Anthropic/OpenAI
@@ -162,7 +162,7 @@ interface IntentEvent {
 - **Expected Outcome:** `kindling intent export` outputs signed/hashed JSONL bundle with metadata manifest.
 - **Validation:** `pnpm test -- --testNamePattern="intent export"`
 - **Dependencies:** KINTENT-002, KINTENT-003, KINTENT-004
-- **Status:** In Progress (`feat/intent-export`, stacked on unmerged `feat/intent-redaction`)
+- **Status:** Merged (PR #68, merged 2026-06-18)
 - **Notes:** Export seals a sequence range of persisted (already-redacted) intent
   events into a portable, signed bundle for Anvil ingestion. The store's hash
   chain is un-keyed (tamper-_evident_); export adds the keyed authentication the
