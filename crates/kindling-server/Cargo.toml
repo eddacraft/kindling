@@ -25,6 +25,12 @@ tower = "0.5"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
+# Used ONLY to resolve the machine-local UTC offset at a given instant for the
+# SessionStart `toLocaleString` parity formatter. The civil-date arithmetic is
+# hand-rolled in `inject.rs`; chrono just answers "what is the local offset now"
+# (honouring the `TZ` env var on Unix, exactly like the Node hook process). We
+# deliberately avoid `chrono-tz` (a large bundled IANA database).
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.31", features = ["signal", "process"] }

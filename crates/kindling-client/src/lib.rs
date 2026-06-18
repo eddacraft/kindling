@@ -14,13 +14,16 @@
 //! # v1 wire contract
 //!
 //! ```text
-//! GET    /v1/health             → 200 { version, schemaVersion, projects: [...] }
-//! POST   /v1/capsules           → 201 Capsule
-//! PATCH  /v1/capsules/:id/close → 200 Capsule
-//! POST   /v1/observations       → 201 Observation
-//! POST   /v1/retrieve           → 200 RetrieveResult
-//! POST   /v1/pins               → 201 Pin
-//! DELETE /v1/pins/:id           → 204
+//! GET    /v1/health                  → 200 { version, schemaVersion, projects: [...] }
+//! POST   /v1/capsules                → 201 Capsule
+//! GET    /v1/capsules/open?sessionId → 200 Capsule | null
+//! PATCH  /v1/capsules/:id/close      → 200 Capsule
+//! POST   /v1/observations            → 201 Observation
+//! POST   /v1/retrieve                → 200 RetrieveResult
+//! POST   /v1/pins                    → 201 Pin
+//! DELETE /v1/pins/:id                → 204
+//! POST   /v1/context/session-start   → 200 { additionalContext: string | null }
+//! POST   /v1/context/pre-compact     → 200 { additionalContext: string | null }
 //! ```
 //!
 //! # Schema version
@@ -69,7 +72,9 @@ use kindling_types::{
     ScopeIds,
 };
 
-use body::{AppendObservationBody, OpenCapsuleBody};
+use body::{
+    AppendObservationBody, OpenCapsuleBody, PreCompactContextBody, SessionStartContextBody,
+};
 
 /// Header carrying the project root string for per-project DB routing. Mirrors
 /// `kindling_server::PROJECT_HEADER`.
@@ -100,6 +105,14 @@ struct HealthBody {
 #[derive(Debug, Deserialize)]
 struct ErrorBody {
     error: String,
+}
+
+/// `/v1/context/*` response shape: `{ "additionalContext": string | null }`.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ContextBody {
+    #[serde(default)]
+    additional_context: Option<String>,
 }
 
 /// A thin async client for the Kindling daemon.
@@ -187,6 +200,21 @@ impl Client {
         .await
     }
 
+    /// `GET /v1/capsules/open?sessionId=…` — the open session capsule for
+    /// `session_id`, or `None` when none is open.
+    ///
+    /// Each Claude Code hook is a fresh process holding only the session id, so
+    /// the Stop hook resolves the capsule it must close through this endpoint
+    /// rather than tracking it in-process.
+    pub async fn get_open_capsule(&self, session_id: &str) -> Result<Option<Capsule>, ClientError> {
+        let path = format!(
+            "/v1/capsules/open?sessionId={}",
+            percent_encode_query(session_id)
+        );
+        self.call("GET", &path, true, None::<&()>, &[StatusCode::OK])
+            .await
+    }
+
     /// `PATCH /v1/capsules/:id/close` — close a capsule.
     pub async fn close_capsule(
         &self,
@@ -250,6 +278,65 @@ impl Client {
         let path = format!("/v1/pins/{}", pin_id);
         self.call_no_content("DELETE", &path, true, &[StatusCode::NO_CONTENT])
             .await
+    }
+
+    /// `POST /v1/context/session-start` — the assembled + formatted SessionStart
+    /// injection markdown, or `None` when there is nothing to inject.
+    ///
+    /// The daemon owns the formatting (recency-ordered observations, pin
+    /// previews, and the `toLocaleString`-parity dates). `max_results` caps the
+    /// recent-observation count (default 10 when `None`). The project scope is
+    /// derived from this client's project root, reproducing the Node hook's
+    /// `{ repoId: <project root> }` filter within the project database.
+    pub async fn session_start_context(
+        &self,
+        max_results: Option<u32>,
+    ) -> Result<Option<String>, ClientError> {
+        let body = SessionStartContextBody {
+            max_results,
+            scope_ids: self.project_scope(),
+        };
+        let resp: ContextBody = self
+            .call(
+                "POST",
+                "/v1/context/session-start",
+                true,
+                Some(&body),
+                &[StatusCode::OK],
+            )
+            .await?;
+        Ok(resp.additional_context)
+    }
+
+    /// `POST /v1/context/pre-compact` — the assembled + formatted PreCompact
+    /// injection markdown (pinned items + latest session summary), or `None`
+    /// when there is nothing to inject.
+    ///
+    /// As with [`Self::session_start_context`], the project scope is derived
+    /// from this client's project root.
+    pub async fn pre_compact_context(&self) -> Result<Option<String>, ClientError> {
+        let body = PreCompactContextBody {
+            scope_ids: self.project_scope(),
+        };
+        let resp: ContextBody = self
+            .call(
+                "POST",
+                "/v1/context/pre-compact",
+                true,
+                Some(&body),
+                &[StatusCode::OK],
+            )
+            .await?;
+        Ok(resp.additional_context)
+    }
+
+    /// A repo scope built from this client's project root, mirroring the Node
+    /// hook's `{ repoId: getProjectRoot(cwd) }`.
+    fn project_scope(&self) -> ScopeIds {
+        ScopeIds {
+            repo_id: Some(self.config.project_root.clone()),
+            ..Default::default()
+        }
     }
 
     // ---- internal request plumbing ------------------------------------------
@@ -318,6 +405,35 @@ impl Client {
         )
         .await
     }
+}
+
+/// Percent-encode a query-parameter value, escaping everything outside the
+/// RFC 3986 unreserved set (`A-Z a-z 0-9 - . _ ~`). Keeps the
+/// [`get_open_capsule`](Client::get_open_capsule) URL well-formed for arbitrary
+/// session ids; UUIDs pass through unchanged.
+fn percent_encode_query(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    for byte in value.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
+                out.push(byte as char);
+            }
+            other => {
+                out.push('%');
+                out.push(
+                    char::from_digit((other >> 4) as u32, 16)
+                        .unwrap()
+                        .to_ascii_uppercase(),
+                );
+                out.push(
+                    char::from_digit((other & 0xf) as u32, 16)
+                        .unwrap()
+                        .to_ascii_uppercase(),
+                );
+            }
+        }
+    }
+    out
 }
 
 /// Map a response to an error if its status is not in `expected`, extracting the

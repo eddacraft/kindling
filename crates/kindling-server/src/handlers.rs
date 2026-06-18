@@ -11,7 +11,7 @@
 //! and drops the lock before returning. No lock is ever held across an
 //! `.await`.
 
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::Json;
 use kindling_service::AppendObservationOptions;
@@ -19,13 +19,21 @@ use kindling_types::{Capsule, Observation, Pin, RetrieveOptions, RetrieveResult}
 use serde_json::{json, Value};
 
 use crate::dto::{
-    AppendObservationRequest, CloseCapsuleRequest, CreatePinRequest, OpenCapsuleRequest,
+    AppendObservationRequest, CloseCapsuleRequest, CreatePinRequest, OpenCapsuleQuery,
+    OpenCapsuleRequest, PreCompactContextRequest, SessionStartContextRequest, DEFAULT_MAX_RESULTS,
 };
 use crate::error::ApiError;
+use crate::inject::{format_pre_compact, format_session_start, local_offset_seconds};
 use crate::state::AppState;
 
 /// Header carrying the project root string for per-project DB routing.
 pub const PROJECT_HEADER: &str = "x-kindling-project";
+
+/// Header carrying the session id for `GET /v1/capsules/open`. Accepted as an
+/// alternative to the `?sessionId=` query param so a hook can resolve a
+/// session's open capsule without a request body (each hook is a fresh
+/// process).
+pub const SESSION_HEADER: &str = "x-kindling-session";
 
 /// Pull the project root from `X-Kindling-Project`, erroring 400 if missing.
 fn project_root(headers: &HeaderMap) -> Result<String, ApiError> {
@@ -81,6 +89,43 @@ pub async fn close_capsule(
     let capsule = {
         let guard = svc.lock().expect("service mutex poisoned");
         guard.close_capsule(&id, req.into())?
+    };
+    Ok(Json(capsule))
+}
+
+/// `GET /v1/capsules/open` — the open session capsule for a session id, or
+/// JSON `null` when none is open.
+///
+/// The session id comes from the `?sessionId=` query param or, equivalently,
+/// the `X-Kindling-Session` header (the query param wins if both are present).
+/// A missing/empty session id yields `400`. The Stop hook uses this to resolve
+/// the capsule it must close, since each hook is a fresh process holding only
+/// the session id.
+pub async fn get_open_capsule(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<OpenCapsuleQuery>,
+) -> Result<Json<Option<Capsule>>, ApiError> {
+    let root = project_root(&headers)?;
+    let session_id = query
+        .session_id
+        .or_else(|| {
+            headers
+                .get(SESSION_HEADER)
+                .and_then(|v| v.to_str().ok())
+                .map(str::to_string)
+        })
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| {
+            ApiError::BadRequest(format!(
+                "missing or empty sessionId (query param or {SESSION_HEADER} header)"
+            ))
+        })?;
+    let svc = state.service_for(&root)?;
+    let capsule = {
+        let guard = svc.lock().expect("service mutex poisoned");
+        guard.get_open_capsule(&session_id)?
     };
     Ok(Json(capsule))
 }
@@ -147,4 +192,57 @@ pub async fn unpin(
         guard.unpin(&id)?;
     }
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// `POST /v1/context/session-start` — assemble + format the SessionStart
+/// injection. Returns `{ "additionalContext": string | null }` (null when there
+/// is nothing to inject). An empty/absent body is accepted.
+pub async fn session_start_context(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    body: Option<Json<SessionStartContextRequest>>,
+) -> Result<Json<Value>, ApiError> {
+    let root = project_root(&headers)?;
+    let req = body.map(|Json(r)| r).unwrap_or_default();
+    let max_results = req.max_results.unwrap_or(DEFAULT_MAX_RESULTS);
+    let now = now_ms();
+    let svc = state.service_for(&root)?;
+    let ctx = {
+        let guard = svc.lock().expect("service mutex poisoned");
+        guard.session_start_context_at(&req.scope_ids, max_results, now)?
+    };
+    // Resolve the local offset once, at the request instant, so every timestamp
+    // in this batch renders in a single consistent zone.
+    let offset = local_offset_seconds(now);
+    let additional = format_session_start(&ctx, offset);
+    Ok(Json(json!({ "additionalContext": additional })))
+}
+
+/// `POST /v1/context/pre-compact` — assemble + format the PreCompact injection.
+/// Returns `{ "additionalContext": string | null }`. An empty/absent body is
+/// accepted.
+pub async fn pre_compact_context(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    body: Option<Json<PreCompactContextRequest>>,
+) -> Result<Json<Value>, ApiError> {
+    let root = project_root(&headers)?;
+    let req = body.map(|Json(r)| r).unwrap_or_default();
+    let now = now_ms();
+    let svc = state.service_for(&root)?;
+    let ctx = {
+        let guard = svc.lock().expect("service mutex poisoned");
+        guard.pre_compact_context_at(&req.scope_ids, now)?
+    };
+    let additional = format_pre_compact(&ctx);
+    Ok(Json(json!({ "additionalContext": additional })))
+}
+
+/// Current time in epoch milliseconds.
+fn now_ms() -> i64 {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system clock before Unix epoch")
+        .as_millis() as i64
 }

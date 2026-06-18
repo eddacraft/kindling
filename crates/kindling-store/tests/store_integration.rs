@@ -263,6 +263,90 @@ fn summaries_roundtrip_and_lookup() {
 }
 
 #[test]
+fn latest_summary_for_scope_picks_newest_within_repo() {
+    let store = SqliteKindlingStore::open_in_memory().unwrap();
+
+    // Two capsules in repo-A, one in repo-B.
+    let cap = |id: &str, repo: &str| Capsule {
+        id: id.to_string(),
+        kind: CapsuleType::Session,
+        intent: "test capsule".to_string(),
+        status: CapsuleStatus::Open,
+        opened_at: 1000,
+        closed_at: None,
+        scope_ids: ScopeIds {
+            session_id: Some("s".to_string()),
+            repo_id: Some(repo.to_string()),
+            agent_id: None,
+            user_id: None,
+            task_id: None,
+        },
+        observation_ids: Vec::new(),
+        summary_id: None,
+    };
+    store.create_capsule(&cap("cap-a1", "repo-A")).unwrap();
+    store.create_capsule(&cap("cap-a2", "repo-A")).unwrap();
+    store.create_capsule(&cap("cap-b1", "repo-B")).unwrap();
+
+    let sum = |id: &str, capsule_id: &str, created_at: i64, content: &str| Summary {
+        id: id.to_string(),
+        capsule_id: capsule_id.to_string(),
+        content: content.to_string(),
+        confidence: 0.9,
+        created_at,
+        evidence_refs: vec![],
+    };
+    // cap-a1 older, cap-a2 newer (within repo-A); cap-b1 newest overall.
+    store
+        .insert_summary(&sum("s-a1", "cap-a1", 1500, "A older"))
+        .unwrap();
+    store
+        .insert_summary(&sum("s-a2", "cap-a2", 2500, "A newer"))
+        .unwrap();
+    store
+        .insert_summary(&sum("s-b1", "cap-b1", 3500, "B newest"))
+        .unwrap();
+
+    let repo_a = ScopeIds {
+        repo_id: Some("repo-A".to_string()),
+        ..Default::default()
+    };
+    let latest_a = store
+        .latest_summary_for_scope(Some(&repo_a))
+        .unwrap()
+        .expect("a summary for repo-A");
+    assert_eq!(
+        latest_a.id, "s-a2",
+        "newest within repo-A, not the global newest"
+    );
+    assert_eq!(latest_a.content, "A newer");
+
+    let repo_b = ScopeIds {
+        repo_id: Some("repo-B".to_string()),
+        ..Default::default()
+    };
+    let latest_b = store
+        .latest_summary_for_scope(Some(&repo_b))
+        .unwrap()
+        .expect("a summary for repo-B");
+    assert_eq!(latest_b.id, "s-b1");
+
+    // Unknown repo → None.
+    let repo_c = ScopeIds {
+        repo_id: Some("repo-C".to_string()),
+        ..Default::default()
+    };
+    assert!(store
+        .latest_summary_for_scope(Some(&repo_c))
+        .unwrap()
+        .is_none());
+
+    // No scope → global newest.
+    let global = store.latest_summary_for_scope(None).unwrap().unwrap();
+    assert_eq!(global.id, "s-b1");
+}
+
+#[test]
 fn pins_respect_ttl_and_scope() {
     let store = SqliteKindlingStore::open_in_memory().unwrap();
     let pin = |id: &str, session: &str, expires_at: Option<i64>| Pin {
