@@ -6,6 +6,22 @@ Kindling automatically captures your Claude Code sessions and injects prior cont
 
 ## Install
 
+**Prerequisite — the `kindling` binary.** The capture/injection hooks run
+`kindling hook <type>`, so the `kindling` binary must be on your `PATH`.
+Install it via any channel:
+
+```bash
+# one-line installer (Linux/macOS)
+curl -fsSL https://install.kindling.dev | sh
+# or Homebrew (macOS)
+brew install eddacraft/tap/kindling
+# or from source
+cargo install kindling
+```
+
+Verify with `kindling --version`. (Hooks fail open — if the binary is missing
+they no-op and never block your session.)
+
 **Add the marketplace, then install the plugin:**
 
 ```
@@ -104,8 +120,8 @@ Each project gets its own isolated database. No data is shared between projects 
 ## Requirements
 
 - Claude Code
-- Node.js >= 18 (already required by Claude Code)
-- better-sqlite3 (installed automatically)
+- The `kindling` binary on your `PATH` (powers the capture/injection hooks — see [Install](#install))
+- Node.js >= 18 (already required by Claude Code; used by the `/memory` slash commands, which still run on the bundled engine)
 
 ## License
 
