@@ -17,16 +17,22 @@
 //!    storing, so non-Rust consumers cannot bypass secret filtering. (Masking
 //!    only — content truncation stays a hook-layer concern.)
 //!
-//! Export/import/bundle methods from the TS service are intentionally absent;
-//! they belong to the CLI task (PORT-012).
+//! Export/import/bundle methods (deferred from PORT-006) are implemented here
+//! by PORT-012; see [`export`]. They are byte-compatible with the TS bundle
+//! format so exports round-trip across the two implementations.
 
 mod context;
 mod error;
+mod export;
 mod service;
 mod validation;
 
 pub use context::{PreCompactContext, ResolvedPin, SessionStartContext};
 pub use error::{ServiceError, ServiceResult};
+pub use export::{
+    ExportBundle, ExportBundleOptions, ExportDataset, ExportStats, ImportOptions, ImportResult,
+    BUNDLE_VERSION,
+};
 pub use service::{
     AppendObservationOptions, CloseCapsuleOptions, CreatePinOptions, KindlingService,
     OpenCapsuleOptions,

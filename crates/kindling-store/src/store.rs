@@ -509,6 +509,277 @@ impl SqliteKindlingStore {
             .collect()
     }
 
+    // ===== export / import / stats =====
+    //
+    // These back the CLI `export`, `import`, and `status` verbs (PORT-012) and
+    // mirror the deterministic ordering of
+    // `packages/kindling-store-sqlite/src/store/export.ts` so a Rust export
+    // round-trips byte-compatibly with the TS importer (and vice versa).
+
+    /// All non-redacted observations (or all, when `include_redacted`),
+    /// optionally scoped, ordered `ts ASC, id ASC`. Matches the TS
+    /// `exportDatabase` observation query.
+    pub fn export_observations(
+        &self,
+        scope: Option<&ScopeIds>,
+        include_redacted: bool,
+        limit: Option<u32>,
+    ) -> StoreResult<Vec<Observation>> {
+        let mut sql = String::from(
+            "SELECT id, kind, content, provenance, ts, scope_ids, redacted
+             FROM observations
+             WHERE 1 = 1",
+        );
+        let mut params: Vec<SqlValue> = Vec::new();
+        if let Some(scope) = scope {
+            push_scope_filters(&mut sql, &mut params, scope);
+        }
+        if !include_redacted {
+            sql.push_str(" AND redacted = 0");
+        }
+        sql.push_str(" ORDER BY ts ASC, id ASC");
+        if let Some(limit) = limit {
+            sql.push_str(" LIMIT ?");
+            params.push(SqlValue::Integer(i64::from(limit)));
+        }
+
+        let mut stmt = self.conn.prepare(&sql)?;
+        let rows = stmt.query_map(params_from_iter(params), RawObservation::from_row)?;
+        rows.map(|row| {
+            row.map_err(StoreError::from)
+                .and_then(RawObservation::into_observation)
+        })
+        .collect()
+    }
+
+    /// All capsules (with ordered observation ids), optionally scoped, ordered
+    /// `opened_at ASC, id ASC`. Matches the TS `exportDatabase` capsule query.
+    pub fn export_capsules(&self, scope: Option<&ScopeIds>) -> StoreResult<Vec<Capsule>> {
+        let mut sql = String::from(
+            "SELECT id, type, intent, status, opened_at, closed_at, scope_ids
+             FROM capsules
+             WHERE 1 = 1",
+        );
+        let mut params: Vec<SqlValue> = Vec::new();
+        if let Some(scope) = scope {
+            push_scope_filters(&mut sql, &mut params, scope);
+        }
+        sql.push_str(" ORDER BY opened_at ASC, id ASC");
+
+        let mut stmt = self.conn.prepare(&sql)?;
+        let raws = stmt
+            .query_map(params_from_iter(params), RawCapsule::from_row)?
+            .collect::<Result<Vec<_>, _>>()?;
+        raws.into_iter()
+            .map(|raw| self.hydrate_capsule(raw))
+            .collect()
+    }
+
+    /// All summaries whose capsule matches `scope`, ordered
+    /// `created_at ASC, id ASC`. Matches the TS `exportDatabase` summary query
+    /// (joins `summaries` to `capsules` and filters on the capsule scope).
+    pub fn export_summaries(&self, scope: Option<&ScopeIds>) -> StoreResult<Vec<Summary>> {
+        let mut sql = String::from(
+            "SELECT s.id, s.capsule_id, s.content, s.confidence, s.created_at, s.evidence_refs
+             FROM summaries s
+             JOIN capsules c ON s.capsule_id = c.id
+             WHERE 1 = 1",
+        );
+        let mut params: Vec<SqlValue> = Vec::new();
+        if let Some(scope) = scope {
+            push_scope_filters_prefixed(&mut sql, &mut params, scope, "c.");
+        }
+        sql.push_str(" ORDER BY s.created_at ASC, s.id ASC");
+
+        let mut stmt = self.conn.prepare(&sql)?;
+        let rows = stmt.query_map(params_from_iter(params), RawSummary::from_row)?;
+        rows.map(|row| {
+            row.map_err(StoreError::from)
+                .and_then(RawSummary::into_summary)
+        })
+        .collect()
+    }
+
+    /// All pins (including expired — export is a full snapshot), optionally
+    /// scoped, ordered `created_at ASC, id ASC`. Matches the TS `exportDatabase`
+    /// pin query.
+    pub fn export_pins(&self, scope: Option<&ScopeIds>) -> StoreResult<Vec<Pin>> {
+        let mut sql = String::from(
+            "SELECT id, target_type, target_id, reason, created_at, expires_at, scope_ids
+             FROM pins
+             WHERE 1 = 1",
+        );
+        let mut params: Vec<SqlValue> = Vec::new();
+        if let Some(scope) = scope {
+            push_scope_filters(&mut sql, &mut params, scope);
+        }
+        sql.push_str(" ORDER BY created_at ASC, id ASC");
+
+        let mut stmt = self.conn.prepare(&sql)?;
+        let rows = stmt.query_map(params_from_iter(params), |row| {
+            Ok(RawPin {
+                id: row.get(0)?,
+                target_type: row.get(1)?,
+                target_id: row.get(2)?,
+                reason: row.get(3)?,
+                created_at: row.get(4)?,
+                expires_at: row.get(5)?,
+                scope_ids: row.get(6)?,
+            })
+        })?;
+        rows.map(|row| row.map_err(StoreError::from).and_then(RawPin::into_pin))
+            .collect()
+    }
+
+    /// Insert an observation if its id is not already present; returns whether a
+    /// row was written. Mirrors the TS importer's `INSERT OR IGNORE`.
+    pub fn import_observation(&self, observation: &Observation) -> StoreResult<bool> {
+        let changes = self.conn.execute(
+            "INSERT OR IGNORE INTO observations (
+               id, kind, content, provenance, ts, scope_ids, redacted,
+               session_id, repo_id, agent_id, user_id
+             ) VALUES (
+               :id, :kind, :content, :provenance, :ts, :scope_ids, :redacted,
+               :session_id, :repo_id, :agent_id, :user_id
+             )",
+            named_params! {
+                ":id": observation.id,
+                ":kind": observation_kind_to_str(observation.kind),
+                ":content": observation.content,
+                ":provenance": serde_json::to_string(&observation.provenance)?,
+                ":ts": observation.ts,
+                ":scope_ids": serde_json::to_string(&observation.scope_ids)?,
+                ":redacted": observation.redacted,
+                ":session_id": observation.scope_ids.session_id,
+                ":repo_id": observation.scope_ids.repo_id,
+                ":agent_id": observation.scope_ids.agent_id,
+                ":user_id": observation.scope_ids.user_id,
+            },
+        )?;
+        Ok(changes > 0)
+    }
+
+    /// Insert a capsule if absent (and, when written, its ordered
+    /// `capsule_observations` links). Returns whether the capsule row was
+    /// written. Mirrors the TS importer.
+    pub fn import_capsule(&self, capsule: &Capsule) -> StoreResult<bool> {
+        let changes = self.conn.execute(
+            "INSERT OR IGNORE INTO capsules (
+               id, type, intent, status, opened_at, closed_at, scope_ids,
+               session_id, repo_id, agent_id, user_id
+             ) VALUES (
+               :id, :type, :intent, :status, :opened_at, :closed_at, :scope_ids,
+               :session_id, :repo_id, :agent_id, :user_id
+             )",
+            named_params! {
+                ":id": capsule.id,
+                ":type": capsule_type_to_str(capsule.kind),
+                ":intent": capsule.intent,
+                ":status": capsule_status_to_str(capsule.status),
+                ":opened_at": capsule.opened_at,
+                ":closed_at": capsule.closed_at,
+                ":scope_ids": serde_json::to_string(&capsule.scope_ids)?,
+                ":session_id": capsule.scope_ids.session_id,
+                ":repo_id": capsule.scope_ids.repo_id,
+                ":agent_id": capsule.scope_ids.agent_id,
+                ":user_id": capsule.scope_ids.user_id,
+            },
+        )?;
+        if changes == 0 {
+            return Ok(false);
+        }
+        let mut stmt = self.conn.prepare(
+            "INSERT OR IGNORE INTO capsule_observations (capsule_id, observation_id, seq)
+             VALUES (?1, ?2, ?3)",
+        )?;
+        for (seq, obs_id) in capsule.observation_ids.iter().enumerate() {
+            stmt.execute((&capsule.id, obs_id, seq as i64))?;
+        }
+        Ok(true)
+    }
+
+    /// Insert a summary if its id is absent; returns whether a row was written.
+    pub fn import_summary(&self, summary: &Summary) -> StoreResult<bool> {
+        let changes = self.conn.execute(
+            "INSERT OR IGNORE INTO summaries (
+               id, capsule_id, content, confidence, created_at, evidence_refs
+             ) VALUES (:id, :capsule_id, :content, :confidence, :created_at, :evidence_refs)",
+            named_params! {
+                ":id": summary.id,
+                ":capsule_id": summary.capsule_id,
+                ":content": summary.content,
+                ":confidence": summary.confidence,
+                ":created_at": summary.created_at,
+                ":evidence_refs": serde_json::to_string(&summary.evidence_refs)?,
+            },
+        )?;
+        Ok(changes > 0)
+    }
+
+    /// Insert a pin if its id is absent; returns whether a row was written.
+    pub fn import_pin(&self, pin: &Pin) -> StoreResult<bool> {
+        let changes = self.conn.execute(
+            "INSERT OR IGNORE INTO pins (
+               id, target_type, target_id, reason, created_at, expires_at, scope_ids,
+               session_id, repo_id, agent_id, user_id
+             ) VALUES (
+               :id, :target_type, :target_id, :reason, :created_at, :expires_at, :scope_ids,
+               :session_id, :repo_id, :agent_id, :user_id
+             )",
+            named_params! {
+                ":id": pin.id,
+                ":target_type": pin_target_type_to_str(pin.target_type),
+                ":target_id": pin.target_id,
+                ":reason": pin.reason,
+                ":created_at": pin.created_at,
+                ":expires_at": pin.expires_at,
+                ":scope_ids": serde_json::to_string(&pin.scope_ids)?,
+                ":session_id": pin.scope_ids.session_id,
+                ":repo_id": pin.scope_ids.repo_id,
+                ":agent_id": pin.scope_ids.agent_id,
+                ":user_id": pin.scope_ids.user_id,
+            },
+        )?;
+        Ok(changes > 0)
+    }
+
+    /// Aggregate counts + database size for the `status` verb. Mirrors the
+    /// pragmas + `COUNT(*)` queries in
+    /// `packages/kindling-cli/src/commands/status.ts`.
+    pub fn database_stats(&self) -> StoreResult<DatabaseStats> {
+        let count =
+            |sql: &str| -> StoreResult<i64> { Ok(self.conn.query_row(sql, [], |row| row.get(0))?) };
+        let observations = count("SELECT COUNT(*) FROM observations")?;
+        let capsules = count("SELECT COUNT(*) FROM capsules")?;
+        let summaries = count("SELECT COUNT(*) FROM summaries")?;
+        let pins = count("SELECT COUNT(*) FROM pins")?;
+        let redacted = count("SELECT COUNT(*) FROM observations WHERE redacted = 1")?;
+        let open_capsules = count("SELECT COUNT(*) FROM capsules WHERE status = 'open'")?;
+        let latest_ts: Option<i64> = self
+            .conn
+            .query_row("SELECT MAX(ts) FROM observations", [], |row| row.get(0))
+            .optional()?
+            .flatten();
+
+        let page_count: i64 = self
+            .conn
+            .query_row("PRAGMA page_count", [], |row| row.get(0))?;
+        let page_size: i64 = self
+            .conn
+            .query_row("PRAGMA page_size", [], |row| row.get(0))?;
+
+        Ok(DatabaseStats {
+            observations,
+            capsules,
+            summaries,
+            pins,
+            redacted,
+            open_capsules,
+            latest_ts,
+            size_bytes: page_count * page_size,
+        })
+    }
+
     fn hydrate_capsule(&self, raw: RawCapsule) -> StoreResult<Capsule> {
         let mut stmt = self.conn.prepare(
             "SELECT observation_id FROM capsule_observations WHERE capsule_id = ?1 ORDER BY seq",
@@ -518,6 +789,22 @@ impl SqliteKindlingStore {
             .collect::<Result<Vec<_>, _>>()?;
         raw.into_capsule(observation_ids)
     }
+}
+
+/// Aggregate database statistics returned by
+/// [`SqliteKindlingStore::database_stats`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DatabaseStats {
+    pub observations: i64,
+    pub capsules: i64,
+    pub summaries: i64,
+    pub pins: i64,
+    pub redacted: i64,
+    pub open_capsules: i64,
+    /// Newest observation timestamp, or `None` when there are no observations.
+    pub latest_ts: Option<Timestamp>,
+    /// `page_count * page_size`.
+    pub size_bytes: i64,
 }
 
 fn now_ms() -> Timestamp {
