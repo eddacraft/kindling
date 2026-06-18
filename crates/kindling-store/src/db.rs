@@ -25,7 +25,7 @@ pub struct StoreOptions {
     pub readonly: bool,
 }
 
-/// Open and initialize a Kindling database at `path`.
+/// Open and initialize a kindling database at `path`.
 ///
 /// Creates parent directories as needed (read-write mode only), configures
 /// the connection, applies the canonical schema to fresh databases, and

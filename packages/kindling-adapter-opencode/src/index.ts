@@ -1,5 +1,5 @@
 /**
- * Kindling OpenCode Adapter
+ * kindling OpenCode Adapter
  *
  * Captures observations from OpenCode development sessions.
  */

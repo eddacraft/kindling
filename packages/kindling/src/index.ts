@@ -1,7 +1,7 @@
 /**
  * @eddacraft/kindling
  *
- * Thin TypeScript client for the Kindling daemon — the Rust-canonical local
+ * Thin TypeScript client for the kindling daemon — the Rust-canonical local
  * memory and continuity engine for AI-assisted development.
  *
  * This package no longer bundles an implementation. It speaks the daemon's v1
@@ -48,12 +48,7 @@ export {
 } from './config.js';
 
 // Typed errors.
-export {
-  KindlingError,
-  DaemonUnavailableError,
-  ApiError,
-  SchemaMismatchError,
-} from './errors.js';
+export { KindlingError, DaemonUnavailableError, ApiError, SchemaMismatchError } from './errors.js';
 
 // Transport constant (project header name) for advanced consumers.
 export { PROJECT_HEADER } from './transport.js';

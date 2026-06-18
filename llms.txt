@@ -1,8 +1,8 @@
-# Kindling
+# kindling
 
 > A lightweight library for adding durable memory and contextual continuity to AI-assisted workflows. Captures observations, organises into capsules, retrieves with provenance. Local-first, embedded SQLite, no external services.
 
-Kindling is infrastructure — it captures context but does not assert truth. Governance and promotion belong to downstream systems.
+kindling is infrastructure — it captures context but does not assert truth. Governance and promotion belong to downstream systems.
 
 ## Docs
 

@@ -139,7 +139,7 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
 
-# Anvil
+# anvil
 .anvil/cache/
 .anvil/evidence/
 .anvil/*.log

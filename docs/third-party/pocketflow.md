@@ -2,7 +2,7 @@
 
 ## Overview
 
-PocketFlow is a lightweight workflow engine that provides explicit node boundaries and execution structure. Kindling uses PocketFlow's node lifecycle events to create high-signal memory capsules.
+PocketFlow is a lightweight workflow engine that provides explicit node boundaries and execution structure. kindling uses PocketFlow's node lifecycle events to create high-signal memory capsules.
 
 ## Source
 
@@ -12,7 +12,7 @@ PocketFlow is a lightweight workflow engine that provides explicit node boundari
 
 ## License Compatibility
 
-PocketFlow uses the MIT license, which is compatible with Kindling's Apache-2.0 license:
+PocketFlow uses the MIT license, which is compatible with kindling's Apache-2.0 license:
 
 - MIT allows commercial use, modification, distribution
 - MIT requires license notice preservation

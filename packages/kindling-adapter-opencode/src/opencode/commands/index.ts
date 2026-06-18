@@ -1,7 +1,7 @@
 /**
  * Memory commands for OpenCode
  *
- * CLI-style commands for interacting with Kindling memory from OpenCode.
+ * CLI-style commands for interacting with kindling memory from OpenCode.
  */
 
 export * from './status.js';

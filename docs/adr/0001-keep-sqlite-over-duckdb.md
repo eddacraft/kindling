@@ -2,12 +2,12 @@
 
 - Status: Accepted
 - Date: 2026-05-14
-- Deciders: Kindling maintainers
+- Deciders: kindling maintainers
 - Tags: storage, retrieval, embedded-db
 
 ## Context
 
-Kindling persists observations (tool calls, diffs, commands, errors, workflow
+kindling persists observations (tool calls, diffs, commands, errors, workflow
 events) and capsules (bounded units of meaning) into an embedded database.
 Today this is SQLite, accessed through `better-sqlite3` on Node and `sql.js`
 in the browser, with FTS5 powering full-text retrieval and WAL mode enabling
@@ -21,7 +21,7 @@ decision on whether to make that swap.
 
 ### Workload shape
 
-Kindling's workload is dominated by:
+kindling's workload is dominated by:
 
 - High-frequency, small writes (one row per observation, often many per
   second during an active session).
@@ -38,7 +38,7 @@ This is an OLTP profile with a search index on top — not an OLAP profile.
 
 **Keep SQLite as the primary embedded store. Do not replace it with DuckDB.**
 
-Reconsider only if Kindling grows a first-class analytics surface (e.g.
+Reconsider only if kindling grows a first-class analytics surface (e.g.
 cross-session insights, large-window aggregations over millions of
 observations) that SQLite cannot serve efficiently. In that scenario, the
 preferred path is to add DuckDB as a secondary read-only analytics engine
@@ -53,13 +53,13 @@ than to migrate the source of truth.
    small write transactions from multiple processes. DuckDB's storage is
    columnar and optimised for bulk loads and analytical scans; single-row
    inserts and short transactions are not its strength.
-2. **Concurrency model fits.** SQLite's WAL gives Kindling multi-reader /
+2. **Concurrency model fits.** SQLite's WAL gives kindling multi-reader /
    single-writer semantics across processes, which is exactly what the
    adapter + server + CLI topology needs. DuckDB historically restricts
    write access to a single process at a time, which would force every
    writer through `kindling-server` and remove the option of direct
    in-process writes.
-3. **FTS5 is the retrieval backbone.** Kindling's retrieval contract
+3. **FTS5 is the retrieval backbone.** kindling's retrieval contract
    depends on FTS5's tokenisers, ranking, and snippet generation. DuckDB's
    `fts` extension exists but is less mature, lacks feature parity, and
    would require re-implementing the deterministic ranking we rely on.
@@ -76,13 +76,13 @@ than to migrate the source of truth.
 ### Why DuckDB is tempting
 
 - Excellent analytical SQL (window functions, complex aggregations, joins
-  across large tables) — useful if Kindling ever exposes cross-session
+  across large tables) — useful if kindling ever exposes cross-session
   analytics.
 - Columnar storage compresses well for append-only observation logs.
 - Native Parquet/Arrow interop would simplify exporting observation
   history for offline analysis.
 
-These are real strengths, but they address a workload Kindling does not
+These are real strengths, but they address a workload kindling does not
 have today.
 
 ## Consequences
@@ -118,7 +118,7 @@ have today.
 ## Alternatives Considered
 
 1. **Full swap to DuckDB (rejected).** Discussed above; trades a strong
-   OLTP+FTS fit for OLAP strengths Kindling does not currently need.
+   OLTP+FTS fit for OLAP strengths kindling does not currently need.
 2. **Dual-write to SQLite and DuckDB (rejected for now).** Doubles write
    cost and operational surface area without a concrete consumer for the
    DuckDB side.

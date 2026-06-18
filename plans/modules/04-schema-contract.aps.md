@@ -10,7 +10,7 @@ Extract the SQLite schema from the TypeScript migration files into a standalone,
 
 ## Background
 
-This work was requested by the Anvil agents after reviewing what the Rust crate needs to be a compatible writer. The TypeScript store is correct and does not need to change — it just needs its schema documented externally so the Rust side can implement against a known contract.
+This work was requested by the anvil agents after reviewing what the Rust crate needs to be a compatible writer. The TypeScript store is correct and does not need to change — it just needs its schema documented externally so the Rust side can implement against a known contract.
 
 ## In Scope
 

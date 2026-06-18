@@ -18,7 +18,7 @@ export function getDefaultDbPath(): string {
 }
 
 /**
- * Initialize Kindling service with database
+ * Initialize kindling service with database
  *
  * @param dbPath - Optional database path (defaults to ~/.kindling/kindling.db)
  * @returns Service instance and database instance

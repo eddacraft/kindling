@@ -3,7 +3,7 @@
  *
  * An IntentEvent is an append-only record of what a developer or agent
  * intended, under what constraints, and in what execution context. It is
- * the canonical capture contract consumed downstream (e.g., Anvil), so
+ * the canonical capture contract consumed downstream (e.g., anvil), so
  * field names use snake_case as the stable interchange format — unlike
  * the camelCase used by in-process domain types.
  *

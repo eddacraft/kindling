@@ -3,7 +3,7 @@
  *
  * MIGRATION NOTE (PORT-019): this command redacted observations through the
  * in-process store's `redactObservation`. The thin
- * {@link import('@eddacraft/kindling').Kindling} client / daemon exposes NO
+ * {@link import('@eddacraft/kindling').kindling} client / daemon exposes NO
  * redaction endpoint, so the command cannot be wired to the daemon. It is kept
  * as a clearly-marked stub (so the command surface and its formatter stay
  * stable) that always reports the operation as unsupported. Re-enable once the
@@ -43,7 +43,7 @@ export function memoryForget(options: ForgetOptions): ForgetResult {
   return {
     observationId: options.observationId,
     redacted: false,
-    error: 'forget is not supported by the Kindling daemon (no redaction endpoint)',
+    error: 'forget is not supported by the kindling daemon (no redaction endpoint)',
   };
 }
 

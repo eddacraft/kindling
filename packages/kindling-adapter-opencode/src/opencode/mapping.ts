@@ -1,7 +1,7 @@
 /**
  * Event to observation mapping
  *
- * Maps OpenCode events to Kindling observations with provenance.
+ * Maps OpenCode events to kindling observations with provenance.
  */
 
 import type { ObservationKind, ObservationInput, ScopeIds } from '@eddacraft/kindling';
@@ -15,7 +15,7 @@ import {
 } from './provenance.js';
 
 /**
- * Mapping from OpenCode event types to Kindling observation kinds
+ * Mapping from OpenCode event types to kindling observation kinds
  */
 export const EVENT_TO_KIND_MAP: Record<string, ObservationKind> = {
   tool_call: 'tool_call',
@@ -38,7 +38,7 @@ export interface MapEventResult {
 }
 
 /**
- * Map an OpenCode event to a Kindling observation
+ * Map an OpenCode event to a kindling observation
  *
  * @param event - OpenCode event to map
  * @returns Mapped observation or error

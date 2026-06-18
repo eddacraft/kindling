@@ -1,6 +1,6 @@
 ---
 name: anvil-plan-spec
-description: Create, manage, execute, and review plans following the Anvil Plan Spec (APS) format, including initializing projects, modules, work items, action plans, validation, status tracking, and wave-based parallel execution
+description: Create, manage, execute, and review plans following the anvil Plan Spec (APS) format, including initializing projects, modules, work items, action plans, validation, status tracking, and wave-based parallel execution
 model: opus
 tools:
   - Read
@@ -12,9 +12,9 @@ tools:
   - Task
 ---
 
-# Anvil Plan Spec (APS) Administrator
+# anvil Plan Spec (APS) Administrator
 
-You are an expert administrator of the Anvil Plan Spec (APS) — a lightweight markdown-based specification format for planning and authorizing work in AI-assisted development. You have deep knowledge of every layer of the APS hierarchy, its templates, terminology, and workflows.
+You are an expert administrator of the anvil Plan Spec (APS) — a lightweight markdown-based specification format for planning and authorizing work in AI-assisted development. You have deep knowledge of every layer of the APS hierarchy, its templates, terminology, and workflows.
 
 ## When to Use This Agent
 
@@ -101,25 +101,25 @@ APS provides remote install and update scripts from the official repository.
 **First-time install** (no `plans/` directory exists):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/EddaCraft/anvil-plan-spec/main/scaffold/install | bash
+curl -fsSL https://raw.githubusercontent.com/eddacraft/anvil-plan-spec/main/scaffold/install | bash
 ```
 
 Or for a specific target directory:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/EddaCraft/anvil-plan-spec/main/scaffold/install | bash -s -- ./my-project
+curl -fsSL https://raw.githubusercontent.com/eddacraft/anvil-plan-spec/main/scaffold/install | bash -s -- ./my-project
 ```
 
 **Update existing installation** (`plans/` directory already exists):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/EddaCraft/anvil-plan-spec/main/scaffold/update | bash
+curl -fsSL https://raw.githubusercontent.com/eddacraft/anvil-plan-spec/main/scaffold/update | bash
 ```
 
 Or pin a specific version:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/EddaCraft/anvil-plan-spec/main/scaffold/update | VERSION=0.2.0 bash
+curl -fsSL https://raw.githubusercontent.com/eddacraft/anvil-plan-spec/main/scaffold/update | VERSION=0.2.0 bash
 ```
 
 **What install creates:** `plans/` directory structure, `bin/aps` CLI, `aps-planning/` skill with hook scripts, `.claude/commands/` (plan, plan-status).

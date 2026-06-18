@@ -1,6 +1,6 @@
-//! Kindling daemon — HTTP API over a Unix domain socket.
+//! kindling daemon — HTTP API over a Unix domain socket.
 //!
-//! A long-running per-user process that serves the Kindling v1 HTTP API,
+//! A long-running per-user process that serves the kindling v1 HTTP API,
 //! wrapping the in-process [`kindling_service::KindlingService`]. This is the
 //! `kindling serve` backend; the CLI wiring lives in a later task (PORT-013).
 //! This crate exposes a library surface so it can be both unit/integration

@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `onStop` - Closes session capsules with optional summary
   - `onUserPromptSubmit` - Captures user messages
   - `onSubagentStop` - Captures subagent completions
-- Event mapping from Claude Code hooks to Kindling observations:
+- Event mapping from Claude Code hooks to kindling observations:
   - Write/Edit tools → `file_diff` observations
   - Bash tool → `command` observations
   - Other tools → `tool_call` observations

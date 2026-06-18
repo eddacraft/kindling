@@ -1,6 +1,6 @@
 [package]
 name = "kindling-store"
-description = "SQLite persistence for Kindling against schema/schema.sql — rusqlite (bundled), FTS5, WAL mode, per-project DB isolation."
+description = "SQLite persistence for kindling against schema/schema.sql — rusqlite (bundled), FTS5, WAL mode, per-project DB isolation."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

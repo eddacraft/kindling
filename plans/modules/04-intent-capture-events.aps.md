@@ -1,4 +1,4 @@
-# Intent Capture Events (Kindling)
+# Intent Capture Events (kindling)
 
 | ID      | Owner  | Status |
 | ------- | ------ | ------ |
@@ -6,12 +6,12 @@
 
 ## Purpose
 
-Define and ship Kindling's first-class **intent capture primitive**: a low-friction,
+Define and ship kindling's first-class **intent capture primitive**: a low-friction,
 append-only event stream that records what a developer/agent intended, under what
 constraints, and in what execution context.
 
 This turns intent into durable, queryable input for downstream governance and
-verification systems (Anvil), while keeping capture close to the developer workflow.
+verification systems (anvil), while keeping capture close to the developer workflow.
 
 ## In Scope
 
@@ -25,7 +25,7 @@ verification systems (Anvil), while keeping capture close to the developer workf
 
 ## Out of Scope
 
-- Central policy evaluation (Anvil-owned)
+- Central policy evaluation (anvil-owned)
 - Merge/deploy gate decisions
 - Full semantic interpretation of intent quality
 - Team/org multi-tenant data governance
@@ -34,7 +34,7 @@ verification systems (Anvil), while keeping capture close to the developer workf
 
 **Depends on:**
 
-- Existing Kindling hook runtime and storage adapters
+- Existing kindling hook runtime and storage adapters
 - `@eddacraft/kindling-core` event bus abstractions
 
 **Exposes:**
@@ -42,7 +42,7 @@ verification systems (Anvil), while keeping capture close to the developer workf
 - `IntentEvent` schema + TypeScript types
 - `kindling intent status` (capture health)
 - `kindling intent export --since <ref>` JSONL bundle
-- Stable export contract for Anvil ingestion
+- Stable export contract for anvil ingestion
 
 ## Ready Checklist
 
@@ -156,7 +156,7 @@ interface IntentEvent {
   path syntax are the parity contract owed by the Rust port. 14 tests under
   `-t "intent redaction"`. Unblocks KINTENT-005 export.
 
-### KINTENT-005: Implement export command for Anvil ingestion
+### KINTENT-005: Implement export command for anvil ingestion
 
 - **Intent:** Provide deterministic transfer of intent records downstream.
 - **Expected Outcome:** `kindling intent export` outputs signed/hashed JSONL bundle with metadata manifest.
@@ -164,7 +164,7 @@ interface IntentEvent {
 - **Dependencies:** KINTENT-002, KINTENT-003, KINTENT-004
 - **Status:** Merged (PR #68, merged 2026-06-18)
 - **Notes:** Export seals a sequence range of persisted (already-redacted) intent
-  events into a portable, signed bundle for Anvil ingestion. The store's hash
+  events into a portable, signed bundle for anvil ingestion. The store's hash
   chain is un-keyed (tamper-_evident_); export adds the keyed authentication the
   store deferred — an **HMAC-SHA256** over a canonical manifest that binds the
   bundle body, the chain tip, the exported sequence range, and the event count.

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Publish the Kindling workspace crates to crates.io in dependency order.
+# Publish the kindling workspace crates to crates.io in dependency order.
 #
 # crates.io requires a crate's dependencies to already be published before it
 # can be published, so the order below is a topological sort of the intra-

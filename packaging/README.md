@@ -1,4 +1,4 @@
-# Kindling distribution
+# kindling distribution
 
 This directory holds the native-binary distribution artefacts for the `kindling`
 umbrella binary. They are consumed by end users through three channels, all of
@@ -8,11 +8,11 @@ target on release `published` and attaches
 `kindling-<version>-<target>.tar.gz` archives plus `.sha256` sidecars as release
 assets.
 
-| Channel | Artefact in this repo | What the user runs |
-| --- | --- | --- |
-| crates.io | `scripts/publish.sh` (order), vendored `crates/*/schema/` | `cargo install kindling` |
-| `curl \| sh` installer | `packaging/install.sh` | `curl -sSL https://install.kindling.dev \| sh` |
-| Homebrew | `packaging/homebrew/kindling.rb` | `brew install eddacraft/tap/kindling` |
+| Channel                | Artefact in this repo                                     | What the user runs                             |
+| ---------------------- | --------------------------------------------------------- | ---------------------------------------------- |
+| crates.io              | `scripts/publish.sh` (order), vendored `crates/*/schema/` | `cargo install kindling`                       |
+| `curl \| sh` installer | `packaging/install.sh`                                    | `curl -sSL https://install.kindling.dev \| sh` |
+| Homebrew               | `packaging/homebrew/kindling.rb`                          | `brew install eddacraft/tap/kindling`          |
 
 ## 1. crates.io
 
@@ -32,7 +32,7 @@ Publishing readiness (done in-repo by PORT-014):
 1. `cargo login <crates.io-token>` (or export `CARGO_REGISTRY_TOKEN`).
 2. Run [`scripts/publish.sh`](../scripts/publish.sh) — it publishes in
    dependency order: `types → filter → store → provider → service → client →
-   server → hook → cli → kindling`. crates.io needs a few seconds to index each
+server → hook → cli → kindling`. crates.io needs a few seconds to index each
    crate before the next dependent one resolves; the script pauses between
    publishes.
 

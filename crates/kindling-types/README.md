@@ -1,6 +1,6 @@
 # kindling-types
 
-Canonical Rust types for Kindling — observations, capsules, summaries, pins,
+Canonical Rust types for kindling — observations, capsules, summaries, pins,
 retrieval. The wire format mirrors the existing TypeScript shapes in
 `packages/kindling-core/src/types/` and is the contract every consumer
 (Rust, TS-via-daemon, future bindings) must agree on.

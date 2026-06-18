@@ -1,5 +1,5 @@
 /**
- * Tests for the OpenCode session lifecycle against a REAL Kindling daemon.
+ * Tests for the OpenCode session lifecycle against a REAL kindling daemon.
  *
  * `SessionManager` now persists through the thin {@link Kindling} client
  * (daemon-backed, async) instead of an in-process `CapsuleStore`. These tests

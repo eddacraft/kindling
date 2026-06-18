@@ -1,6 +1,6 @@
 # PocketFlow Capabilities
 
-This document describes what PocketFlow enables beyond core Kindling functionality. PocketFlow is vendored at `packages/kindling-adapter-pocketflow/vendor/pocketflow/`.
+This document describes what PocketFlow enables beyond core kindling functionality. PocketFlow is vendored at `packages/kindling-adapter-pocketflow/vendor/pocketflow/`.
 
 ## What is PocketFlow?
 
@@ -259,7 +259,7 @@ class StructuredNode extends Node<StructuredStore> {
 - Data extraction from documents
 - API response formatting
 
-## Kindling + PocketFlow Integration
+## kindling + PocketFlow Integration
 
 The `@eddacraft/kindling-adapter-pocketflow` package provides `KindlingNode` and `KindlingFlow` that automatically capture observations:
 
@@ -348,7 +348,7 @@ PocketFlow enables building sophisticated AI systems with minimal code:
 | MapReduce   | ~60           | Large data processing          |
 | Multi-Agent | ~100          | Coordinated specialists        |
 
-Combined with Kindling, you get:
+Combined with kindling, you get:
 
 - **Observability**: Every node invocation is captured
 - **Context**: Past invocations inform future decisions

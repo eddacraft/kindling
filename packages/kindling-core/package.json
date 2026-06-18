@@ -1,7 +1,7 @@
 {
   "name": "@eddacraft/kindling-core",
   "version": "0.1.3",
-  "description": "DEPRECATED: use @eddacraft/kindling instead. Core domain model and orchestration for Kindling - local memory engine for AI-assisted development",
+  "description": "DEPRECATED: use @eddacraft/kindling instead. Core domain model and orchestration for kindling - local memory engine for AI-assisted development",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -25,15 +25,15 @@
     "capsules",
     "retrieval"
   ],
-  "author": "EddaCraft <hello@eddacraft.ai>",
-  "homepage": "https://github.com/EddaCraft/kindling/tree/main/packages/kindling-core#readme",
+  "author": "eddacraft <hello@eddacraft.ai>",
+  "homepage": "https://github.com/eddacraft/kindling/tree/main/packages/kindling-core#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/EddaCraft/kindling.git",
+    "url": "git+https://github.com/eddacraft/kindling.git",
     "directory": "packages/kindling-core"
   },
   "bugs": {
-    "url": "https://github.com/EddaCraft/kindling/issues"
+    "url": "https://github.com/eddacraft/kindling/issues"
   },
   "license": "Apache-2.0",
   "scripts": {

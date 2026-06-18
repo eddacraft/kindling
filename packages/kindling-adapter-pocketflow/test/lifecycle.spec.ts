@@ -1,5 +1,5 @@
 /**
- * Tests for the PocketFlow lifecycle integration against a REAL Kindling daemon.
+ * Tests for the PocketFlow lifecycle integration against a REAL kindling daemon.
  *
  * The adapter now writes through the thin {@link Kindling} client (daemon-backed,
  * async) instead of an in-process store. These tests stand up the debug
@@ -90,9 +90,9 @@ describe.skipIf(!HAS_BINARY)('KindlingNode (live daemon)', () => {
         query: 'searchablenode',
         scopeIds: context.scopeIds,
       });
-      expect(
-        startHits.candidates.some((c) => c.entity.content.includes('searchablenode')),
-      ).toBe(true);
+      expect(startHits.candidates.some((c) => c.entity.content.includes('searchablenode'))).toBe(
+        true,
+      );
 
       const endHits = await context.kindling.retrieve({
         query: 'completed',
@@ -236,16 +236,12 @@ describe.skipIf(!HAS_BINARY)('KindlingFlow (live daemon)', () => {
       query: 'lifecycleflow',
       scopeIds: context.scopeIds,
     });
-    expect(
-      startHits.candidates.some((c) => c.entity.content.includes('lifecycleflow')),
-    ).toBe(true);
+    expect(startHits.candidates.some((c) => c.entity.content.includes('lifecycleflow'))).toBe(true);
 
     const endHits = await context.kindling.retrieve({
       query: 'completed',
       scopeIds: context.scopeIds,
     });
-    expect(
-      endHits.candidates.some((c) => c.entity.content.includes('lifecycleflow')),
-    ).toBe(true);
+    expect(endHits.candidates.some((c) => c.entity.content.includes('lifecycleflow'))).toBe(true);
   });
 });

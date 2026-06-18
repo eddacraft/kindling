@@ -7,7 +7,7 @@
  * URL). This module masks that content *before* it is persisted or exported,
  * while recording — in the event's existing {@link IntentRedaction} block —
  * exactly which field paths were touched and under which policy. Governance
- * consumers (Anvil) thus learn *that* and *where* redaction happened without
+ * consumers (anvil) thus learn *that* and *where* redaction happened without
  * ever seeing the secret.
  *
  * ## Mechanism, not policy

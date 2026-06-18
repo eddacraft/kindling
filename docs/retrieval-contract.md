@@ -2,7 +2,7 @@
 
 ## Overview
 
-Kindling retrieval is **deterministic**, **scoped**, and **explainable**. The same query with the same context always produces the same results. All results include provenance, explaining why they were returned.
+kindling retrieval is **deterministic**, **scoped**, and **explainable**. The same query with the same context always produces the same results. All results include provenance, explaining why they were returned.
 
 Retrieval combines three sources in a tiered structure:
 
@@ -438,7 +438,7 @@ Each result type has built-in provenance:
 
 ## Determinism Guarantees
 
-Kindling retrieval is **deterministic** under these conditions:
+kindling retrieval is **deterministic** under these conditions:
 
 1. **Same query** — Identical query string
 2. **Same scope** — Identical `scopeIds`
@@ -462,7 +462,7 @@ Kindling retrieval is **deterministic** under these conditions:
 
 ### Caching
 
-Kindling does **not cache retrieval results** by default (to preserve determinism).
+kindling does **not cache retrieval results** by default (to preserve determinism).
 
 Adapters may implement caching if:
 

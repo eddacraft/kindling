@@ -1,6 +1,6 @@
-# Kindling Schema Contract
+# kindling Schema Contract
 
-This directory contains the **cross-language SQLite schema contract** for Kindling. Both the TypeScript store (`@eddacraft/kindling-store-sqlite`) and the Rust crate implement against the files here.
+This directory contains the **cross-language SQLite schema contract** for kindling. Both the TypeScript store (`@eddacraft/kindling-store-sqlite`) and the Rust crate implement against the files here.
 
 ## Files
 

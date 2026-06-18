@@ -1,6 +1,6 @@
 [package]
 name = "kindling-service"
-description = "In-process Kindling orchestration API — open/close capsule, append observation, retrieve, pin, unpin. Used by the daemon and by direct Rust consumers (Anvil, headless workflows)."
+description = "In-process kindling orchestration API — open/close capsule, append observation, retrieve, pin, unpin. Used by the daemon and by direct Rust consumers (anvil, headless workflows)."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

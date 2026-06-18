@@ -1,5 +1,5 @@
 /**
- * sql.js Kindling Store - Write and Read Path
+ * sql.js kindling Store - Write and Read Path
  *
  * Provides atomic, deterministic writes for observations, capsules, summaries, and pins
  * using sql.js (WASM SQLite) for browser compatibility.
@@ -61,7 +61,7 @@ function getAll<T>(result: QueryExecResult[]): T[] {
 }
 
 /**
- * sql.js-based Kindling store implementation
+ * sql.js-based kindling store implementation
  *
  * This is a drop-in replacement for SqliteKindlingStore that uses
  * sql.js instead of better-sqlite3, enabling browser compatibility.

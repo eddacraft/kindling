@@ -1,5 +1,5 @@
 /**
- * Kindling Local Provider
+ * kindling Local Provider
  *
  * FTS + recency-based retrieval provider.
  */
@@ -10,7 +10,7 @@ if (!(globalThis as Record<string, unknown>)[KEY]) {
   (globalThis as Record<string, unknown>)[KEY] = true;
   console.warn(
     '[DEPRECATED] @eddacraft/kindling-provider-local is deprecated and will be removed at v1.0.0. ' +
-      'Kindling is now a Rust daemon; use @eddacraft/kindling (thin client) or the `kindling` binary. ' +
+      'kindling is now a Rust daemon; use @eddacraft/kindling (thin client) or the `kindling` binary. ' +
       'See https://github.com/eddacraft/kindling.',
   );
 }

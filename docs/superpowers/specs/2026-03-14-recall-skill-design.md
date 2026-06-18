@@ -6,7 +6,7 @@
 
 ## Overview
 
-A Claude Code skill that teaches agents how to retrieve and use local memory from Kindling. The skill is a retrieval protocol — it defines when to check memory, how to query, how to interpret results, and when to pin findings. It targets agents primarily but is usable by anyone.
+A Claude Code skill that teaches agents how to retrieve and use local memory from kindling. The skill is a retrieval protocol — it defines when to check memory, how to query, how to interpret results, and when to pin findings. It targets agents primarily but is usable by anyone.
 
 The skill orchestrates existing `/memory` commands (`search`, `status`, `pin`, `pins`, `unpin`) — no new tooling required. The skill's description must not conflict with existing command descriptions — the commands are tools, the skill is the protocol for using them.
 

@@ -1,4 +1,4 @@
-# Homebrew formula for Kindling.
+# Homebrew formula for kindling.
 #
 # This formula belongs in the `eddacraft/tap` tap repository
 # (github.com/eddacraft/homebrew-tap). Copy it to `Formula/kindling.rb` there.

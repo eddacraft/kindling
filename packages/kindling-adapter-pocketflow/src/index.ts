@@ -1,5 +1,5 @@
 /**
- * Kindling PocketFlow Adapter
+ * kindling PocketFlow Adapter
  *
  * PocketFlow workflow integration for node-level capsules.
  * Captures node execution lifecycle as observations with intent

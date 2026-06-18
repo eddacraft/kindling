@@ -4,7 +4,7 @@
 //! [`ClientError::Unavailable`](kindling_client::ClientError::Unavailable) when
 //! the daemon is down. A producer that wants its observations to survive a
 //! daemon outage therefore has to reinvent a local fallback (this is exactly
-//! why Anvil grew a `usage.ndjson`). [`SpooledClient`] centralizes that once.
+//! why anvil grew a `usage.ndjson`). [`SpooledClient`] centralizes that once.
 //!
 //! # The contract
 //!

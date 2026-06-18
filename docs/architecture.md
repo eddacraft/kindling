@@ -2,7 +2,7 @@
 
 ## Overview
 
-Kindling is a local-first memory and continuity engine for AI-assisted development. It captures observations from development sessions, organizes them into capsules (bounded units of meaning), and provides deterministic, explainable retrieval.
+kindling is a local-first memory and continuity engine for AI-assisted development. It captures observations from development sessions, organizes them into capsules (bounded units of meaning), and provides deterministic, explainable retrieval.
 
 The architecture is deliberately layered to separate concerns:
 
@@ -17,7 +17,7 @@ The architecture is deliberately layered to separate concerns:
 1. **Local-first** - No external services; embedded SQLite
 2. **Deterministic** - Same query, same context produces same results
 3. **Explainable** - Every result has provenance
-4. **Infrastructure, not truth** - Kindling captures what happened; it does not assert organizational authority
+4. **Infrastructure, not truth** - kindling captures what happened; it does not assert organizational authority
 
 ## System Diagram
 
@@ -34,7 +34,7 @@ The architecture is deliberately layered to separate concerns:
      │  @eddacraft/kindling (Main Package)      │
      │                                          │
      │  ┌────────────────────────────────────┐  │
-     │  │  Kindling Core                     │  │
+     │  │  kindling Core                     │  │
      │  │  - Observation ingestion           │  │
      │  │  - Capsule lifecycle               │  │
      │  │  - Retrieval orchestration         │  │
@@ -241,7 +241,7 @@ The architecture is deliberately layered to separate concerns:
 
 ## Scoping and Multi-tenancy
 
-Kindling supports scoped queries via `ScopeIds`:
+kindling supports scoped queries via `ScopeIds`:
 
 - `sessionId` - isolate by session (e.g., OpenCode session)
 - `repoId` - isolate by repository
@@ -318,7 +318,7 @@ migrations/
 
 ## Configuration
 
-Kindling is configured via:
+kindling is configured via:
 
 1. **Environment variables**
    - `KINDLING_DB_PATH` - override default DB location
@@ -330,7 +330,7 @@ Kindling is configured via:
 
 ## Non-Goals (Explicit Out of Scope)
 
-- **Organizational truth** - Kindling does not promote or curate memory
+- **Organizational truth** - kindling does not promote or curate memory
 - **Governance workflows** - No approval, conflict resolution, lifecycle management
 - **Multi-user access control** - Local-first; single-user by default
 - **Cloud/server modes** - Embedded only

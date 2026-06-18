@@ -1,4 +1,4 @@
-# Patterns from Atuin Applicable to Kindling
+# Patterns from Atuin Applicable to kindling
 
 Research date: 2026-02-23
 Source: https://github.com/atuinsh/atuin
@@ -12,7 +12,7 @@ provides interactive full-screen TUI search (replacing Ctrl+R), optional E2E
 encrypted sync across machines, and has expanded into dotfiles management and
 executable runbooks. 200k+ developers use it.
 
-Both Atuin and Kindling share core architectural DNA: local SQLite storage,
+Both Atuin and kindling share core architectural DNA: local SQLite storage,
 scope-based filtering, hook-driven context capture, and local-first design with
 optional sync. The differences are in domain (shell commands vs AI workflow
 observations) and maturity of specific subsystems.
@@ -27,7 +27,7 @@ observations) and maturity of specific subsystems.
 inside a git repo, filtering history to commands from _any_ directory within that
 repo's tree. No flags required.
 
-**Kindling opportunity:** Kindling has `repoId` as a scope dimension but it
+**kindling opportunity:** kindling has `repoId` as a scope dimension but it
 requires explicit passing (`--repo`). Auto-detecting the current git repo root
 from `cwd` at retrieval time and defaulting `repoId` to it would make search
 contextual by default. The Claude Code adapter and CLI could both do this.
@@ -40,7 +40,7 @@ scope population in CLI search and adapter hooks.
 **Atuin pattern:** Stores exit code, duration (nanoseconds), and working
 directory per command.
 
-**Kindling opportunity:** The `command` observation type captures the command
+**kindling opportunity:** The `command` observation type captures the command
 text but not its outcome. Enriching `provenance` (already a JSON field) with
 `exitCode`, `durationMs`, and `cwd` would improve retrieval ranking — failed
 commands and long-running commands are disproportionately worth remembering.
@@ -55,7 +55,7 @@ JSON. Adapter-side changes only.
 distributions, configurable subcommand grouping (e.g. `kubectl get` not just
 `kubectl`).
 
-**Kindling opportunity:** `kindling stats` could show:
+**kindling opportunity:** `kindling stats` could show:
 
 - Observation counts by kind over time
 - Most-referenced capsules
@@ -73,7 +73,7 @@ All queryable from the existing schema with straightforward SQL.
 **Atuin pattern:** `atuin search --exit 0 --after "yesterday 3pm" make` —
 combining content matching with structured metadata filters.
 
-**Kindling opportunity:** Current `kindling search` takes a query and optional
+**kindling opportunity:** Current `kindling search` takes a query and optional
 `--session`/`--repo`. Adding filters:
 
 - `--kind error|command|file_diff|...`
@@ -96,7 +96,7 @@ provider and orchestrator already support scope filtering.
 modes (session / directory / host / global / workspace). `Alt+number` quick
 jump, `Ctrl+O` command inspector, tab-to-edit.
 
-**Kindling opportunity:** Kindling's CLI search returns results and exits. An
+**kindling opportunity:** kindling's CLI search returns results and exits. An
 interactive mode where you type queries, toggle scope filters in real-time,
 preview capsule/observation contents, and select results to expand would be a
 significant usability upgrade. Consider `ink` (React for CLIs), `blessed`, or
@@ -110,14 +110,14 @@ significant usability upgrade. Consider `ink` (React for CLIs), `blessed`, or
 its own random encryption key, which is then wrapped with the master key. Server
 never sees plaintext. Key rotation only re-wraps keys, not data.
 
-**Kindling opportunity:** Current sync is GitHub-based (push to private repo,
+**kindling opportunity:** Current sync is GitHub-based (push to private repo,
 cleartext in the repo). Adopting a wrapped-key model where observation/capsule
 content is encrypted before leaving the machine would be a stronger privacy
 guarantee. The sync index (capsule IDs, timestamps, types) could stay cleartext
 for discoverability while content stays encrypted.
 
 **Design note:** Atuin's per-host record chains eliminate merge conflicts — each
-machine owns its own append-only stream. Kindling's capsules are already
+machine owns its own append-only stream. kindling's capsules are already
 scoped by sessionId/repoId, making a similar conflict-free design natural.
 
 **Effort:** Medium-high. New encryption module, key management UX, migration
@@ -128,7 +128,7 @@ path for existing synced data.
 **Atuin pattern:** A "directory" filter scopes history to the exact current
 working directory (distinct from "workspace" which covers the whole repo).
 
-**Kindling opportunity:** In monorepos, `repoId` is too broad. A `directoryId`
+**kindling opportunity:** In monorepos, `repoId` is too broad. A `directoryId`
 or `cwd` field on observations would enable "what happened in this folder"
 queries. Useful for large projects with distinct subsystems.
 
@@ -143,7 +143,7 @@ queries. Useful for large projects with distinct subsystems.
 **Atuin pattern:** Hooks into bash/zsh/fish via preexec/precmd to capture every
 command automatically with zero friction.
 
-**Kindling opportunity:** Currently captures through AI-tool adapters only.
+**kindling opportunity:** Currently captures through AI-tool adapters only.
 Adding shell hooks would capture the full developer workflow — manual git,
 make, npm, docker commands that happen _between_ AI interactions. This makes
 memory much more complete and enables "what did I do to fix this last time"
@@ -157,7 +157,7 @@ is clean.
 
 **Atuin pattern:** Expanded into syncing aliases and env vars across machines.
 
-**Kindling opportunity:** Capsules could capture environment snapshots: tool
+**kindling opportunity:** Capsules could capture environment snapshots: tool
 versions, relevant config, env vars at session start. Enables "what was
 different about my environment when this worked" debugging. Not sync per se, but
 recording environment state as observations.
@@ -166,8 +166,8 @@ recording environment state as observations.
 
 **Atuin pattern:** Hostname per command, global sync, search across all machines.
 
-**Kindling opportunity:** The `userId` scope dimension exists but is unused. A
-multi-machine Kindling where memory spans devices ("I solved this on my laptop
+**kindling opportunity:** The `userId` scope dimension exists but is unused. A
+multi-machine kindling where memory spans devices ("I solved this on my laptop
 last week") would require real sync infrastructure but the scope model already
 supports it.
 
@@ -175,7 +175,7 @@ supports it.
 
 ## Design patterns to adopt (not features, but principles)
 
-| Atuin pattern                                                | Kindling equivalent                                    | Gap                                 |
+| Atuin pattern                                                | kindling equivalent                                    | Gap                                 |
 | ------------------------------------------------------------ | ------------------------------------------------------ | ----------------------------------- |
 | Never modifies original data (shell history file untouched)  | Observations are immutable, redaction replaces content | Already aligned                     |
 | Filter modes toggleable in real-time during search           | Retrieval scopes fixed per query                       | Interactive TUI would close this    |
@@ -194,7 +194,7 @@ supports it.
 - **Sync server infrastructure** — Operating a Rust server with PostgreSQL is
   significant complexity. GitHub-based sync fits local-first ethos better for
   now.
-- **Shell-as-primary-interface** — Kindling's primary consumers are AI tools,
+- **Shell-as-primary-interface** — kindling's primary consumers are AI tools,
   not humans typing in terminals. Shell integration is additive, not a pivot.
 
 ---

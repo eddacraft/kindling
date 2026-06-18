@@ -75,7 +75,7 @@ interface ContextBody {
 }
 
 /**
- * A thin async client for the Kindling daemon.
+ * A thin async client for the kindling daemon.
  *
  * Construct once and reuse; the client holds no live socket (one connection per
  * call) and is safe to share.

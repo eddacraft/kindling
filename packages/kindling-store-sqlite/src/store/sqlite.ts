@@ -1,5 +1,5 @@
 /**
- * SQLite Kindling Store - Write Path
+ * SQLite kindling Store - Write Path
  *
  * Provides atomic, deterministic writes for observations, capsules, summaries, and pins
  */
@@ -23,7 +23,7 @@ export interface EvidenceSnippet {
 }
 
 /**
- * SQLite-based Kindling store implementation
+ * SQLite-based kindling store implementation
  */
 export class SqliteKindlingStore {
   constructor(private db: Database.Database) {}

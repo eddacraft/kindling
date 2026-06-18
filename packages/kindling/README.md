@@ -5,7 +5,7 @@ Local memory and continuity engine for AI-assisted development.
 [![npm version](https://img.shields.io/npm/v/@eddacraft/kindling.svg)](https://www.npmjs.com/package/@eddacraft/kindling)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](../../LICENSE)
 
-**Kindling** captures observations (tool calls, diffs, commands, errors) from AI workflows, organizes them into capsules, and makes context retrievable with deterministic, explainable results. All data is stored locally using embedded SQLite with FTS5.
+**kindling** captures observations (tool calls, diffs, commands, errors) from AI workflows, organizes them into capsules, and makes context retrievable with deterministic, explainable results. All data is stored locally using embedded SQLite with FTS5.
 
 ## Installation
 
@@ -128,4 +128,4 @@ Apache-2.0
 
 ## Related
 
-- [Anvil](https://eddacraft.ai) — policy and enforcement layer for AI-assisted development; complements Kindling by enforcing what should happen rather than capturing what did.
+- [anvil](https://eddacraft.ai) — policy and enforcement layer for AI-assisted development; complements kindling by enforcing what should happen rather than capturing what did.

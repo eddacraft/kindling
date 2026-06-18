@@ -1,6 +1,6 @@
-# Contributing to Kindling
+# Contributing to kindling
 
-Thank you for your interest in contributing to Kindling! We welcome contributions from the community.
+Thank you for your interest in contributing to kindling! We welcome contributions from the community.
 
 ## Getting Started
 
@@ -12,7 +12,7 @@ Thank you for your interest in contributing to Kindling! We welcome contribution
 ### Development Setup
 
 ```bash
-git clone https://github.com/EddaCraft/kindling.git
+git clone https://github.com/eddacraft/kindling.git
 cd kindling
 pnpm install
 pnpm build
@@ -56,7 +56,7 @@ pnpm clean
 
 ## Branching Model
 
-Kindling uses a single permanent branch model with short-lived work branches:
+kindling uses a single permanent branch model with short-lived work branches:
 
 - `main` is the default branch, integration branch, and stable release branch.
   Always publishable to npm.
@@ -114,7 +114,7 @@ Prefixes:
 
 ## Scope Guardrails
 
-Kindling is infrastructure for local memory and continuity. Contributions should align with this scope.
+kindling is infrastructure for local memory and continuity. Contributions should align with this scope.
 
 ### In Scope
 
@@ -146,7 +146,7 @@ For net-new functionality, start with a design conversation. Open an issue descr
 
 - The problem you're solving
 - Your proposed approach (optional)
-- Why it belongs in Kindling
+- Why it belongs in kindling
 
 The maintainers will help decide whether it should move forward. Please wait for approval before opening a feature PR.
 
@@ -168,7 +168,7 @@ kindling/
 
 ## Questions?
 
-- **Issues**: [GitHub Issues](https://github.com/EddaCraft/kindling/issues)
+- **Issues**: [GitHub Issues](https://github.com/eddacraft/kindling/issues)
 - **Discussions**: Open an issue for questions about contributing
 
 ## License

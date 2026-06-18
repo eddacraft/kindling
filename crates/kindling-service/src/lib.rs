@@ -1,9 +1,9 @@
-//! In-process Kindling orchestration.
+//! In-process kindling orchestration.
 //!
 //! [`KindlingService`] exposes capsule lifecycle, observation append,
 //! retrieval, and pin management over the already-ported store, provider, and
 //! filter crates. Consumed in-process by the daemon (`kindling-server`), by the
-//! CLI, and directly by Rust integrators (e.g. Anvil headless flows).
+//! CLI, and directly by Rust integrators (e.g. anvil headless flows).
 //!
 //! Ports `KindlingService` from
 //! `packages/kindling-core/src/service/kindling-service.ts`. Two deliberate

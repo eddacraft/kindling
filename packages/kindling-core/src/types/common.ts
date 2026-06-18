@@ -1,5 +1,5 @@
 /**
- * Common types used across Kindling packages
+ * Common types used across kindling packages
  */
 
 /**

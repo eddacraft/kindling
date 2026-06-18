@@ -1,5 +1,5 @@
 /**
- * Shared helpers for the Kindling `/memory` slash-command scripts.
+ * Shared helpers for the kindling `/memory` slash-command scripts.
  *
  * These commands shell out to the `kindling` binary (the plugin's documented
  * prerequisite) and operate the per-project SQLite database in-process via the
@@ -90,7 +90,7 @@ function kindlingBin() {
  * soft with guidance.
  */
 function binaryUnavailable(detail) {
-  console.log('Kindling could not run the `kindling` binary.');
+  console.log('kindling could not run the `kindling` binary.');
   console.log('');
   console.log('The `kindling` binary is required for /memory commands.');
   console.log('Install it (see the plugin README) and ensure it is on your PATH,');

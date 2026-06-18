@@ -1,4 +1,4 @@
-//! Kindling — single-binary entry point.
+//! kindling — single-binary entry point.
 //!
 //! One artefact, `kindling`, exposes all three surfaces:
 //!

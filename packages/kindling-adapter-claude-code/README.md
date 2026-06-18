@@ -1,22 +1,22 @@
 # @eddacraft/kindling-adapter-claude-code
 
 > **⚠️ Deprecated** — this package is deprecated and will be removed at v1.0.0.
-> Kindling is now a Rust daemon. Use [`@eddacraft/kindling`](https://www.npmjs.com/package/@eddacraft/kindling)
+> kindling is now a Rust daemon. Use [`@eddacraft/kindling`](https://www.npmjs.com/package/@eddacraft/kindling)
 > (the thin HTTP-over-UDS client) or the `kindling` binary instead.
 > See <https://github.com/eddacraft/kindling>.
 
-Claude Code adapter for Kindling - capture tool calls and session context via hooks for memory continuity.
+Claude Code adapter for kindling - capture tool calls and session context via hooks for memory continuity.
 
 ## Overview
 
-This adapter integrates Kindling with [Claude Code](https://claude.ai/code) via its hooks system. It automatically captures:
+This adapter integrates kindling with [Claude Code](https://claude.ai/code) via its hooks system. It automatically captures:
 
 - **Tool calls** (Read, Write, Edit, Bash, Glob, Grep, etc.)
 - **User messages**
 - **Subagent completions**
 - **Session lifecycle** (start/stop)
 
-All captured events become searchable observations in Kindling, enabling context retrieval across sessions.
+All captured events become searchable observations in kindling, enabling context retrieval across sessions.
 
 ## Installation
 
@@ -73,7 +73,7 @@ The adapter provides handlers for Claude Code hooks. Register them in your `.cla
 
 ### `createHookHandlers(store, config?)`
 
-Creates hook handlers connected to a Kindling store.
+Creates hook handlers connected to a kindling store.
 
 ```typescript
 const handlers = createHookHandlers(store, {
@@ -193,7 +193,7 @@ The primary use case is maintaining context across Claude Code sessions:
    - Session closes with summary
 
 2. **Session 2**: "What did I work on yesterday?"
-   - Query Kindling: `service.retrieve({ query: 'authentication' })`
+   - Query kindling: `service.retrieve({ query: 'authentication' })`
    - Get back: relevant observations with provenance
 
 This enables Claude Code to "remember" what happened in previous sessions.

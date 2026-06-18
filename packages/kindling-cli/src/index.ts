@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Kindling CLI
+ * kindling CLI
  *
  * Command-line interface for inspecting, managing, and debugging local memory.
  */
@@ -24,7 +24,7 @@ if (!(globalThis as Record<string, unknown>)[DEPRECATION_KEY]) {
   (globalThis as Record<string, unknown>)[DEPRECATION_KEY] = true;
   process.stderr.write(
     '[DEPRECATED] @eddacraft/kindling-cli is deprecated and will be removed at v1.0.0. ' +
-      'Kindling is now a Rust daemon; use @eddacraft/kindling (thin client) or the `kindling` binary. ' +
+      'kindling is now a Rust daemon; use @eddacraft/kindling (thin client) or the `kindling` binary. ' +
       'See https://github.com/eddacraft/kindling.\n',
   );
 }
@@ -39,7 +39,7 @@ program
 // Init command
 program
   .command('init')
-  .description('Initialize Kindling (create database and configure hooks)')
+  .description('Initialize kindling (create database and configure hooks)')
   .option('--db <path>', 'Database path (default: ~/.kindling/kindling.db)')
   .option('--claude-code', 'Also configure Claude Code integration')
   .option('--skip-db', 'Skip database creation (only configure hooks)')
@@ -165,19 +165,19 @@ const syncCommand = program
 
 syncCommand
   .command('init')
-  .description('Initialize Kindling GitHub sync (ONCE globally)')
+  .description('Initialize kindling GitHub sync (ONCE globally)')
   .requiredOption('--repo <name>', 'GitHub repo (username/kindling-memory)')
   .option('--private', 'Create as private repo (recommended)')
   .action(syncInitCommand);
 
 syncCommand
   .command('add-submodule')
-  .description('Add Kindling memory as submodule to current project')
+  .description('Add kindling memory as submodule to current project')
   .action(syncAddSubmoduleCommand);
 
 syncCommand
   .command('push')
-  .description('Push current Kindling memory to GitHub')
+  .description('Push current kindling memory to GitHub')
   .option('--db <path>', 'Database path (default: ~/.kindling/kindling.db)')
   .option('--branch <name>', 'Branch to push to (default: main)')
   .option('--scope <value>', 'Scope filter: all|7d|30d (default: all)')

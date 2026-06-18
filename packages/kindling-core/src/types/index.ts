@@ -1,5 +1,5 @@
 /**
- * Kindling Core Types
+ * kindling Core Types
  *
  * Re-exports all domain types for convenient importing
  */

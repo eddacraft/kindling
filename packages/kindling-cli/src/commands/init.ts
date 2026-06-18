@@ -1,5 +1,5 @@
 /**
- * Init command - Initialize Kindling (create database and optionally configure hooks)
+ * Init command - Initialize kindling (create database and optionally configure hooks)
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync, cpSync } from 'fs';
@@ -126,7 +126,7 @@ async function configureClaudeCode(): Promise<{
     return {
       configured: false,
       pluginPath: '',
-      message: `Plugin source not found. Install manually:\n  git clone https://github.com/EddaCraft/kindling ${kindlingPluginDir}`,
+      message: `Plugin source not found. Install manually:\n  git clone https://github.com/eddacraft/kindling ${kindlingPluginDir}`,
     };
   }
 

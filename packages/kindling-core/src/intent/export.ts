@@ -2,7 +2,7 @@
  * Signed intent export bundle (KINTENT-005)
  *
  * Seals a sequence range of persisted intent events into a portable, signed
- * bundle for downstream ingestion (Anvil). Events handed here are already in
+ * bundle for downstream ingestion (anvil). Events handed here are already in
  * their persisted form — the redaction boundary (KINTENT-004) runs at the store
  * write path, so secrets never reach disk and therefore never reach an export.
  *

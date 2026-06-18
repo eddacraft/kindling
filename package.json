@@ -17,14 +17,14 @@
     "opencode",
     "pocketflow"
   ],
-  "author": "EddaCraft <hello@eddacraft.ai>",
-  "homepage": "https://github.com/EddaCraft/kindling#readme",
+  "author": "eddacraft <hello@eddacraft.ai>",
+  "homepage": "https://github.com/eddacraft/kindling#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/EddaCraft/kindling.git"
+    "url": "git+https://github.com/eddacraft/kindling.git"
   },
   "bugs": {
-    "url": "https://github.com/EddaCraft/kindling/issues"
+    "url": "https://github.com/eddacraft/kindling/issues"
   },
   "license": "Apache-2.0",
   "engines": {

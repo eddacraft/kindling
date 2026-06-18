@@ -1,6 +1,6 @@
 # @eddacraft/kindling-adapter-opencode
 
-OpenCode session adapter for Kindling - capture tool calls, commands, and file changes from AI coding sessions.
+OpenCode session adapter for kindling - capture tool calls, commands, and file changes from AI coding sessions.
 
 [![npm version](https://img.shields.io/npm/v/@eddacraft/kindling-adapter-opencode.svg)](https://www.npmjs.com/package/@eddacraft/kindling-adapter-opencode)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](../../LICENSE)

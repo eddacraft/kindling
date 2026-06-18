@@ -185,6 +185,6 @@ pub(crate) async fn request(
     _req: OutgoingRequest<'_>,
 ) -> Result<RawResponse, ClientError> {
     Err(ClientError::Unavailable(
-        "the Kindling client requires a Unix domain socket; Windows is not yet supported".into(),
+        "the kindling client requires a Unix domain socket; Windows is not yet supported".into(),
     ))
 }

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Kindling's data model is designed for **local-first memory capture** with **deterministic retrieval**. The model consists of five core entities:
+kindling's data model is designed for **local-first memory capture** with **deterministic retrieval**. The model consists of five core entities:
 
 1. **Observation** — atomic record of something that happened
 2. **Capsule** — bounded unit of meaning (session, workflow node)

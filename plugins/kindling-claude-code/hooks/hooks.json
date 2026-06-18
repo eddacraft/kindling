@@ -1,5 +1,5 @@
 {
-  "description": "Kindling memory capture and context injection hooks",
+  "description": "kindling memory capture and context injection hooks",
   "hooks": {
     "SessionStart": [
       {

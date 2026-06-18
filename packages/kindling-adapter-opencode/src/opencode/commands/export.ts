@@ -3,7 +3,7 @@
  *
  * MIGRATION NOTE (PORT-019): this command serialized a portable export bundle
  * via the in-process service's `createExportBundle` / `serializeBundle`. The
- * thin {@link import('@eddacraft/kindling').Kindling} client / daemon exposes NO
+ * thin {@link import('@eddacraft/kindling').kindling} client / daemon exposes NO
  * export endpoint, so the command cannot be wired to the daemon. It is kept as a
  * clearly-marked stub (so the command surface and its formatter stay stable)
  * that always reports the operation as unsupported. Re-enable once the daemon
@@ -53,7 +53,7 @@ export function memoryExport(_options: ExportOptions = {}): ExportResult {
   return {
     filePath: '',
     stats: { observations: 0, capsules: 0, summaries: 0, pins: 0 },
-    error: 'export is not supported by the Kindling daemon (no export endpoint)',
+    error: 'export is not supported by the kindling daemon (no export endpoint)',
   };
 }
 

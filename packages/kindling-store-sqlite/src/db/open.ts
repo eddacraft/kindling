@@ -43,7 +43,7 @@ function getDefaultDbPath(): string {
 }
 
 /**
- * Open and initialize a Kindling database
+ * Open and initialize a kindling database
  *
  * Opens database with:
  * - WAL mode (write-ahead logging) for better concurrency

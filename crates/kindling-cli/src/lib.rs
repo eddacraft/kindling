@@ -1,10 +1,10 @@
-//! Kindling CLI commands.
+//! kindling CLI commands.
 //!
 //! Defines the `clap` command tree ([`Cli`]) and handlers for the 12 CLI verbs.
 //! The default execution mode is **in-process** via [`kindling_service`]; the
 //! global `--via-daemon` flag switches the daemon-backed verbs (log, capsule
 //! open/close, search, pin, unpin, forget) to route through [`kindling_client`]
-//! for safe concurrent use alongside other Kindling tools.
+//! for safe concurrent use alongside other kindling tools.
 //!
 //! `export`/`import`/`status`/`list`/`init` are always in-process (they operate
 //! on the DB file directly or have no daemon endpoint). `serve` starts the UDS

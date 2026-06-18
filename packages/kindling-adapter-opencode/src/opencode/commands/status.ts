@@ -5,7 +5,7 @@
  *
  * MIGRATION NOTE (PORT-019): the old in-process command reported per-scope
  * counts (observations / capsules / summaries / pins) by querying the SQLite
- * store directly. The thin {@link import('@eddacraft/kindling').Kindling} client
+ * store directly. The thin {@link import('@eddacraft/kindling').kindling} client
  * / daemon exposes no such aggregate-count endpoint — only `GET /v1/health`
  * (version, schema version, touched projects). This command is therefore
  * reduced to reporting daemon health; the count breakdown is dropped until the
@@ -16,7 +16,7 @@
 /**
  * Health service interface.
  *
- * Satisfied by the {@link import('@eddacraft/kindling').Kindling} thin client —
+ * Satisfied by the {@link import('@eddacraft/kindling').kindling} thin client —
  * `memoryStatus` only needs its `health` method.
  */
 export interface HealthService {

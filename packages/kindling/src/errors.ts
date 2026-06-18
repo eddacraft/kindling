@@ -8,7 +8,7 @@
  *   - {@link SchemaMismatchError}    ⇔ `ClientError::SchemaMismatch`
  */
 
-/** Base class for all Kindling client errors. */
+/** Base class for all kindling client errors. */
 export class KindlingError extends Error {
   constructor(message: string) {
     super(message);
@@ -27,7 +27,7 @@ export class DaemonUnavailableError extends KindlingError {
     super(
       `kindling daemon unavailable: ${message}. ` +
         'Install the kindling binary or set KINDLING_BIN. ' +
-        'See https://github.com/EddaCraft/kindling#installation',
+        'See https://github.com/eddacraft/kindling#installation',
     );
   }
 }
@@ -58,9 +58,7 @@ export class SchemaMismatchError extends KindlingError {
   readonly actual: number;
 
   constructor(expected: number, actual: number) {
-    super(
-      `schema version mismatch: client expected ${expected}, daemon reports ${actual}`,
-    );
+    super(`schema version mismatch: client expected ${expected}, daemon reports ${actual}`);
     this.expected = expected;
     this.actual = actual;
   }

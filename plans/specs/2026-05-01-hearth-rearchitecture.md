@@ -5,14 +5,14 @@
 | Status    | Brainstorm / proposal — pre-ADR                                               |
 | Owner     | @joshuaboys                                                                   |
 | Created   | 2026-05-01                                                                    |
-| Scope     | EddaCraft stack across `eddacraft/anvil-001` + `eddacraft/kindling`           |
+| Scope     | eddacraft stack across `eddacraft/anvil-001` + `eddacraft/kindling`           |
 | Mirror of | `eddacraft/anvil-001` `plans/brainstorms/2026-05-01-hearth-rearchitecture.md` |
 
 **Locked-in decisions** (do not relitigate):
 
-1. Introduce a fifth named primitive — **Hearth** — the always-on local Rust daemon that hosts the Anvil kernel, Kindling log, Ember proposal queue, and Edda memory store in one process, sharing one semantic substrate (witchcraft).
-2. **Kindling positioning is hybrid**: Rust is canonical, the crate lives in the Anvil monorepo, but Kindling still ships independently as both a Rust crate and `@eddacraft/kindling` npm projection generated via `ts-rs`.
-3. **Witchcraft powers Ember, Edda, and the Anvil kernel — not Kindling.** Ember does hybrid BM25 + semantic candidate detection; Edda does semantic-with-confidence retrieval over curated decisions; the Anvil kernel embeds symbols/functions for code-similarity. Kindling stays FTS-only — witchcraft never reads from or writes to kindling.db.
+1. Introduce a fifth named primitive — **Hearth** — the always-on local Rust daemon that hosts the anvil kernel, kindling log, Ember proposal queue, and Edda memory store in one process, sharing one semantic substrate (witchcraft).
+2. **kindling positioning is hybrid**: Rust is canonical, the crate lives in the anvil monorepo, but kindling still ships independently as both a Rust crate and `@eddacraft/kindling` npm projection generated via `ts-rs`.
+3. **Witchcraft powers Ember, Edda, and the anvil kernel — not kindling.** Ember does hybrid BM25 + semantic candidate detection; Edda does semantic-with-confidence retrieval over curated decisions; the anvil kernel embeds symbols/functions for code-similarity. kindling stays FTS-only — witchcraft never reads from or writes to kindling.db.
 
 ---
 
@@ -27,7 +27,7 @@ The rearchitecture is mostly _acknowledging substrate that already exists_ in th
 - **`anvil-kernel-types`** is already a zero-dep root crate suitable for ts-rs derivation.
 - **`docs/vision/aspirational-ultimate-feature.md`** already names the four end-user capabilities — invariant streaming, structural drift modelling, plan-aware watching, behavioural diff — that this rearchitecture unlocks.
 
-**Reading:** Hearth is a **rename + scope-expansion of `anvil-intercept`** plus an **import of the planned Kindling Rust crates** plus a **new `forge-retrieval` substrate crate** wrapping witchcraft. The novel work is (a) the retrieval crate, (b) Ember/Edda Rust modules, (c) symbol-embedding in the kernel, and (d) cleanup of the TS projection layer. The IPC, daemon lifecycle, session registry, surface-driver protocol, and Rust ports are already designed or in flight.
+**Reading:** Hearth is a **rename + scope-expansion of `anvil-intercept`** plus an **import of the planned kindling Rust crates** plus a **new `forge-retrieval` substrate crate** wrapping witchcraft. The novel work is (a) the retrieval crate, (b) Ember/Edda Rust modules, (c) symbol-embedding in the kernel, and (d) cleanup of the TS projection layer. The IPC, daemon lifecycle, session registry, surface-driver protocol, and Rust ports are already designed or in flight.
 
 ---
 
@@ -37,7 +37,7 @@ The rearchitecture is mostly _acknowledging substrate that already exists_ in th
 
 - **Single binary**: `hearth` (replaces today's `anvil-intercept` binary entry; the `anvil intercept start` subcommand stays as a backwards-compatible launcher for one release).
 - **One long-lived OS process per user-session.** Started lazily on first client request (CLI auto-spawns) or persistently via OS service unit (`launchd` / `systemd --user` / Windows service).
-- **Single tokio runtime** orchestrating: file watcher, kernel parser+graph, Kindling write path, Ember candidate detector, Edda promotion arbiter, retrieval substrate, IPC listener, MCP server, HTTP server.
+- **Single tokio runtime** orchestrating: file watcher, kernel parser+graph, kindling write path, Ember candidate detector, Edda promotion arbiter, retrieval substrate, IPC listener, MCP server, HTTP server.
 - **Per-workspace state directory**: `~/.hearth/<workspace-fingerprint>/` containing `kindling.db`, `ember.db`, `edda/` (git-backed YAML), `forge.db` (witchcraft index), `socket`, `pid`, `logs/`.
 - **Single writer, many readers** for every SQLite DB (WAL mode). Readers can be inside Hearth (other modules) or, for read-only tooling, external processes. The daemon owns the writer lock.
 - **Symbol-graph state** stays in-memory (current kernel design); witchcraft state is persisted but rebuilt on demand.
@@ -51,16 +51,16 @@ All four lanes converge on the same `HearthService` trait inside the daemon — 
 | **Local socket** | Unix socket (`socket`) / Windows named pipe                | JSON-RPC 2.0 (`hearth-proto` — see §3.1; renamed from today's `anvil-intercept-proto`) | CLI, TUI, drivers                              | Default, lowest-latency. Auth via filesystem ACL + per-session token.                                                      |
 | **HTTP**         | `axum` on `127.0.0.1:<random>` (port written to state dir) | JSON-RPC 2.0 over HTTP POST + SSE for streams                                          | Web dashboard, agents in containers            | Loopback-only by default. Bearer token in state dir.                                                                       |
 | **MCP**          | stdio JSON-RPC                                             | Model Context Protocol                                                                 | Claude Code, Cursor, OpenAI agents             | Existing `anvil mcp serve --stdio` (RMCP) becomes a thin shim that forwards to the local socket.                           |
-| **stdio hooks**  | stdin/stdout JSON, one observation per process             | Kindling hook contract (D-003 immutable)                                               | Claude Code hook, OpenCode adapter, PocketFlow | The `kindling-hook` binary ships independently and proxies into Hearth's local socket; <10 ms round-trip target preserved. |
+| **stdio hooks**  | stdin/stdout JSON, one observation per process             | kindling hook contract (D-003 immutable)                                               | Claude Code hook, OpenCode adapter, PocketFlow | The `kindling-hook` binary ships independently and proxies into Hearth's local socket; <10 ms round-trip target preserved. |
 
 **Service shape** (load-bearing methods, illustrative):
 
 ```rust
-// Anvil enforcement
+// anvil enforcement
 fn validate_buffer(req: ValidateBufferRequest) -> Result<Vec<Diagnostic>>;
 fn watch_workspace(req: WatchRequest) -> Stream<EngineEvent>;
 
-// Kindling (write-only / read-deterministic)
+// kindling (write-only / read-deterministic)
 fn open_capsule(req: OpenCapsuleRequest) -> Capsule;
 fn append_observation(req: AppendObservationRequest) -> Ack;
 fn close_capsule(req: CloseCapsuleRequest) -> Ack;
@@ -90,7 +90,7 @@ The session-registry, process-group enforcement, and IPC plumbing already in `an
 - **Service mode**: `hearth install --user` writes a `systemd --user` / `launchd` / Windows service unit that starts on login.
 - **Reload**: `hearth reload` re-reads `.anvil/architecture.yaml`, policy bundles, workspace config without dropping the socket. Schema migrations require restart.
 - **Shutdown**: SIGTERM → drain IPC queue (5 s) → close DBs → release socket. SIGKILL leaves a stale socket; startup detects via PID file and reclaims.
-- **Crash containment**: per-file parse errors are isolated by the kernel (existing); a witchcraft panic is caught and degrades retrieval to FTS-only; Ember and Edda failures degrade gracefully (Hearth reports `Degraded` health but stays up for Anvil enforcement).
+- **Crash containment**: per-file parse errors are isolated by the kernel (existing); a witchcraft panic is caught and degrades retrieval to FTS-only; Ember and Edda failures degrade gracefully (Hearth reports `Degraded` health but stays up for anvil enforcement).
 
 ### 2.4 Existing CLIs / hooks / IDE extensions become clients
 
@@ -99,7 +99,7 @@ The session-registry, process-group enforcement, and IPC plumbing already in `an
 | `anvil` CLI does its own scan inline (or via embedded `anvil-checks`)      | Thin client; sends `validate_buffer` to Hearth socket. Falls back to embedded scanner if no daemon.                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `anvil watch` runs a foreground watcher                                    | Subcommand becomes alias for `hearth watch`; daemon owns the watcher, CLI subscribes to event stream.                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `anvil mcp serve --stdio` is a launch shim with embedded fallback (RMCP)   | Forwards every MCP request to Hearth socket; embedded fallback retained for offline use.                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| Claude Code hook (`kindling-hook` binary) writes directly to a SQLite file | Connects to Hearth socket → daemon writes Kindling. Hook stays a small, statically-linked binary so it works on machines without `hearth` if needed (back-channel direct DB write retained as fallback per D-003 contract). **Single-writer invariant preserved by socket-first probe:** the hook always checks for the Hearth socket and sends over IPC if present; only when the socket is absent (i.e. daemon not running, writer lock free) does it open the SQLite file directly. The hook never opens the DB while the daemon is alive. |
+| Claude Code hook (`kindling-hook` binary) writes directly to a SQLite file | Connects to Hearth socket → daemon writes kindling. Hook stays a small, statically-linked binary so it works on machines without `hearth` if needed (back-channel direct DB write retained as fallback per D-003 contract). **Single-writer invariant preserved by socket-first probe:** the hook always checks for the Hearth socket and sends over IPC if present; only when the socket is absent (i.e. daemon not running, writer lock free) does it open the SQLite file directly. The hook never opens the DB while the daemon is alive. |
 | `archive/anvil-vscode-extension/` (paused)                                 | Re-introduced as `crates/anvil-vscode-driver/` LSP-style client; pure presentation, all logic in Hearth. (DRVR-003.)                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | TUI (`anvil-tui`) is in-process                                            | Becomes a thin client using the existing `EngineEvent` stream; `anvil-tui` crate stays but its surfaces consume the daemon stream rather than embedding the kernel.                                                                                                                                                                                                                                                                                                                                                                           |
 
@@ -145,9 +145,9 @@ Crates marked **NEW** are introduced; **RENAMED** preserves git history via `git
 | `anvil-policy`        | existing | OPA/Rego evaluation.                                                                                                                                                                                            |
 | `anvil-observability` | existing | W3C traceparent, redaction (TRACE-001/-003).                                                                                                                                                                    |
 | `kindling-service`    | **NEW**  | Orchestrates store + filter + provider behind D-003's `KindlingService` trait.                                                                                                                                  |
-| `ember-curator`       | **NEW**  | Reads observations from Kindling (via service trait), runs candidate-proposal detection using `forge-retrieval`'s hybrid mode. Writes proposals to `ember-store`. **One-way data flow enforced at type level.** |
-| `edda-promotion`      | **NEW**  | Human-review state machine. Promotion requires explicit `--approved-by <human>` token plus a Kindling-recorded approval observation. Auto-promotion is structurally impossible.                                 |
-| `edda-query`          | **NEW**  | Hybrid + confidence-rerank query path; consumed by Anvil kernel for "find decisions relevant to this code" and by MCP for agent contexts.                                                                       |
+| `ember-curator`       | **NEW**  | Reads observations from kindling (via service trait), runs candidate-proposal detection using `forge-retrieval`'s hybrid mode. Writes proposals to `ember-store`. **One-way data flow enforced at type level.** |
+| `edda-promotion`      | **NEW**  | Human-review state machine. Promotion requires explicit `--approved-by <human>` token plus a kindling-recorded approval observation. Auto-promotion is structurally impossible.                                 |
+| `edda-query`          | **NEW**  | Hybrid + confidence-rerank query path; consumed by anvil kernel for "find decisions relevant to this code" and by MCP for agent contexts.                                                                       |
 
 #### Layer 3 — daemon
 
@@ -165,7 +165,7 @@ Crates marked **NEW** are introduced; **RENAMED** preserves git history via `git
 | --------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `anvil-cli`           | existing, **trimmed**              | All non-daemon subcommands become Hearth clients. `--no-daemon` flag forces embedded fallback.                                                                                                            |
 | `anvil-tui`           | existing                           | Reuses kernel-types `EngineEvent`s subscribed via socket.                                                                                                                                                 |
-| `kindling-cli`        | **NEW** (per D-003 PORT-011)       | Independent binary. Connects to Hearth if running, else opens the SQLite directly (Kindling's contract guarantees this works because Kindling is FTS-only and the schema is the cross-language contract). |
+| `kindling-cli`        | **NEW** (per D-003 PORT-011)       | Independent binary. Connects to Hearth if running, else opens the SQLite directly (kindling's contract guarantees this works because kindling is FTS-only and the schema is the cross-language contract). |
 | `kindling-hook`       | **NEW** (per D-003 PORT-007)       | Independent binary. Same dual-mode: prefers Hearth socket, falls back to direct DB write. <10 ms target preserved.                                                                                        |
 | `anvil-vscode-driver` | **NEW** (returns ADR-033 archived) | Pure LSP-style client. (DRVR-003.)                                                                                                                                                                        |
 | `anvil-bench`         | existing                           | Criterion harness, gains Hearth round-trip benchmarks.                                                                                                                                                    |
@@ -216,9 +216,9 @@ Crates marked **NEW** are introduced; **RENAMED** preserves git history via `git
 
 **Invariants of the graph:**
 
-- `kindling-*` crates have **no path** to `forge-retrieval` (preserves "Kindling is FTS-only" — checked structurally by `cargo deny`/Hakari rules).
+- `kindling-*` crates have **no path** to `forge-retrieval` (preserves "kindling is FTS-only" — checked structurally by `cargo deny`/Hakari rules).
 - `ember-curator` reads from `kindling-service` via a _narrow query trait_ defined in `kindling-types`; it **does not** depend on `kindling-store` directly.
-- `edda-promotion` cannot bypass `edda-store`'s human-approval gate (the "approve" method is gated by `ApprovalToken` constructed only by reading a confirmed observation from Kindling).
+- `edda-promotion` cannot bypass `edda-store`'s human-approval gate (the "approve" method is gated by `ApprovalToken` constructed only by reading a confirmed observation from kindling).
 - `anvil-kernel` imports `anvil-symbol-index` behind a `feature = "symbol-embeddings"` flag that is on by default but switchable off in CI / no-daemon mode.
 
 ---
@@ -267,14 +267,14 @@ pub struct QueryPolicy {
 | -------------------------------------- | ------------- | ------------ | ---------------------- | ------------------ | -------------------------------------------------------------------------------------------------------- |
 | **Ember candidate detector**           | `Ember`       | Hybrid       | 0.5                    | none               | Recall-weighted; we _want_ loose proposals because Edda gates promotion.                                 |
 | **Edda agent-context query**           | `Edda`        | Hybrid       | 0.4 (semantic-leaning) | `ConfidenceRerank` | Precision-weighted. Confidence rerank uses Edda's curator-assigned weight + age decay.                   |
-| **Anvil kernel — anti-duplication**    | `SymbolGraph` | SemanticOnly | n/a                    | none               | Embeddings of symbol name + signature + extracted comment. Threshold-gated for the enforcement decision. |
-| **Anvil kernel — pattern conformance** | `SymbolGraph` | SemanticOnly | n/a                    | none               | Embeds signatures of "approved" patterns from Edda; new symbols are checked for cosine similarity.       |
+| **anvil kernel — anti-duplication**    | `SymbolGraph` | SemanticOnly | n/a                    | none               | Embeddings of symbol name + signature + extracted comment. Threshold-gated for the enforcement decision. |
+| **anvil kernel — pattern conformance** | `SymbolGraph` | SemanticOnly | n/a                    | none               | Embeds signatures of "approved" patterns from Edda; new symbols are checked for cosine similarity.       |
 | **MCP `query_edda` tool**              | `Edda`        | Hybrid       | 0.4                    | `ConfidenceRerank` | Same as agent-context. Provenance trace always on (transparency for AI Act Art. 13).                     |
 
 ### 4.3 Storage layout
 
 - `~/.hearth/<workspace-fingerprint>/forge.db` — single SQLite file with **three logical indexes** (Ember, Edda, SymbolGraph) keyed by `IndexKind` in document metadata. Witchcraft's schema permits this via the `metadata` JSON column. (`<workspace-fingerprint>` is the same per-workspace state-directory key used in §2.1.)
-- Backed up by `hearth backup` (forge.db is rebuildable from Kindling + Edda + the symbol graph, but rebuild is slow so we ship a backup tool).
+- Backed up by `hearth backup` (forge.db is rebuildable from kindling + Edda + the symbol graph, but rebuild is slow so we ship a backup tool).
 - **Witchcraft schema is opinionated** (UUID, ts, metadata JSON, hash, body; 128-d 4-bit-quantized residual embeddings). We accept that constraint — our payload shape is small enough to fit. The crate hides the witchcraft schema from upstream consumers behind `Document` and `Hits`.
 
 ### 4.4 Embedder selection
@@ -330,9 +330,9 @@ From the witchcraft survey (cite: GitHub repo, README, Cargo.toml as of 2026-04-
 
 ### 5.2 `eddacraft/kindling`
 
-This repo becomes a **release surface** for the Kindling crate(s) that physically live in `eddacraft/anvil-001`. Two viable mechanics, recommendation in **bold**:
+This repo becomes a **release surface** for the kindling crate(s) that physically live in `eddacraft/anvil-001`. Two viable mechanics, recommendation in **bold**:
 
-- **(Recommended) Subtree split + monorepo home**: `eddacraft/kindling` mirrors the `crates/kindling-*` and `packages/kindling-*` subtrees from anvil-001 via `git subtree split` on each release, plus its own README/CHANGELOG/LICENSE. CI in anvil-001 publishes; CI in kindling repo verifies the split. This keeps Kindling adoptable cross-project (`cargo install kindling-cli`, `npm install @eddacraft/kindling`) without requiring consumers to clone the whole stack.
+- **(Recommended) Subtree split + monorepo home**: `eddacraft/kindling` mirrors the `crates/kindling-*` and `packages/kindling-*` subtrees from anvil-001 via `git subtree split` on each release, plus its own README/CHANGELOG/LICENSE. CI in anvil-001 publishes; CI in kindling repo verifies the split. This keeps kindling adoptable cross-project (`cargo install kindling-cli`, `npm install @eddacraft/kindling`) without requiring consumers to clone the whole stack.
 - _Alternative_: keep both repos with kindling repo as a true secondary clone, syncing via a release script. Higher drift risk; not recommended.
 
 Either way, the kindling repo's `plans/05-rust-port` module retires (its work is now done in anvil-001). The `D-003` decision text moves verbatim into anvil-001's `plans/decisions/` so the rationale is co-located with the code.
@@ -342,7 +342,7 @@ Either way, the kindling repo's `plans/05-rust-port` module retires (its work is
 - **Adapter packages** (`kindling-adapter-claude-code`, `-opencode`, `-pocketflow`): TS for adapter ergonomics; consume Hearth via `kindling-hook` binary or socket. Rewriting to Rust offers no benefit.
 - **Browser store** (`kindling-store-sqljs`): TS-only by definition (sql.js is browser-bound).
 - **APS planning spec** (`packages/aps`): OSS, TS-canonical, slow-evolving.
-- **Anvil website** (under `apps/website/`): unchanged.
+- **anvil website** (under `apps/website/`): unchanged.
 
 ### 5.4 What we delete (consolidated)
 
@@ -371,7 +371,7 @@ The four capabilities below are the minimum that the substrate makes viable and 
 **EU AI Act mapping:**
 
 - **Art. 9 (risk management)** — PAW is a continuous risk-control measure for code generated by AI assistants.
-- **Art. 12 (record-keeping)** — every PAW signal is a Kindling observation, immutable and auditable.
+- **Art. 12 (record-keeping)** — every PAW signal is a kindling observation, immutable and auditable.
 - **Art. 14 (human oversight)** — PAW surfaces decisions to humans rather than blocking; honours warnings-over-blocks (ADR-002).
 
 ### 6.2 Behavioural diff review (BDR)
@@ -387,7 +387,7 @@ The four capabilities below are the minimum that the substrate makes viable and 
 
 ### 6.3 Anti-duplication & pattern conformance (ADP)
 
-**What it does:** Before a new function is accepted (at save time), the kernel queries `forge-retrieval/SymbolGraph` for semantically similar existing symbols. If similarity > threshold, raises an Anvil warning citing the existing symbol. Conversely, if a symbol matches a pattern Edda has marked "preferred," the warning becomes positive: "matches approved pattern `repository-with-cache`."
+**What it does:** Before a new function is accepted (at save time), the kernel queries `forge-retrieval/SymbolGraph` for semantically similar existing symbols. If similarity > threshold, raises an anvil warning citing the existing symbol. Conversely, if a symbol matches a pattern Edda has marked "preferred," the warning becomes positive: "matches approved pattern `repository-with-cache`."
 
 **Why now:** The symbol graph addresses the "AI agents reinvent the wheel" complaint directly. Listed as a capability in `aspirational-ultimate-feature.md` but never previously feasible without a vector DB.
 
@@ -419,8 +419,8 @@ The four capabilities below are the minimum that the substrate makes viable and 
 | ------------------------------------------------- | ---------- | ------------------------------------------------ |
 | Hearth cold start                                 | < 500 ms   | Lifecycle requirement (CLI auto-spawn).          |
 | IPC round-trip (`validate_buffer` empty payload)  | < 5 ms     | Existing intercept p99 measurements.             |
-| Kindling write (single observation)               | < 10 ms    | D-003 success criterion.                         |
-| Kindling FTS retrieve (default budget)            | < 100 ms   | `retrieval-contract.md`.                         |
+| kindling write (single observation)               | < 10 ms    | D-003 success criterion.                         |
+| kindling FTS retrieve (default budget)            | < 100 ms   | `retrieval-contract.md`.                         |
 | Witchcraft hybrid query (Ember corpus, 100k docs) | < 30 ms    | Witchcraft README claim 21 ms + 9 ms IPC budget. |
 | Edda query w/ confidence rerank                   | < 100 ms   | Hybrid + rerank budget.                          |
 | Symbol-graph cold build (100k LOC TS)             | < 3 s      | Existing kernel target.                          |
@@ -433,11 +433,11 @@ CI gates fail the build if regression > 25 % vs. baseline (mirrors ADR-014 promo
 
 Encoded as `cargo deny` rules + `cargo test` cases + `clippy` lints + structural CI checks:
 
-1. **`forge-retrieval` has no path to `kindling-store`, `kindling-service`, or `kindling-provider`.** Enforced by `cargo-deny` dependency rule. _Justification:_ Kindling stays FTS-only; witchcraft never touches it.
+1. **`forge-retrieval` has no path to `kindling-store`, `kindling-service`, or `kindling-provider`.** Enforced by `cargo-deny` dependency rule. _Justification:_ kindling stays FTS-only; witchcraft never touches it.
 2. **`anvil-kernel` enforcement decisions never await on `forge-retrieval`'s witchcraft path beyond a configurable timeout, and similarity scores are deterministic given a stable index** (test: build index → query twice → assert byte-equal hit list). _Justification:_ prevention-over-detection + deterministic-not-probabilistic.
-3. **Kindling observations are immutable** — only `redacted` flag mutates; SQL trigger rejects updates to other columns. _Justification:_ D-003 + write-emit contract.
-4. **Edda promotion requires a human-attested approval token**, constructed only by reading a Kindling observation of kind `human_approval` whose payload is signed by a registered approver. Property test: forge a Proposal → assert `promote()` rejects without an approval. _Justification:_ "If you can't explain why it's in Edda, it doesn't belong."
-5. **Truth flow is one-way: Kindling → Ember → Edda.** No `kindling-*` crate has a path to `ember-*` or `edda-*`; `ember-*` cannot import `edda-*`. _Justification:_ core principle.
+3. **kindling observations are immutable** — only `redacted` flag mutates; SQL trigger rejects updates to other columns. _Justification:_ D-003 + write-emit contract.
+4. **Edda promotion requires a human-attested approval token**, constructed only by reading a kindling observation of kind `human_approval` whose payload is signed by a registered approver. Property test: forge a Proposal → assert `promote()` rejects without an approval. _Justification:_ "If you can't explain why it's in Edda, it doesn't belong."
+5. **Truth flow is one-way: kindling → Ember → Edda.** No `kindling-*` crate has a path to `ember-*` or `edda-*`; `ember-*` cannot import `edda-*`. _Justification:_ core principle.
 6. **Provenance is mandatory.** Every `EngineEvent` carries a `provenance` field; serde-test ensures encoding/decoding never drops it. _Justification:_ `anvil-vision.md` quote.
 7. **Schema version compatibility** — Hearth refuses to start if `kindling.db` schema version is outside its compatible range. _Justification:_ D-003 cross-language contract; see `schema/version.json`.
 
@@ -450,7 +450,7 @@ Single integration test (`tests/round_trip.rs` in `hearth-daemon`) that proves t
 2. Connect a mock VS Code driver client over the socket; subscribe to events.
 3. Emit an observation via `kindling-hook`:
      POST {kind: "tool_call", content: "edited foo.ts", scopeIds:{...}}
-   Assert: Kindling row exists; FTS picks it up; subscriber sees ObservationEvent.
+   Assert: kindling row exists; FTS picks it up; subscriber sees ObservationEvent.
 4. Trigger Ember candidate detection (it should run automatically on observation
    threshold; here we force it via a debug RPC).
    Assert: Ember proposal exists in ember.db with hybrid rationale; confidence
@@ -459,7 +459,7 @@ Single integration test (`tests/round_trip.rs` in `hearth-daemon`) that proves t
    Assert: edda/decisions/<id>.yaml on disk; git commit signed; subscriber sees
    EddaEntryPromoted.
 6. Modify foo.ts in a way that touches the new Edda entry's symbol pattern.
-   Assert: Anvil policy decision references the Edda entry by id and emits a
+   Assert: anvil policy decision references the Edda entry by id and emits a
    warning whose `provenance` includes both the symbol-graph hit and the Edda
    query trace; mock VS Code driver receives a Diagnostic on the open buffer.
 7. Shutdown Hearth gracefully; restart; query Edda; assert state survives.
@@ -475,7 +475,7 @@ Before declaring Hearth v1 ready:
 - **G2**: All invariants in §7.2 enforced and proven by tests.
 - **G3**: Smoke test §7.3 passes on macOS, Linux, Windows.
 - **G4**: ts-rs projection round-trip — generate TS types, compile a sample TS adapter against them, assert no breaking changes vs. last published `@eddacraft/kindling`.
-- **G5**: 30-day dogfood window — Anvil team runs Hearth as primary on their own work; bug rate trending < 1 sev-1 per week before public alpha.
+- **G5**: 30-day dogfood window — anvil team runs Hearth as primary on their own work; bug rate trending < 1 sev-1 per week before public alpha.
 
 ---
 
@@ -485,9 +485,9 @@ This is **a sketch**, not a contract — use the existing APS planning surface t
 
 | Horizon                                       | Headline                                                                                                                                         | Crates new/touched                                                                                        |
 | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| **H2** (next release, slate already drafting) | Rename intercept → hearth; add forge-retrieval skeleton; ship Kindling Rust crates; preserve current behaviour. **No new user-facing features.** | hearth-\* renames, kindling-types/store/provider/service/filter/hook, forge-retrieval (no consumers yet). |
+| **H2** (next release, slate already drafting) | Rename intercept → hearth; add forge-retrieval skeleton; ship kindling Rust crates; preserve current behaviour. **No new user-facing features.** | hearth-\* renames, kindling-types/store/provider/service/filter/hook, forge-retrieval (no consumers yet). |
 | **H3**                                        | Wire forge-retrieval into Ember + Edda Rust modules; ts-rs projections; delete `packages/kindling-integration` and `packages/anvil/runtime`.     | `ember-*`, `edda-*`, ts-rs export pipeline.                                                               |
-| **H4** (the substrate-unlock release)         | Anvil kernel symbol embeddings + ADP + BDR + PAW + IMR ship. EU AI Act-aligned audit trail surfaces.                                             | anvil-symbol-index, kernel ADP path, MCP `query_edda`, VS Code driver re-introduction (DRVR-003).         |
+| **H4** (the substrate-unlock release)         | anvil kernel symbol embeddings + ADP + BDR + PAW + IMR ship. EU AI Act-aligned audit trail surfaces.                                             | anvil-symbol-index, kernel ADP path, MCP `query_edda`, VS Code driver re-introduction (DRVR-003).         |
 | **H5**                                        | Cross-project pattern library (Hearth-v2 federation); web dashboard.                                                                             | (deferred from this rearchitecture)                                                                       |
 
 H2 + H3 are intentionally invisible to users — we are repaving the runway. H4 is the headline release that the EU AI Act window is positioned for.
@@ -500,7 +500,7 @@ H2 + H3 are intentionally invisible to users — we are repaving the runway. H4 
 2. **T5 model loading** — first witchcraft query incurs model-load cost (~hundreds of ms). Mitigation: lazy-load on first retrieval call; pre-warm in `hearth start --pre-warm` for service-mode installations.
 3. **Embedder backend selection at install time** — distribution matrix grows (per-OS, per-CPU/GPU). Mitigation: ship a single `t5-quantized` default that runs everywhere; offer optimised variants behind opt-in installer flags.
 4. **Edda Git-backed YAML + signed commits** — requires a stable signing setup (GPG or sigstore). Open question: which signing primitive do we standardise on? Suggest sigstore (`cosign`) for GPG-free workflows. **(Non-blocking decision; can default to GPG if signing key already exists.)**
-5. **Kindling subtree-split mechanics** — `git subtree split` is fragile across long-lived branches. Mitigation: a single canonical `tools/release-kindling.sh` script in anvil-001 that generates the kindling-repo tree on each release; CI verifies determinism.
+5. **kindling subtree-split mechanics** — `git subtree split` is fragile across long-lived branches. Mitigation: a single canonical `tools/release-kindling.sh` script in anvil-001 that generates the kindling-repo tree on each release; CI verifies determinism.
 6. **`anvil-kernel` symbol embeddings vs. "deterministic over probabilistic"** — using cosine similarity for ADP introduces a probabilistic signal into the enforcement adjacent path. Mitigation: ADP emits warnings (not blocks) by default; the deterministic Rust kernel still owns enforcement decisions; the embedding query is _advisory input_, not authoritative output. Document this tension explicitly in a follow-up ADR.
 7. **MCP-only agents that can't run Hearth** — for sandboxed or remote agents that only speak MCP, ensure Hearth's MCP surface is reachable over the existing `anvil mcp serve --stdio` shim and via HTTP-MCP for cloud agents. Loopback HTTP guard plus bearer-token auth keeps it safe.
 

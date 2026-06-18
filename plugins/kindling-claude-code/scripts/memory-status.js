@@ -17,7 +17,7 @@ const counts = (status && status.counts) || {};
 const database = (status && status.database) || {};
 const activity = (status && status.activity) || {};
 
-console.log('=== Kindling Memory Status ===');
+console.log('=== kindling Memory Status ===');
 console.log('');
 console.log('Observations: ' + (counts.observations || 0));
 console.log('Sessions:     ' + (counts.capsules || 0) + ' (' + (counts.openCapsules || 0) + ' open)');

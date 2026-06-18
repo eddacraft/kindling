@@ -1,11 +1,11 @@
 # Changelog
 
-All notable changes to the Kindling project will be documented in this file.
+All notable changes to the kindling project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-> **Heads-up on the road to 1.0.0.** Kindling is being re-implemented in Rust
+> **Heads-up on the road to 1.0.0.** kindling is being re-implemented in Rust
 > as the canonical engine, with `@eddacraft/kindling` repurposed as a thin
 > HTTP-over-UDS client that downloads the Rust binary at install time. The
 > existing TypeScript implementation packages (`-core`, `-store-sqlite`,

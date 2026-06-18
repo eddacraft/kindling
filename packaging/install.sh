@@ -1,5 +1,5 @@
 #!/bin/sh
-# Kindling native-binary installer.
+# kindling native-binary installer.
 #
 #   curl -sSL https://install.kindling.dev | sh
 #
@@ -192,7 +192,7 @@ path_hint() {
 # Main
 # ---------------------------------------------------------------------------
 main() {
-  printf '\n  Kindling installer\n  Local memory for AI-assisted development\n\n'
+  printf '\n  kindling installer\n  Local memory for AI-assisted development\n\n'
 
   require_tools
 

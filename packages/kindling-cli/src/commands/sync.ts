@@ -1,5 +1,5 @@
 /**
- * GitHub Sync Command - Sync Kindling memory to GitHub repo
+ * GitHub Sync Command - Sync kindling memory to GitHub repo
  *
  * Enables Claude Code Web integration using git submodules.
  */
@@ -51,7 +51,7 @@ function saveSyncConfig(config: { repo: string }): void {
  * This is done ONCE globally, not per-project.
  */
 export async function syncInitCommand(options: SyncOptions): Promise<void> {
-  console.log('🔄 Initializing Kindling GitHub Sync...\n');
+  console.log('🔄 Initializing kindling GitHub Sync...\n');
   console.log('⚠️  IMPORTANT: This creates a SHARED memory repository.');
   console.log('    Do this ONCE globally, not per project.\n');
 
@@ -96,9 +96,9 @@ export async function syncInitCommand(options: SyncOptions): Promise<void> {
   // Create README
   writeFileSync(
     join(syncDir, 'README.md'),
-    `# Kindling Memory Sync
+    `# kindling Memory Sync
 
-This repository contains synced Kindling memory for integration with Claude Code Web.
+This repository contains synced kindling memory for integration with Claude Code Web.
 
 ## ⚠️ IMPORTANT: This should be PRIVATE
 
@@ -111,7 +111,7 @@ Add this repo as a submodule in your projects:
 \`\`\`bash
 cd ~/projects/my-app
 git submodule add https://github.com/${repoUrl}.git .kindling
-git commit -m "Add Kindling memory submodule"
+git commit -m "Add kindling memory submodule"
 \`\`\`
 
 Or use the CLI:
@@ -169,7 +169,7 @@ Thumbs.db
   // Initial commit
   try {
     execSync('git add .', { cwd: syncDir, stdio: 'pipe' });
-    execSync('git commit -m "Initial Kindling memory sync setup"', {
+    execSync('git commit -m "Initial kindling memory sync setup"', {
       cwd: syncDir,
       stdio: 'pipe',
     });
@@ -194,17 +194,17 @@ Thumbs.db
 }
 
 /**
- * Add Kindling memory as submodule to current project
+ * Add kindling memory as submodule to current project
  *
- * Run this in EACH project that should have access to Kindling memory.
+ * Run this in EACH project that should have access to kindling memory.
  */
 export async function syncAddSubmoduleCommand(_options: SyncOptions): Promise<void> {
-  console.log('📦 Adding Kindling memory submodule...\n');
+  console.log('📦 Adding kindling memory submodule...\n');
 
   // Get repo URL from config
   const config = getSyncConfig();
   if (!config.repo) {
-    console.error('Error: Kindling sync not initialized.');
+    console.error('Error: kindling sync not initialized.');
     console.error('\nRun first:');
     console.error('  kindling sync init --repo username/kindling-memory');
     process.exit(1);
@@ -237,7 +237,7 @@ export async function syncAddSubmoduleCommand(_options: SyncOptions): Promise<vo
 
     // Commit the change
     execSync('git add .gitmodules .kindling', { stdio: 'pipe' });
-    execSync('git commit -m "Add Kindling memory submodule"', { stdio: 'pipe' });
+    execSync('git commit -m "Add kindling memory submodule"', { stdio: 'pipe' });
 
     console.log('\n✅ Submodule added successfully!\n');
     console.log('📂 Your project structure:');
@@ -265,26 +265,26 @@ export async function syncAddSubmoduleCommand(_options: SyncOptions): Promise<vo
 }
 
 /**
- * Push current Kindling state to GitHub
+ * Push current kindling state to GitHub
  */
 export async function syncPushCommand(options: SyncOptions): Promise<void> {
   const dbPath = options.db || getDefaultDbPath();
   const syncDir = join(homedir(), '.kindling-sync');
 
   if (!existsSync(syncDir)) {
-    console.error('Error: Kindling sync not initialized.');
+    console.error('Error: kindling sync not initialized.');
     console.error('Run: kindling sync init --repo username/kindling-memory');
     process.exit(1);
   }
 
-  console.log('🔄 Syncing Kindling memory to GitHub...\n');
+  console.log('🔄 Syncing kindling memory to GitHub...\n');
 
   const db = openDatabase({ path: dbPath });
   const store = new SqliteKindlingStore(db);
   const provider = new LocalFtsProvider(db);
   const service = new KindlingService({ store, provider });
 
-  // Export Kindling data
+  // Export kindling data
   const bundle = service.export({
     includeRedacted: false, // Never sync redacted data
   });
@@ -366,7 +366,7 @@ export async function syncPushCommand(options: SyncOptions): Promise<void> {
   // Git commit and push
   try {
     execSync('git add .', { cwd: syncDir, stdio: 'pipe' });
-    execSync(`git commit -m "Sync Kindling memory at ${new Date().toISOString()}"`, {
+    execSync(`git commit -m "Sync kindling memory at ${new Date().toISOString()}"`, {
       cwd: syncDir,
       stdio: 'pipe',
     });

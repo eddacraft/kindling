@@ -1,11 +1,11 @@
 # @eddacraft/kindling-cli
 
 > **⚠️ Deprecated** — this package is deprecated and will be removed at v1.0.0.
-> Kindling is now a Rust daemon. Use [`@eddacraft/kindling`](https://www.npmjs.com/package/@eddacraft/kindling)
+> kindling is now a Rust daemon. Use [`@eddacraft/kindling`](https://www.npmjs.com/package/@eddacraft/kindling)
 > (the thin HTTP-over-UDS client) or the `kindling` binary instead.
 > See <https://github.com/eddacraft/kindling>.
 
-Command-line interface for Kindling - inspect, search, and manage your local AI memory.
+Command-line interface for kindling - inspect, search, and manage your local AI memory.
 
 [![npm version](https://img.shields.io/npm/v/@eddacraft/kindling-cli.svg)](https://www.npmjs.com/package/@eddacraft/kindling-cli)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](../../LICENSE)
