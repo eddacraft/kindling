@@ -1,0 +1,306 @@
+name: release
+
+# Cross-platform release build pipeline for the `kindling` umbrella binary
+# (PORT-010). All 7 targets are cross-built from a single Linux runner using
+# cargo-zigbuild (zig as the linker/cross-toolchain), packaged with a SHA256
+# sidecar, smoke-tested where executable on Linux, and — on a published
+# GitHub Release — uploaded as release assets.
+#
+# Triggers:
+#   * release.published    -> build all targets + upload assets to the Release
+#   * workflow_dispatch     -> build all targets + upload as workflow artifacts
+#                             (manual end-to-end test without cutting a release)
+#   * pull_request / push   -> BUILD-ONLY matrix check (no upload), so the
+#                             cross-build is validated on PRs/pushes touching
+#                             the Rust crates, Cargo manifests, or this file.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'crates/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - '.github/workflows/release.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'crates/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - '.github/workflows/release.yml'
+
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Default to least privilege; the upload job opts up to `contents: write`.
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  # Pin Zig for reproducible cross-builds. cargo-zigbuild drives this zig.
+  ZIG_VERSION: 0.15.2
+  CARGO_ZIGBUILD_VERSION: 0.23.0
+
+jobs:
+  cross-build:
+    name: build ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ---- Linux (glibc) ----
+          - target: x86_64-unknown-linux-gnu
+            os_class: linux
+            exec_smoke: native # runs directly on the x86_64 Linux runner
+          - target: aarch64-unknown-linux-gnu
+            os_class: linux
+            exec_smoke: qemu # runs under QEMU arm64 emulation
+          # ---- Linux (musl, static) ----
+          - target: x86_64-unknown-linux-musl
+            os_class: linux
+            exec_smoke: native
+          - target: aarch64-unknown-linux-musl
+            os_class: linux
+            exec_smoke: qemu
+          # ---- macOS (Mach-O) ----
+          # cargo-zigbuild cross-compiles *-apple-darwin from Linux. Our binary
+          # has no Darwin-framework deps so it links without an SDK, but we
+          # still provision the macOS SDK so the SDK version is embedded and so
+          # future subcommands that touch system libs keep building.
+          - target: x86_64-apple-darwin
+            os_class: macos
+            exec_smoke: format # cannot exec Mach-O on Linux; verify format only
+          - target: aarch64-apple-darwin
+            os_class: macos
+            exec_smoke: format
+          # ---- Windows ----
+          # We use the *-gnu target on purpose: cargo-zigbuild cross-compiles it
+          # from Linux with the zig-provided mingw runtime. The *-msvc target
+          # would require the proprietary MS SDK, which is impractical on a
+          # Linux runner. Documented choice (PORT-010).
+          - target: x86_64-pc-windows-gnu
+            os_class: windows
+            exec_smoke: format # cannot exec a PE binary on Linux; verify format
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Use the repo-pinned toolchain (rust-toolchain.toml -> 1.95.0) and add
+      # the cross target's std. dtolnay/rust-toolchain honours the toml channel
+      # when we pass `@master` with an explicit target.
+      - name: Install Rust toolchain + target
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: '1.95.0'
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo + target
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: release-${{ matrix.target }}
+
+      - name: Install Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: ${{ env.ZIG_VERSION }}
+
+      - name: Install cargo-zigbuild
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-zigbuild@${{ env.CARGO_ZIGBUILD_VERSION }}
+
+      # macOS cross-link wants an SDK to embed the SDK version and to resolve
+      # system frameworks if any get pulled in later. Provide one via SDKROOT.
+      - name: Provision macOS SDK (Apple targets only)
+        if: matrix.os_class == 'macos'
+        run: |
+          set -euo pipefail
+          SDK_TAG="14.5"
+          SDK_URL="https://github.com/joseluisq/macosx-sdks/releases/download/${SDK_TAG}/MacOSX${SDK_TAG}.sdk.tar.xz"
+          echo "::notice::Downloading macOS SDK ${SDK_TAG} for ${{ matrix.target }}"
+          mkdir -p "${RUNNER_TEMP}/macos-sdk"
+          curl -fsSL "$SDK_URL" -o "${RUNNER_TEMP}/MacOSX.sdk.tar.xz"
+          tar -xf "${RUNNER_TEMP}/MacOSX.sdk.tar.xz" -C "${RUNNER_TEMP}/macos-sdk"
+          echo "SDKROOT=${RUNNER_TEMP}/macos-sdk/MacOSX${SDK_TAG}.sdk" >> "$GITHUB_ENV"
+
+      # Resolve the version used for artefact names:
+      #   * release  -> the tag (strip refs/tags/ and a leading v)
+      #   * else     -> the kindling package version from cargo metadata
+      - name: Resolve version
+        id: version
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_EVENT_NAME}" = "release" ]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+            VERSION="${TAG#v}"
+          else
+            VERSION="$(cargo metadata --format-version 1 --no-deps \
+              | python3 -c "import sys,json; d=json.load(sys.stdin); print(next(p['version'] for p in d['packages'] if p['name']=='kindling'))")"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Resolved kindling version: ${VERSION}"
+
+      - name: Build kindling (cargo-zigbuild)
+        run: cargo zigbuild --release --target ${{ matrix.target }} --bin kindling
+
+      # ---- Smoke test -------------------------------------------------------
+      # Linux x86_64 targets: execute natively and assert a version line + exit 0.
+      - name: Smoke test (native exec)
+        if: matrix.exec_smoke == 'native'
+        run: |
+          set -euo pipefail
+          BIN="target/${{ matrix.target }}/release/kindling"
+          echo "::group::native --version"
+          OUT="$("$BIN" --version)"
+          echo "$OUT"
+          echo "::endgroup::"
+          test -n "$OUT"
+          echo "$OUT" | grep -Eq 'kindling [0-9]+\.[0-9]+\.[0-9]+' \
+            || { echo "::error::version line not found in: $OUT"; exit 1; }
+
+      # Linux aarch64 targets: execute under QEMU arm64 emulation via Docker.
+      - name: Smoke test (QEMU arm64 exec)
+        if: matrix.exec_smoke == 'qemu'
+        run: |
+          set -euo pipefail
+          BIN="target/${{ matrix.target }}/release/kindling"
+          echo "::notice::Running ${{ matrix.target }} under QEMU arm64 emulation"
+          docker run --rm --platform linux/arm64 \
+            -v "$PWD:/work" -w /work \
+            arm64v8/debian:bookworm-slim \
+            /work/"$BIN" --version | tee /tmp/qemu-out.txt
+          test -s /tmp/qemu-out.txt
+          grep -Eq 'kindling [0-9]+\.[0-9]+\.[0-9]+' /tmp/qemu-out.txt \
+            || { echo "::error::version line not found under QEMU"; exit 1; }
+
+      # macOS / Windows targets: cannot execute on a Linux runner. Verify the
+      # artefact exists, is non-empty, and is the expected binary format.
+      # NOTE: this is NOT an execution smoke test. Real exec-smoke for these
+      # platforms requires native macOS / Windows runners (a future native
+      # matrix could add that). Under the single-Linux-runner constraint this
+      # task mandates, exec-smoke is satisfied for Linux and format-verified
+      # for the rest.
+      - name: Smoke test (format verify, no exec)
+        if: matrix.exec_smoke == 'format'
+        run: |
+          set -euo pipefail
+          echo "::notice::${{ matrix.target }} cannot be EXECUTED on a Linux runner — \
+          verifying binary format only. Execution smoke-test for this platform is \
+          DEFERRED to a native runner (see PORT-010 notes)."
+          case "${{ matrix.os_class }}" in
+            macos)   BIN="target/${{ matrix.target }}/release/kindling" ;;
+            windows) BIN="target/${{ matrix.target }}/release/kindling.exe" ;;
+          esac
+          test -s "$BIN" || { echo "::error::artefact missing or empty: $BIN"; exit 1; }
+          DESC="$(file -b "$BIN")"
+          echo "file: $DESC"
+          case "${{ matrix.target }}" in
+            x86_64-apple-darwin)  echo "$DESC" | grep -q 'Mach-O .*x86_64' ;;
+            aarch64-apple-darwin) echo "$DESC" | grep -q 'Mach-O .*arm64'  ;;
+            x86_64-pc-windows-gnu) echo "$DESC" | grep -Eq 'PE32\+ .*x86-64' ;;
+            *) echo "::error::no format assertion for ${{ matrix.target }}"; exit 1 ;;
+          esac || { echo "::error::unexpected binary format: $DESC"; exit 1; }
+
+      # ---- Package ----------------------------------------------------------
+      # tar.gz for unix-like targets, zip for windows. Plus a .sha256 sidecar
+      # that PORT-014 distribution will verify.
+      - name: Package artefact + checksum
+        id: package
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.version.outputs.version }}"
+          TARGET="${{ matrix.target }}"
+          STAGE="${RUNNER_TEMP}/stage"
+          OUTDIR="${RUNNER_TEMP}/dist"
+          mkdir -p "$STAGE" "$OUTDIR"
+
+          if [ "${{ matrix.os_class }}" = "windows" ]; then
+            BIN_SRC="target/${TARGET}/release/kindling.exe"
+            cp "$BIN_SRC" "$STAGE/kindling.exe"
+            ARCHIVE="kindling-${VERSION}-${TARGET}.zip"
+            ( cd "$STAGE" && zip -q "${OUTDIR}/${ARCHIVE}" kindling.exe )
+          else
+            BIN_SRC="target/${TARGET}/release/kindling"
+            cp "$BIN_SRC" "$STAGE/kindling"
+            ARCHIVE="kindling-${VERSION}-${TARGET}.tar.gz"
+            tar -czf "${OUTDIR}/${ARCHIVE}" -C "$STAGE" kindling
+          fi
+
+          ( cd "$OUTDIR" && sha256sum "$ARCHIVE" > "${ARCHIVE}.sha256" )
+          echo "archive=${ARCHIVE}" >> "$GITHUB_OUTPUT"
+          echo "outdir=${OUTDIR}" >> "$GITHUB_OUTPUT"
+          echo "::group::checksum"
+          cat "${OUTDIR}/${ARCHIVE}.sha256"
+          echo "::endgroup::"
+
+      # ---- Upload (workflow_dispatch) --------------------------------------
+      # Manual runs collect artefacts so a release can be rehearsed end-to-end.
+      - name: Upload workflow artifact (dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: kindling-${{ matrix.target }}
+          path: |
+            ${{ steps.package.outputs.outdir }}/${{ steps.package.outputs.archive }}
+            ${{ steps.package.outputs.outdir }}/${{ steps.package.outputs.archive }}.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+      # ---- Stage for release upload ----------------------------------------
+      # On a real release, hand the packaged files to the upload job. We use
+      # upload-artifact as the transport between jobs, then the upload job
+      # downloads them all and attaches them to the Release in one shot.
+      - name: Stage release assets (release)
+        if: github.event_name == 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-asset-${{ matrix.target }}
+          path: |
+            ${{ steps.package.outputs.outdir }}/${{ steps.package.outputs.archive }}
+            ${{ steps.package.outputs.outdir }}/${{ steps.package.outputs.archive }}.sha256
+          if-no-files-found: error
+          retention-days: 1
+
+  # ---- Upload to GitHub Release ------------------------------------------
+  # Only runs for a published release. Collects every staged target's archive +
+  # sidecar and attaches them to the Release. This is the only job that needs
+  # write access to repository contents.
+  upload-release:
+    name: upload release assets
+    needs: cross-build
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download staged assets
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-asset-*
+          merge-multiple: true
+          path: dist
+
+      - name: List assets
+        run: ls -lR dist
+
+      - name: Attach to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/*.sha256
+          fail_on_unmatched_files: true
