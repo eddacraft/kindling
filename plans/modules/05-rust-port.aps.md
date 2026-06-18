@@ -205,7 +205,7 @@ Supersedes `02-rust-hook-binary` and `03-rust-cli`. Replaces the dual-maintain p
 - **Intent:** Generated TypeScript type definitions available for the thin TS client to consume
 - **Expected Outcome:** `cargo test -p kindling-types --features ts-rs` writes `.d.ts` files to a stable location (`crates/kindling-types/bindings/`); a copy step bundles them into `packages/kindling/src/generated/`; CI fails if generated output drifts from the committed files
 - **Validation:** CI job re-runs `ts-rs` and `git diff --exit-code` on generated files — passes if no drift
-- **Status:** Draft
+- **Status:** In Progress — `feat/rust-port-thin-client` (bundled with PORT-017). Core ts-rs generation + `crates/kindling-types/bindings/` + drift gate already done in PORT-002; this adds the copy step into `packages/kindling/src/generated/` + a CI drift gate for the copy.
 - **Dependencies:** PORT-002
 
 #### PORT-017: `@eddacraft/kindling` thin client SDK
@@ -213,7 +213,7 @@ Supersedes `02-rust-hook-binary` and `03-rust-cli`. Replaces the dual-maintain p
 - **Intent:** Repurpose the primary npm package as the thin HTTP-over-UDS client + auto-spawn + generated types
 - **Expected Outcome:** `packages/kindling/` rewritten — removes better-sqlite3, FTS, server, CLI; adds `Kindling` client class with the same method shape as the old service (`openCapsule`, `closeCapsule`, `appendObservation`, `retrieve`, `pin`, `unpin`); auto-spawns daemon on first call; uses generated types from PORT-016; ships with no native dependencies
 - **Validation:** `pnpm test` in `packages/kindling/` passes against a running daemon; integration test spawns daemon from a clean state on first call; published package contains no native modules
-- **Status:** Draft
+- **Status:** In Progress — `feat/rust-port-thin-client`. Autonomous (client code + tests vs a locally-built daemon); the npm postinstall binary DOWNLOAD is PORT-018 (needs a real release) — here the binary is resolved via PATH / `KINDLING_BIN` env. Mirrors the Rust client (PORT-008) over Node http-over-UDS.
 - **Dependencies:** PORT-013, PORT-016
 
 #### PORT-018: npm postinstall binary download

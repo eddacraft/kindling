@@ -7,6 +7,9 @@ on:
       - 'crates/**'
       - 'schema/**'
       - 'scripts/sync-vendored-schema.sh'
+      - 'packages/kindling/src/generated/**'
+      - 'packages/kindling/schema/**'
+      - 'packages/kindling/scripts/sync-types.mjs'
       - 'Cargo.toml'
       - 'Cargo.lock'
       - 'rust-toolchain.toml'
@@ -17,6 +20,9 @@ on:
       - 'crates/**'
       - 'schema/**'
       - 'scripts/sync-vendored-schema.sh'
+      - 'packages/kindling/src/generated/**'
+      - 'packages/kindling/schema/**'
+      - 'packages/kindling/scripts/sync-types.mjs'
       - 'Cargo.toml'
       - 'Cargo.lock'
       - 'rust-toolchain.toml'
@@ -76,6 +82,30 @@ jobs:
         run: |
           if ! git diff --exit-code -- crates/kindling-types/bindings; then
             echo "::error::TypeScript bindings are out of date. Run: cargo test -p kindling-types --features ts-rs"
+            exit 1
+          fi
+
+  ts-generated-copy:
+    name: thin-client generated types up to date
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+      # Regenerate the ts-rs bindings, then re-run the copy pipeline that vendors
+      # them (and the canonical schema) into the thin client package.
+      - run: cargo test -p kindling-types --features ts-rs
+      - run: node packages/kindling/scripts/sync-types.mjs
+      - name: Fail if bindings or copied generated types drifted
+        run: |
+          if ! git diff --exit-code -- \
+            crates/kindling-types/bindings \
+            packages/kindling/src/generated \
+            packages/kindling/schema; then
+            echo "::error::Generated types are out of date. Run: cargo test -p kindling-types --features ts-rs && node packages/kindling/scripts/sync-types.mjs"
             exit 1
           fi
 
