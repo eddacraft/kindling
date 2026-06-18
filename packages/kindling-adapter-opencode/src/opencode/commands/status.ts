@@ -1,90 +1,61 @@
 /**
  * /memory status command
  *
- * Shows memory system status and statistics
+ * Shows daemon status.
+ *
+ * MIGRATION NOTE (PORT-019): the old in-process command reported per-scope
+ * counts (observations / capsules / summaries / pins) by querying the SQLite
+ * store directly. The thin {@link import('@eddacraft/kindling').Kindling} client
+ * / daemon exposes no such aggregate-count endpoint — only `GET /v1/health`
+ * (version, schema version, touched projects). This command is therefore
+ * reduced to reporting daemon health; the count breakdown is dropped until the
+ * daemon grows a stats endpoint. The previous `StatusStore` interface and count
+ * fields are gone.
  */
-
-import type { ScopeIds } from '@eddacraft/kindling-core';
 
 /**
- * Store interface for status command
+ * Health service interface.
+ *
+ * Satisfied by the {@link import('@eddacraft/kindling').Kindling} thin client —
+ * `memoryStatus` only needs its `health` method.
  */
-export interface StatusStore {
-  queryObservations(
-    scopeIds?: Partial<ScopeIds>,
-    fromTs?: number,
-    toTs?: number,
-    limit?: number,
-  ): { id: string }[];
-
-  getCapsules(scopeIds?: Partial<ScopeIds>): { id: string; status: string }[];
-  getSummaries(scopeIds?: Partial<ScopeIds>): { id: string; createdAt: number }[];
-  getPins(scopeIds?: Partial<ScopeIds>): { id: string }[];
+export interface HealthService {
+  health(): Promise<{
+    version: string;
+    schemaVersion: number;
+    projects: string[];
+  }>;
 }
 
 /**
- * Status command options
- */
-export interface StatusOptions {
-  /** Scope to show status for */
-  scopeIds?: Partial<ScopeIds>;
-  /** Database file path */
-  dbPath?: string;
-}
-
-/**
- * Status result
+ * Status result (daemon health).
  */
 export interface StatusResult {
-  observations: number;
-  capsules: { total: number; open: number; closed: number };
-  summaries: number;
-  pins: number;
-  lastSummaryAt?: number;
-  dbPath?: string;
+  /** Daemon package version. */
+  version: string;
+  /** Schema version reported by the daemon's store. */
+  schemaVersion: number;
+  /** Project ids the daemon has touched this session. */
+  projects: string[];
 }
 
 /**
- * Execute /memory status command
+ * Execute /memory status command.
  *
- * @param store - Status store
- * @param options - Command options
- * @returns Status result
+ * @param service - Health service (the daemon client)
+ * @returns Daemon status
  */
-export function memoryStatus(store: StatusStore, options: StatusOptions = {}): StatusResult {
-  const { scopeIds, dbPath } = options;
-
-  // Count observations
-  const observations = store.queryObservations(scopeIds);
-
-  // Count capsules
-  const capsules = store.getCapsules(scopeIds);
-  const open = capsules.filter((c) => c.status === 'open').length;
-  const closed = capsules.filter((c) => c.status === 'closed').length;
-
-  // Count summaries and get latest
-  const summaries = store.getSummaries(scopeIds);
-  const lastSummary = summaries.sort((a, b) => b.createdAt - a.createdAt)[0];
-
-  // Count pins
-  const pins = store.getPins(scopeIds);
-
+export async function memoryStatus(service: HealthService): Promise<StatusResult> {
+  const health = await service.health();
   return {
-    observations: observations.length,
-    capsules: {
-      total: capsules.length,
-      open,
-      closed,
-    },
-    summaries: summaries.length,
-    pins: pins.length,
-    lastSummaryAt: lastSummary?.createdAt,
-    dbPath,
+    version: health.version,
+    schemaVersion: health.schemaVersion,
+    projects: health.projects,
   };
 }
 
 /**
- * Format status result as human-readable text
+ * Format status result as human-readable text.
  *
  * @param result - Status result
  * @returns Formatted status text
@@ -95,22 +66,11 @@ export function formatStatus(result: StatusResult): string {
   lines.push('Memory Status');
   lines.push('=============');
   lines.push('');
-  lines.push(`Observations: ${result.observations}`);
+  lines.push(`Daemon version: ${result.version}`);
+  lines.push(`Schema version: ${result.schemaVersion}`);
   lines.push(
-    `Capsules: ${result.capsules.total} (${result.capsules.open} open, ${result.capsules.closed} closed)`,
+    `Projects touched: ${result.projects.length > 0 ? result.projects.join(', ') : '(none)'}`,
   );
-  lines.push(`Summaries: ${result.summaries}`);
-  lines.push(`Pins: ${result.pins}`);
-
-  if (result.lastSummaryAt) {
-    const date = new Date(result.lastSummaryAt);
-    lines.push(`Last summary: ${date.toISOString()}`);
-  }
-
-  if (result.dbPath) {
-    lines.push('');
-    lines.push(`Database: ${result.dbPath}`);
-  }
 
   return lines.join('\n');
 }

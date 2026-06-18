@@ -1,43 +1,26 @@
 /**
  * /memory export command
  *
- * Exports memory to a portable bundle
+ * MIGRATION NOTE (PORT-019): this command serialized a portable export bundle
+ * via the in-process service's `createExportBundle` / `serializeBundle`. The
+ * thin {@link import('@eddacraft/kindling').Kindling} client / daemon exposes NO
+ * export endpoint, so the command cannot be wired to the daemon. It is kept as a
+ * clearly-marked stub (so the command surface and its formatter stay stable)
+ * that always reports the operation as unsupported. Re-enable once the daemon
+ * grows an export endpoint (export is owned by the Rust CLI / a future daemon
+ * route per the Rust-canonical design).
  */
-
-import type { ScopeIds, ExportBundle } from '@eddacraft/kindling-core';
-import { writeFileSync } from 'fs';
-import { join } from 'path';
-
-/**
- * Export service interface
- */
-export interface ExportService {
-  createExportBundle(options?: {
-    scope?: Partial<ScopeIds>;
-    includeRedacted?: boolean;
-    limit?: number;
-    metadata?: {
-      description?: string;
-      tags?: string[];
-      [key: string]: unknown;
-    };
-  }): ExportBundle;
-
-  serializeBundle(bundle: ExportBundle, pretty?: boolean): string;
-}
 
 /**
  * Export options
  */
 export interface ExportOptions {
-  /** Optional scope filter */
-  scope?: Partial<ScopeIds>;
-  /** Include redacted observations */
-  includeRedacted?: boolean;
   /** Output file path (default: auto-generated) */
   outputPath?: string;
   /** Export description */
   description?: string;
+  /** Include redacted observations */
+  includeRedacted?: boolean;
 }
 
 /**
@@ -58,53 +41,20 @@ export interface ExportResult {
 }
 
 /**
- * Execute /memory export command
+ * Execute /memory export command.
  *
- * @param service - Export service
- * @param options - Export options
- * @returns Export result
+ * STUB: the daemon does not expose an export endpoint, so this always returns an
+ * unsupported result. See the module note.
+ *
+ * @param _options - Export options (ignored)
+ * @returns Export result (always unsupported)
  */
-export function memoryExport(service: ExportService, options: ExportOptions = {}): ExportResult {
-  const { scope, includeRedacted = false, outputPath, description } = options;
-
-  try {
-    // Create export bundle
-    const bundle = service.createExportBundle({
-      scope,
-      includeRedacted,
-      metadata: description ? { description } : undefined,
-    });
-
-    // Generate file path if not provided
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const defaultPath = join(process.cwd(), `kindling-export-${timestamp}.json`);
-    const filePath = outputPath || defaultPath;
-
-    // Serialize and write bundle
-    const json = service.serializeBundle(bundle, true);
-    writeFileSync(filePath, json, 'utf-8');
-
-    return {
-      filePath,
-      stats: {
-        observations: bundle.dataset.observations.length,
-        capsules: bundle.dataset.capsules.length,
-        summaries: bundle.dataset.summaries.length,
-        pins: bundle.dataset.pins.length,
-      },
-    };
-  } catch (err) {
-    return {
-      filePath: '',
-      stats: {
-        observations: 0,
-        capsules: 0,
-        summaries: 0,
-        pins: 0,
-      },
-      error: err instanceof Error ? err.message : 'Unknown error',
-    };
-  }
+export function memoryExport(_options: ExportOptions = {}): ExportResult {
+  return {
+    filePath: '',
+    stats: { observations: 0, capsules: 0, summaries: 0, pins: 0 },
+    error: 'export is not supported by the Kindling daemon (no export endpoint)',
+  };
 }
 
 /**

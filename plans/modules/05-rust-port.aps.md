@@ -229,7 +229,7 @@ Supersedes `02-rust-hook-binary` and `03-rust-cli`. Replaces the dual-maintain p
 - **Intent:** Existing TS adapter packages (`-claude-code`, `-opencode`, `-pocketflow`) consume the new thin client
 - **Expected Outcome:** Each adapter's dependency on `@eddacraft/kindling-core` (and any direct store/provider deps) replaced with the new `@eddacraft/kindling` thin client; adapter code calls daemon-backed APIs; adapters published as compatible minor versions
 - **Validation:** Each adapter's existing test suite passes against a running daemon; example apps in each adapter README run end-to-end
-- **Status:** Draft
+- **Status:** In Progress — `feat/rust-port-adapter-cutover`. Cuts the LIVE integrations (opencode, pocketflow) over from `@eddacraft/kindling-core` (in-process store/service) to the `@eddacraft/kindling` thin client (daemon-backed). The claude-code adapter is DEFERRED to PORT-020 deprecation — superseded by the Rust hook (PORT-009) + plugin cutover (PORT-015), so rewiring it is wasted effort.
 - **Dependencies:** PORT-017
 
 #### PORT-020: Deprecate and remove TS implementation packages
