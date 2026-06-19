@@ -1,6 +1,6 @@
 [package]
 name = "kindling-provider"
-description = "Local FTS5 retrieval provider for kindling — BM25 normalization, tiered retrieval (pins → current summary → ranked candidates)."
+description = "Internal building block of kindling — app authors want the `kindling` binary or the `kindling-client` SDK. Local FTS5 retrieval provider — BM25 normalization, tiered retrieval (pins → current summary → ranked candidates)."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
