@@ -1,6 +1,6 @@
 [package]
 name = "kindling-types"
-description = "Canonical kindling domain types — observations, capsules, retrieval. ts-rs derives generate the TypeScript projection."
+description = "Internal building block of kindling — these types are re-exported by the `kindling-client` SDK, so depend on that, not this crate directly. Canonical domain types (observations, capsules, retrieval); ts-rs derives generate the TypeScript projection."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

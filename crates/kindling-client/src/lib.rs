@@ -40,8 +40,9 @@
 //!
 //! ```no_run
 //! # async fn run() -> Result<(), kindling_client::ClientError> {
-//! use kindling_client::Client;
-//! use kindling_types::{CapsuleType, ScopeIds};
+//! // Everything you need is re-exported here — no need to depend on
+//! // `kindling-types` directly.
+//! use kindling_client::{Client, CapsuleType, ScopeIds};
 //!
 //! let client = Client::new()?;
 //! let health = client.health().await?;
@@ -68,9 +69,15 @@ use hyper::StatusCode;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 
-use kindling_types::{
-    Capsule, CapsuleType, Id, Observation, ObservationInput, Pin, RetrieveOptions, RetrieveResult,
-    ScopeIds,
+/// Domain types re-exported from [`kindling_types`] so the daemon client is a
+/// self-contained SDK: depend on `kindling-client` alone and reach every type
+/// the API sends or returns as `kindling_client::<Type>`. `kindling-types`
+/// stays an internal transitive dependency you never have to name.
+pub use kindling_types::{
+    CandidateResult, Capsule, CapsuleStatus, CapsuleType, Id, Observation, ObservationInput,
+    ObservationKind, Pin, PinResult, PinTargetType, ProviderSearchOptions, ProviderSearchResult,
+    RetrieveOptions, RetrieveProvenance, RetrieveResult, RetrievedEntity, ScopeIds, Summary,
+    Timestamp,
 };
 
 use body::{

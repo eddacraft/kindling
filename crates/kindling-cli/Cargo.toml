@@ -1,6 +1,6 @@
 [package]
 name = "kindling-cli"
-description = "kindling CLI command implementations (clap) — init, log, capsule open/close, status, search, list, pin, unpin, export, import, serve."
+description = "Internal building block of kindling — the `kindling` binary is what you install. CLI command implementations (clap): init, log, capsule open/close, status, search, list, pin, unpin, export, import, serve."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
