@@ -7,6 +7,7 @@ version = "0.1.0"
 edition = "2021"
 license = "Apache-2.0"
 repository = "https://github.com/eddacraft/kindling"
+homepage = "https://docs.eddacraft.ai/kindling/overview"
 authors = ["aneki <josh@eddacraft.io>"]
 rust-version = "1.85"
 

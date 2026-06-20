@@ -1,13 +1,15 @@
 [package]
 name = "kindling"
-description = "kindling — local memory and continuity engine for AI-assisted development. Single-binary entry point dispatching to serve / hook / CLI subcommands."
+description = "Local-first memory and continuity CLI for AI-assisted development."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+homepage.workspace = true
 authors.workspace = true
 rust-version.workspace = true
-homepage = "https://github.com/eddacraft/kindling"
+documentation = "https://docs.rs/kindling"
+readme = "README.md"
 keywords = ["memory", "ai", "context", "sqlite", "cli"]
 categories = ["command-line-utilities", "development-tools"]
 

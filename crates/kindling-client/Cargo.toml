@@ -1,6 +1,11 @@
 [package]
 name = "kindling-client"
-description = "Rust HTTP-over-UDS client for the kindling daemon. Auto-spawns the daemon on first call. Used by the hook subcommand and by anvil for concurrent-safe integration."
+description = "Daemon-backed Rust SDK for kindling, a local-first memory engine for AI-assisted development."
+homepage.workspace = true
+documentation = "https://docs.rs/kindling-client"
+readme = "README.md"
+keywords = ["memory", "ai", "context", "sdk", "agent"]
+categories = ["development-tools", "api-bindings"]
 version.workspace = true
 edition.workspace = true
 license.workspace = true

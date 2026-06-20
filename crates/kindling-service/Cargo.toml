@@ -1,6 +1,11 @@
 [package]
 name = "kindling-service"
-description = "In-process (zero-IPC) kindling SDK — open/close capsule, append observation, retrieve, pin, unpin; for single-process Rust consumers (anvil, headless workflows). Most apps want the daemon-backed `kindling-client` instead, which is safe under concurrent access."
+description = "In-process orchestration layer for kindling memory: capsules, observations, retrieval and pins."
+homepage.workspace = true
+documentation = "https://docs.rs/kindling-service"
+readme = "README.md"
+keywords = ["memory", "ai", "context", "agent", "sqlite"]
+categories = ["development-tools"]
 version.workspace = true
 edition.workspace = true
 license.workspace = true
