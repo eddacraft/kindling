@@ -6,12 +6,10 @@
 # workspace dependency graph (leaves first, umbrella last):
 #
 #   kindling-types     (no intra-workspace deps)
-#   kindling-filter    (no intra-workspace deps)
 #   kindling-store     -> types
 #   kindling-provider  -> store, types
-#   kindling-service   -> types, store, provider, filter
-#   kindling-client    -> types
-#   kindling-spool     -> client, types   (durable-emit layer; depends on client)
+#   kindling-service   -> types, store, provider   (filter folded in)
+#   kindling-client    -> types   (durable-emit spool is an opt-in feature)
 #   kindling-server    -> types, store, service
 #   kindling-hook      -> client, types
 #   kindling-cli       -> types, store, service, client, server
@@ -43,12 +41,10 @@ set -eu
 
 CRATES="
 kindling-types
-kindling-filter
 kindling-store
 kindling-provider
 kindling-service
 kindling-client
-kindling-spool
 kindling-server
 kindling-hook
 kindling-cli
