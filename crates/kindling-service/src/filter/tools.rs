@@ -6,8 +6,8 @@
 
 use serde_json::Value;
 
-use crate::secrets::mask_secrets;
-use crate::truncate::{truncate, MAX_CONTENT_LENGTH, NOISY_TOOL_MAX_LENGTH};
+use super::secrets::mask_secrets;
+use super::truncate::{truncate, MAX_CONTENT_LENGTH, NOISY_TOOL_MAX_LENGTH};
 
 /// Tools whose results are skipped entirely (too noisy to store).
 const SKIP_TOOLS: &[&str] = &["WebSearch"];

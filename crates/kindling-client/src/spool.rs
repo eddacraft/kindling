@@ -1,7 +1,7 @@
-//! A thin, opt-in **durable-emit** layer over [`kindling_client`].
+//! A thin, opt-in **durable-emit** layer over [`crate`].
 //!
-//! [`kindling_client::Client::append_observation`] returns
-//! [`ClientError::Unavailable`](kindling_client::ClientError::Unavailable) when
+//! [`crate::Client::append_observation`] returns
+//! [`ClientError::Unavailable`](crate::ClientError::Unavailable) when
 //! the daemon is down. A producer that wants its observations to survive a
 //! daemon outage therefore has to reinvent a local fallback (this is exactly
 //! why anvil grew a `usage.ndjson`). [`SpooledClient`] centralizes that once.
@@ -31,13 +31,13 @@
 //!
 //! Only *connectivity* failures buffer to the spool:
 //!
-//! - [`ClientError::Unavailable`](kindling_client::ClientError::Unavailable) and
-//!   [`ClientError::Http`](kindling_client::ClientError::Http) → spool
+//! - [`ClientError::Unavailable`](crate::ClientError::Unavailable) and
+//!   [`ClientError::Http`](crate::ClientError::Http) → spool
 //!   ([`AppendOutcome::Spooled`]).
-//! - [`ClientError::Api`](kindling_client::ClientError::Api),
-//!   [`ClientError::SchemaMismatch`](kindling_client::ClientError::SchemaMismatch),
-//!   [`ClientError::Decode`](kindling_client::ClientError::Decode), and
-//!   [`ClientError::Io`](kindling_client::ClientError::Io) → propagate
+//! - [`ClientError::Api`](crate::ClientError::Api),
+//!   [`ClientError::SchemaMismatch`](crate::ClientError::SchemaMismatch),
+//!   [`ClientError::Decode`](crate::ClientError::Decode), and
+//!   [`ClientError::Io`](crate::ClientError::Io) → propagate
 //!   ([`SpoolError::Client`]). The daemon *responded*; a rejected observation
 //!   must never be spooled or it would loop forever on every flush.
 //!
@@ -54,7 +54,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
-use kindling_client::{Client, ClientError};
+use crate::{Client, ClientError};
 use kindling_types::{Id, Observation, ObservationInput};
 
 /// Configuration for a [`SpooledClient`].
@@ -138,7 +138,7 @@ pub enum SpoolError {
     Client(#[from] ClientError),
 }
 
-/// A durable-emit wrapper around a [`kindling_client::Client`].
+/// A durable-emit wrapper around a [`crate::Client`].
 ///
 /// Holds the client, the spool path, and an in-process [`Mutex`] that serializes
 /// every spool-file operation (single-producer-per-spool-file).

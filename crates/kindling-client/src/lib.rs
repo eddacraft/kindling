@@ -59,6 +59,8 @@
 mod body;
 mod config;
 mod error;
+#[cfg(feature = "spool")]
+pub mod spool;
 mod transport;
 
 pub use body::{CloseCapsuleBody, CreatePinBody};

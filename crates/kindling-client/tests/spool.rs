@@ -1,17 +1,19 @@
-//! Integration tests for `kindling-spool` against an in-process daemon.
+#![cfg(feature = "spool")]
+//! Integration tests for the `spool` module against an in-process daemon.
 //!
 //! "Daemon up" cases use a real `kindling-server` on a temp socket
 //! ([`support::TestDaemon`]). "Daemon down" cases point the client at a socket
 //! with no listener plus a spawner that fails, so every call resolves to
 //! `ClientError::Unavailable` ([`support::down_client`]).
 
+#[path = "spool_support.rs"]
 mod support;
 
 use std::io::Write;
 use std::path::PathBuf;
 
+use kindling_client::spool::{AppendOutcome, SpoolError, SpooledClient};
 use kindling_client::ClientError;
-use kindling_spool::{AppendOutcome, SpoolError, SpooledClient};
 use kindling_types::{ObservationInput, ObservationKind, RetrieveOptions, ScopeIds};
 use serde_json::Value;
 use support::{down_client, TestDaemon};
