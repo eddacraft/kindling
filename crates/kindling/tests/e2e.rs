@@ -43,7 +43,9 @@ impl Daemon {
             socket_path: socket_path.clone(),
             kindling_home: home_path.clone(),
             pid_path: home_path.join("k.pid"),
+            port_path: home_path.join("k.port"),
             idle_timeout: Duration::from_secs(3600),
+            transport: kindling_server::Transport::default(),
         };
         let handle = tokio::spawn(async move { kindling_server::serve(config).await });
         wait_for_socket(&socket_path).await;

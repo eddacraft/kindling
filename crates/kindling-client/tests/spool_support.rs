@@ -7,7 +7,7 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use kindling_client::{Client, ClientConfig, Spawner};
+use kindling_client::{Client, ClientConfig, Spawner, Transport};
 use kindling_server::{serve, ServerConfig};
 use tempfile::TempDir;
 use tokio::task::JoinHandle;
@@ -51,11 +51,13 @@ impl TestDaemon {
 pub fn live_client(socket_path: PathBuf, project_root: &str) -> Client {
     let cfg = ClientConfig {
         socket_path,
+        port_path: PathBuf::from("unused.port"),
         project_root: project_root.to_string(),
         expected_schema_version: schema_version_u32(),
         connect_timeout: Duration::from_secs(2),
         poll_interval: Duration::from_millis(10),
         spawn: Spawner::custom(|| panic!("spawner must not be called when daemon is running")),
+        transport: Transport::default(),
     };
     Client::with_config(cfg)
 }
@@ -66,6 +68,7 @@ pub fn live_client(socket_path: PathBuf, project_root: &str) -> Client {
 pub fn down_client(socket_path: PathBuf, project_root: &str) -> Client {
     let cfg = ClientConfig {
         socket_path,
+        port_path: PathBuf::from("unused.port"),
         project_root: project_root.to_string(),
         expected_schema_version: schema_version_u32(),
         connect_timeout: Duration::from_millis(150),
@@ -76,6 +79,7 @@ pub fn down_client(socket_path: PathBuf, project_root: &str) -> Client {
                 "kindling binary not found (simulated daemon-down)",
             ))
         }),
+        transport: Transport::default(),
     };
     Client::with_config(cfg)
 }
@@ -90,7 +94,9 @@ pub fn temp_server_config() -> (ServerConfig, TempDir, PathBuf) {
         socket_path: socket_path.clone(),
         kindling_home: home_path.clone(),
         pid_path: home_path.join("k.pid"),
+        port_path: home_path.join("k.port"),
         idle_timeout: Duration::from_secs(3600),
+        transport: kindling_server::Transport::default(),
     };
     (config, home, socket_path)
 }

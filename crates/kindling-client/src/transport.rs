@@ -1,33 +1,30 @@
-//! HTTP/1-over-UDS transport with auto-spawn.
+//! HTTP/1 transport with auto-spawn.
 //!
 //! One connection per request (simple and robust; no pooling). Before each
-//! request we ensure the daemon is reachable: if the socket is missing or a
-//! connect is refused, we invoke the spawner ONCE and poll the socket until a
-//! connection succeeds or the connect budget elapses.
+//! request we ensure the daemon is reachable: if the rendezvous (a UDS path on
+//! Unix, a published TCP port on Windows/TCP) is missing or a connect is
+//! refused, we invoke the spawner ONCE and poll until a connection succeeds or
+//! the connect budget elapses.
+//!
+//! The HTTP/1 exchange itself ([`send_http`]) is transport-agnostic: it wraps
+//! any tokio `AsyncRead + AsyncWrite` in [`TokioIo`], so the UDS and TCP paths
+//! share it verbatim. The transport is selected per [`ClientConfig::transport`].
 
-#[cfg(unix)]
 use std::io;
-#[cfg(unix)]
 use std::path::Path;
-#[cfg(unix)]
 use std::time::{Duration, Instant};
 
-#[cfg(unix)]
 use http_body_util::BodyExt;
 use hyper::body::Bytes;
-#[cfg(unix)]
 use hyper::client::conn::http1;
-#[cfg(unix)]
 use hyper::Request;
 use hyper::StatusCode;
-#[cfg(unix)]
 use hyper_util::rt::TokioIo;
+use tokio::net::TcpStream;
 #[cfg(unix)]
 use tokio::net::UnixStream;
 
-use crate::config::ClientConfig;
-#[cfg(unix)]
-use crate::config::Spawner;
+use crate::config::{ClientConfig, Spawner, Transport};
 use crate::error::ClientError;
 
 /// A decoded HTTP response: status plus raw body bytes.
@@ -38,8 +35,6 @@ pub(crate) struct RawResponse {
 
 /// One request to send: verb, URI, optional project header, and a
 /// pre-serialized JSON body (empty for bodyless requests).
-// On non-unix the request path is a stub that ignores these fields.
-#[cfg_attr(not(unix), allow(dead_code))]
 pub(crate) struct OutgoingRequest<'a> {
     pub method: &'a str,
     pub path: &'a str,
@@ -48,20 +43,43 @@ pub(crate) struct OutgoingRequest<'a> {
     pub body: String,
 }
 
-/// Connect to the daemon socket (spawning + polling per `cfg` if necessary),
-/// then send one request and collect the response.
-#[cfg(unix)]
+/// Connect to the daemon (spawning + polling per `cfg` if necessary) over the
+/// configured transport, then send one request and collect the response.
 pub(crate) async fn request(
     cfg: &ClientConfig,
     req: OutgoingRequest<'_>,
 ) -> Result<RawResponse, ClientError> {
-    let stream = ensure_connected(
-        &cfg.socket_path,
-        &cfg.spawn,
-        cfg.connect_timeout,
-        cfg.poll_interval,
-    )
-    .await?;
+    match cfg.transport {
+        #[cfg(unix)]
+        Transport::Uds => {
+            let stream = ensure_connected(
+                &cfg.socket_path,
+                &cfg.spawn,
+                cfg.connect_timeout,
+                cfg.poll_interval,
+            )
+            .await?;
+            send_http(stream, req).await
+        }
+        Transport::Tcp => {
+            let stream = ensure_connected_tcp(
+                &cfg.port_path,
+                &cfg.spawn,
+                cfg.connect_timeout,
+                cfg.poll_interval,
+            )
+            .await?;
+            send_http(stream, req).await
+        }
+    }
+}
+
+/// Send one HTTP/1 request over an established byte stream and collect the
+/// response. Transport-agnostic: works over any `AsyncRead + AsyncWrite`.
+async fn send_http<S>(stream: S, req: OutgoingRequest<'_>) -> Result<RawResponse, ClientError>
+where
+    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Send + Unpin + 'static,
+{
     let io = TokioIo::new(stream);
     let OutgoingRequest {
         method,
@@ -107,7 +125,7 @@ pub(crate) async fn request(
     Ok(RawResponse { status, body })
 }
 
-/// Ensure the daemon is reachable, auto-spawning once if needed.
+/// Ensure the daemon is reachable over UDS, auto-spawning once if needed.
 ///
 /// 1. Try to connect. On success, return the stream.
 /// 2. If the socket is missing OR the connect is refused/not-found, invoke the
@@ -163,28 +181,84 @@ async fn ensure_connected(
     }
 }
 
+/// Ensure the daemon is reachable over loopback TCP, auto-spawning once if
+/// needed. This is the Windows default transport, and is exercised on Linux.
+///
+/// Unlike UDS, TCP has no filesystem rendezvous: the daemon binds an ephemeral
+/// port and publishes it to `port_path`. So discovery is two-step — read the
+/// port file, then connect to `127.0.0.1:<port>`.
+///
+/// 1. Read the port file and try to connect. On success, return the stream.
+/// 2. If the port file is missing/unparseable OR the connect is refused, invoke
+///    the spawner ONCE, then poll (re-reading the port file each iteration, as
+///    the daemon writes it only after binding) until success or the
+///    `connect_timeout` budget elapses.
+/// 3. If still failing, return [`ClientError::Unavailable`].
+async fn ensure_connected_tcp(
+    port_path: &Path,
+    spawner: &Spawner,
+    connect_timeout: Duration,
+    poll_interval: Duration,
+) -> Result<TcpStream, ClientError> {
+    // Fast path: port file present and daemon already up.
+    if let Some(port) = read_port(port_path) {
+        match TcpStream::connect(("127.0.0.1", port)).await {
+            Ok(stream) => return Ok(stream),
+            Err(e) if is_absent(&e) => { /* stale port file; spawn + poll */ }
+            Err(e) => {
+                return Err(ClientError::Unavailable(format!(
+                    "connecting to 127.0.0.1:{port}: {e}"
+                )));
+            }
+        }
+    }
+
+    // Spawn exactly once, then poll within the budget.
+    if let Err(e) = spawner.spawn() {
+        return Err(ClientError::Unavailable(format!(
+            "failed to spawn kindling daemon: {e}"
+        )));
+    }
+
+    let deadline = Instant::now() + connect_timeout;
+    loop {
+        let last_err = match read_port(port_path) {
+            Some(port) => match TcpStream::connect(("127.0.0.1", port)).await {
+                Ok(stream) => return Ok(stream),
+                Err(e) if is_absent(&e) => format!("connecting to 127.0.0.1:{port}: {e}"),
+                Err(e) => {
+                    return Err(ClientError::Unavailable(format!(
+                        "connecting to 127.0.0.1:{port} after spawn: {e}"
+                    )));
+                }
+            },
+            None => format!("port file {} not yet present", port_path.display()),
+        };
+        if Instant::now() >= deadline {
+            return Err(ClientError::Unavailable(format!(
+                "daemon TCP port (via {}) did not become reachable within {:?} after spawn ({last_err})",
+                port_path.display(),
+                connect_timeout
+            )));
+        }
+        tokio::time::sleep(poll_interval).await;
+    }
+}
+
+/// Read and parse the daemon's published TCP port. Returns `None` when the file
+/// is missing, empty, or does not contain a valid `u16` (treated identically to
+/// "daemon not listening yet").
+fn read_port(port_path: &Path) -> Option<u16> {
+    std::fs::read_to_string(port_path)
+        .ok()
+        .and_then(|s| s.trim().parse::<u16>().ok())
+}
+
 /// Whether a connect error means "daemon not (yet) listening": a missing socket
 /// file or a refused connection.
-#[cfg(unix)]
 fn is_absent(e: &io::Error) -> bool {
     matches!(
         e.kind(),
         io::ErrorKind::NotFound | io::ErrorKind::ConnectionRefused
     )
-}
-
-/// Windows stub. The client talks to the daemon over a Unix domain socket; the
-/// daemon's Windows transport (loopback TCP) is not yet wired end-to-end, so on
-/// Windows every request fails loud with a clear message rather than silently
-/// misbehaving. The binary still builds and ships (the release smoke-test
-/// format-verifies the Windows artefact rather than executing it); real Windows
-/// support is deferred (tracked with the daemon's Windows TCP fallback).
-#[cfg(not(unix))]
-pub(crate) async fn request(
-    _cfg: &ClientConfig,
-    _req: OutgoingRequest<'_>,
-) -> Result<RawResponse, ClientError> {
-    Err(ClientError::Unavailable(
-        "the kindling client requires a Unix domain socket; Windows is not yet supported".into(),
-    ))
 }
