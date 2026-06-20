@@ -12,10 +12,11 @@ set -eu
 # Environment overrides:
 #   KINDLING_VERSION      release tag to install (e.g. v0.1.0); default: latest
 #   KINDLING_INSTALL_DIR  install directory; default: ~/.local/bin
+#   KINDLING_REPO         GitHub repo to install from; default: eddacraft/kindling
 #
 # POSIX sh, shellcheck-clean.
 
-REPO="eddacraft/kindling"
+REPO="${KINDLING_REPO:-eddacraft/kindling}"
 BIN_NAME="kindling"
 INSTALL_DIR="${KINDLING_INSTALL_DIR:-${HOME}/.local/bin}"
 
@@ -105,13 +106,13 @@ install_binary() {
   trap 'rm -rf "$tmp"' EXIT
 
   info "Downloading ${archive} (${TAG})..."
-  if ! curl -fsSL "${base_url}/${archive}" -o "${tmp}/${archive}"; then
+  if ! curl -fsSL --proto '=https' --tlsv1.2 "${base_url}/${archive}" -o "${tmp}/${archive}"; then
     warn "Could not download ${archive}."
     cargo_fallback
     return
   fi
 
-  if curl -fsSL "${base_url}/${archive}.sha256" -o "${tmp}/${archive}.sha256" 2>/dev/null; then
+  if curl -fsSL --proto '=https' --tlsv1.2 "${base_url}/${archive}.sha256" -o "${tmp}/${archive}.sha256" 2>/dev/null; then
     info "Verifying checksum..."
     (
       cd "$tmp"

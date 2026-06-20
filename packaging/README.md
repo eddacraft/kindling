@@ -11,7 +11,7 @@ assets.
 | Channel                | Artefact in this repo                                     | What the user runs                                                                                |
 | ---------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | crates.io              | `scripts/publish.sh` (order), vendored `crates/*/schema/` | `cargo install eddacraft-kindling`                                                                |
-| `curl \| sh` installer | `packaging/install.sh`                                    | `curl -fsSL https://raw.githubusercontent.com/eddacraft/kindling/main/packaging/install.sh \| sh` |
+| `curl \| sh` installer | [`install.sh`](../install.sh) (repo root)                 | `curl -fsSL https://raw.githubusercontent.com/eddacraft/kindling/main/install.sh \| sh` |
 | Homebrew (planned)     | `packaging/homebrew/kindling.rb`                          | `brew install eddacraft/tap/kindling` _(once the tap is published)_                               |
 
 > The CLI binary publishes to crates.io as **`eddacraft-kindling`** because the
@@ -47,11 +47,14 @@ kindling-service → kindling-server → kindling-client → eddacraft-kindling`
 
 ## 2. `curl … | sh` installer
 
-[`packaging/install.sh`](./install.sh) detects OS/arch, resolves the latest release
-(or `KINDLING_VERSION`), downloads the matching tarball + `.sha256`, **verifies
-the checksum**, and installs `kindling` to `KINDLING_INSTALL_DIR`
-(default `~/.local/bin`). Linux (x86_64/aarch64) and macOS (x86_64/aarch64) are
-covered; Windows is not (use the `*-pc-windows-gnu.zip` release asset).
+The installer lives at the **repo root** ([`install.sh`](../install.sh)) — it is
+the single `curl | sh` entry point. It detects OS/arch, resolves the latest
+release (or `KINDLING_VERSION`), downloads the matching archive + `.sha256`,
+**verifies the checksum**, installs `kindling` to `KINDLING_INSTALL_DIR`
+(default `~/.local/bin`), and offers to run `kindling init` (with optional Claude
+Code setup). If no prebuilt binary matches the platform it falls back to
+`cargo install eddacraft-kindling`. Linux (x86_64/aarch64, gnu + musl), macOS
+(x86_64/aarch64), and Windows (x86_64, `.zip`) are covered.
 
 **Credential-gated / infra maintainer steps:**
 
@@ -59,7 +62,7 @@ covered; Windows is not (use the `*-pc-windows-gnu.zip` release asset).
    downloads.
 2. Until/unless a dedicated vanity domain is set up, users run the installer
    straight from the repo:
-   `curl -fsSL https://raw.githubusercontent.com/eddacraft/kindling/main/packaging/install.sh | sh`.
+   `curl -fsSL https://raw.githubusercontent.com/eddacraft/kindling/main/install.sh | sh`.
 
 ## 3. Homebrew (`eddacraft/tap`) — planned, not yet published
 
