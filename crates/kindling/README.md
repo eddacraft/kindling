@@ -7,8 +7,12 @@
 ## Install
 
 ```bash
-cargo install kindling
+cargo install eddacraft-kindling
 ```
+
+This installs the `kindling` binary. (The crate is published as
+`eddacraft-kindling` because the bare `kindling` name on crates.io is taken by
+an unrelated project; the command you run is still `kindling`.)
 
 ## Quick start
 

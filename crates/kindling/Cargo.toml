@@ -1,6 +1,9 @@
 [package]
-name = "kindling"
-description = "Local-first memory and continuity CLI for AI-assisted development."
+# Published as `eddacraft-kindling` because the bare `kindling` name on
+# crates.io belongs to an unrelated crate. The installed binary is still
+# `kindling` (see [[bin]] below); `cargo install eddacraft-kindling`.
+name = "eddacraft-kindling"
+description = "Local-first memory and continuity CLI for AI-assisted development (the `kindling` binary)."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -8,7 +11,7 @@ repository.workspace = true
 homepage.workspace = true
 authors.workspace = true
 rust-version.workspace = true
-documentation = "https://docs.rs/kindling"
+documentation = "https://docs.rs/eddacraft-kindling"
 readme = "README.md"
 keywords = ["memory", "ai", "context", "sqlite", "cli"]
 categories = ["command-line-utilities", "development-tools"]

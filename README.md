@@ -11,7 +11,7 @@ Use kindling from the CLI, as a daemon-backed Rust SDK, or as an embedded in-pro
 - **Built for AI coding workflows:** Claude Code hooks today, with a crate-level API for other tools and agents.
 - **Public docs:** [docs.eddacraft.ai/kindling](https://docs.eddacraft.ai/kindling/overview)
 
-[![crates.io](https://img.shields.io/crates/v/kindling.svg)](https://crates.io/crates/kindling)
+[![crates.io](https://img.shields.io/crates/v/eddacraft-kindling.svg)](https://crates.io/crates/eddacraft-kindling)
 [![npm version](https://img.shields.io/npm/v/@eddacraft/kindling.svg)](https://www.npmjs.com/package/@eddacraft/kindling)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
@@ -58,10 +58,12 @@ That's it. kindling now captures your Claude Code sessions automatically — too
 ### Rust / Cargo
 
 ```bash
-cargo install kindling
+cargo install eddacraft-kindling
 ```
 
-This installs the `kindling` binary:
+This installs the `kindling` binary (the crate is published as
+`eddacraft-kindling` — the bare `kindling` name on crates.io is taken by an
+unrelated project; the command you run is still `kindling`):
 
 ```bash
 kindling init
@@ -127,7 +129,7 @@ kindling uses [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) which
 
 | Crate | Use it when |
 | --- | --- |
-| [`kindling`](https://crates.io/crates/kindling) | You want the CLI binary: `kindling init`, `kindling log`, `kindling search`, `kindling serve`, or Claude Code hook support. |
+| [`eddacraft-kindling`](https://crates.io/crates/eddacraft-kindling) | You want the CLI binary `kindling` (`cargo install eddacraft-kindling`): `kindling init`, `kindling log`, `kindling search`, `kindling serve`, or Claude Code hook support. |
 | [`kindling-client`](https://crates.io/crates/kindling-client) | You are building a Rust integration that should talk to the kindling daemon safely across concurrent tools. This is the default SDK choice. |
 | [`kindling-service`](https://crates.io/crates/kindling-service) | You need embedded, in-process access to capsule lifecycle, observation capture, retrieval and pins. |
 | [`kindling-server`](https://crates.io/crates/kindling-server) | You are extending or embedding the daemon/runtime layer. Most users should run `kindling serve` instead. |
