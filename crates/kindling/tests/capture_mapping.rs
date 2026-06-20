@@ -11,7 +11,7 @@
 //! compared as `serde_json::Value` (object key order is therefore NOT asserted —
 //! see the known-gaps note in the crate docs about provenance key ordering).
 
-use kindling_hook::{map_capture, HookInput, HookType};
+use kindling::hook::{map_capture, HookInput, HookType};
 use serde_json::Value;
 
 const FIXTURES: &str = include_str!("fixtures/capture-cases.json");

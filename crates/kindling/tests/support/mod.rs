@@ -33,7 +33,7 @@ impl CliEnv {
 
     /// Run the CLI with the given args (the `--db` is NOT auto-added; pass it).
     pub fn run(&self, args: &[&str]) -> Output {
-        let bin = env!("CARGO_BIN_EXE_kindling-cli");
+        let bin = env!("CARGO_BIN_EXE_kindling");
         Command::new(bin)
             .args(args)
             .output()

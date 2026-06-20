@@ -1,9 +1,9 @@
-//! End-to-end tests driving the real `kindling-hook` binary against an
+//! End-to-end tests driving the real `kindling` binary's hook surface against an
 //! in-process daemon over a temp Unix socket.
 //!
 //! Each test:
 //!   - starts a `kindling-server` daemon on a temp socket + temp kindling home;
-//!   - runs `CARGO_BIN_EXE_kindling-hook <type>` with stdin = the hook JSON and
+//!   - runs `CARGO_BIN_EXE_kindling hook <type>` with stdin = the hook JSON and
 //!     env `KINDLING_SOCK` (socket override) + `KINDLING_REPO_ROOT` (forces the
 //!     project root, so DB routing is deterministic) + a pinned `TZ`;
 //!   - asserts daemon DB state and/or the binary's stdout, and that every hook
@@ -64,8 +64,9 @@ impl Daemon {
     /// Run the hook binary for `hook_type` with `stdin_json` piped in. Returns
     /// (exit_ok, stdout). Always sets the socket/repo-root/TZ env.
     async fn run_hook(&self, hook_type: &str, stdin_json: &str) -> (bool, String) {
-        let exe = env!("CARGO_BIN_EXE_kindling-hook");
+        let exe = env!("CARGO_BIN_EXE_kindling");
         let mut child = Command::new(exe)
+            .arg("hook")
             .arg(hook_type)
             .env("KINDLING_SOCK", &self.socket_path)
             .env("KINDLING_REPO_ROOT", REPO_ROOT)

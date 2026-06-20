@@ -3,7 +3,7 @@
 //! Byte-for-byte port of the Node adapter's capture mapping:
 //! `packages/kindling-adapter-claude-code/src/claude-code/{mapping.ts,
 //! provenance.ts}` (content formatting + provenance), using the adapter
-//! filter port in [`crate::filter`].
+//! filter port in [`crate::hook::filter`].
 //!
 //! Each builder returns an [`ObservationInput`] with `scopeIds`
 //! `{ sessionId, repoId: <raw cwd> }`. **NOTE:** Node's `mapping.ts` uses the
@@ -15,8 +15,8 @@
 use kindling_types::{ObservationInput, ObservationKind, ScopeIds};
 use serde_json::{Map, Value};
 
-use crate::filter::{filter_content, filter_tool_result, MAX_RESULT_LENGTH};
-use crate::input::HookInput;
+use crate::hook::filter::{filter_content, filter_tool_result, MAX_RESULT_LENGTH};
+use crate::hook::input::HookInput;
 
 /// Map a tool name to its observation kind. Mirrors `TOOL_TO_KIND_MAP` with the
 /// `?? 'tool_call'` default for unknown tools.

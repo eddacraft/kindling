@@ -22,7 +22,7 @@ fn serve_binds_and_idle_shuts_down() {
     let home = tempfile::tempdir().unwrap();
     let socket = home.path().join("k.sock");
 
-    let bin = env!("CARGO_BIN_EXE_kindling-cli");
+    let bin = env!("CARGO_BIN_EXE_kindling");
     let mut child = Command::new(bin)
         .args([
             "serve",
@@ -86,7 +86,7 @@ async fn via_daemon_log_roundtrip() {
     // Run the CLI with HOME pointed at the temp home so the client's default
     // socket path resolves to our daemon. The project root is the CLI process's
     // cwd; the daemon hashes it to a per-project DB under <home>/projects/.
-    let bin = env!("CARGO_BIN_EXE_kindling-cli");
+    let bin = env!("CARGO_BIN_EXE_kindling");
     let project_root = std::env::current_dir().unwrap();
     let cli_home = home.path().to_path_buf();
     let out = tokio::task::spawn_blocking({

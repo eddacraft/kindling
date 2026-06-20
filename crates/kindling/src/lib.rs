@@ -10,11 +10,13 @@
 //! on the DB file directly or have no daemon endpoint). `serve` starts the UDS
 //! daemon via [`kindling_server::serve`].
 //!
-//! Wired into the umbrella `kindling` binary by PORT-013; here the crate ships
-//! its own `kindling-cli` bin plus this library so the dispatch is testable.
+//! This library backs the single `kindling` binary (`src/main.rs`); the hook
+//! surface is folded in as [`mod@hook`]. The CLI dispatch is exposed via
+//! [`cli_main`] so it stays integration-testable.
 
 mod cli;
 mod commands;
+pub mod hook;
 mod output;
 
 pub use cli::{
@@ -105,8 +107,8 @@ pub fn open_service(explicit_db: Option<&str>) -> Result<(KindlingService, PathB
 
 /// Parse args from the process and execute, returning the desired exit code.
 ///
-/// The bin (`main.rs`) calls this and `std::process::exit`s with the result.
-pub fn main() -> i32 {
+/// The bin (`main.rs`) calls this and maps the result onto its exit code.
+pub fn cli_main() -> i32 {
     let cli = <Cli as clap::Parser>::parse();
     run(cli)
 }

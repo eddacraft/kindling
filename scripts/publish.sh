@@ -11,9 +11,7 @@
 #   kindling-service   -> types, store, provider   (filter folded in)
 #   kindling-client    -> types   (durable-emit spool is an opt-in feature)
 #   kindling-server    -> types, store, service
-#   kindling-hook      -> client, types
-#   kindling-cli       -> types, store, service, client, server
-#   kindling           -> cli, hook   (the umbrella binary; published last)
+#   kindling           -> types, store, service, client, server   (the binary; cli + hook folded in)
 #
 # Prerequisites (CREDENTIAL-GATED — the maintainer must do these):
 #   * A crates.io account + API token: `cargo login <token>`
@@ -46,8 +44,6 @@ kindling-provider
 kindling-service
 kindling-client
 kindling-server
-kindling-hook
-kindling-cli
 kindling
 "
 

@@ -5,17 +5,17 @@
 //! Each hook is a fresh, short-lived process; the binary **always exits 0** so a
 //! hook can never block Claude Code (errors are logged to stderr instead).
 //!
-//! This crate is split into a library (testable [`dispatch`]) and a binary
-//! (`kindling-hook`, `src/main.rs`) so integration tests can pipe JSON through
-//! the real executable via `CARGO_BIN_EXE_kindling-hook`. The umbrella
-//! `kindling hook <type>` wiring lands in PORT-013; here `argv[1]` is the hook
-//! type string.
+//! This module exposes a testable [`dispatch`] reachable through the merged
+//! `kindling` binary's `kindling hook <type>` surface (and the `kindling-hook`
+//! symlink drop-in); integration tests pipe JSON through the real executable via
+//! `CARGO_BIN_EXE_kindling`. The hook type string is taken from the dispatch
+//! (`argv[1]` for the symlink form, `argv[2]` for `kindling hook <type>`).
 //!
 //! # Fidelity to the Node hooks
 //!
 //! The capture mapping (content, provenance, scope) is a byte-for-byte port of
 //! `packages/kindling-adapter-claude-code/src/claude-code/{mapping,provenance,
-//! events}.ts`, using the adapter filter port in [`filter`] (see that module
+//! events}.ts`, using the adapter filter port in [`mod@filter`] (see that module
 //! for why it does **not** reuse `kindling-filter`). Known fidelity gaps vs the
 //! Node path are documented on the relevant functions and in the task report:
 //!   - captured observations are **not** attached to the session capsule (the
