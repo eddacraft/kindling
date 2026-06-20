@@ -11,12 +11,10 @@ kindling automatically captures your Claude Code sessions and injects prior cont
 Install it via any channel:
 
 ```bash
-# one-line installer (Linux/macOS)
-curl -fsSL https://install.kindling.dev | sh
-# or Homebrew (macOS)
-brew install eddacraft/tap/kindling
-# or from source
-cargo install kindling
+# prebuilt binary (recommended; Linux/macOS — no Node.js or Rust needed)
+curl -fsSL https://raw.githubusercontent.com/eddacraft/kindling/main/install.sh | sh
+# or from crates.io (the published crate is `eddacraft-kindling`; the binary is `kindling`)
+cargo install eddacraft-kindling
 ```
 
 Verify with `kindling --version`. (Hooks fail open — if the binary is missing
