@@ -1,11 +1,27 @@
 #!/bin/sh
-set -e
+set -eu
 
 # kindling installer
-# Usage: curl -fsSL https://raw.githubusercontent.com/eddacraft/kindling/main/install.sh | sh
+#
+# Downloads the prebuilt `kindling` binary from a GitHub release and installs
+# it. No Node.js or Rust toolchain required.
+#
+# Usage:
+#   curl -fsSL https://raw.githubusercontent.com/eddacraft/kindling/main/install.sh | sh
+#
+# Environment overrides:
+#   KINDLING_VERSION      release tag to install (e.g. v0.1.0); default: latest
+#   KINDLING_INSTALL_DIR  install directory; default: ~/.local/bin
+#
+# POSIX sh, shellcheck-clean.
 
-PACKAGE="@eddacraft/kindling-cli"
-MIN_NODE_MAJOR=20
+REPO="eddacraft/kindling"
+BIN_NAME="kindling"
+INSTALL_DIR="${KINDLING_INSTALL_DIR:-${HOME}/.local/bin}"
+
+# Set once the binary is installed; used by setup + the closing hints so we work
+# even when INSTALL_DIR is not yet on PATH.
+KINDLING_CMD=""
 
 # --- helpers ---
 
@@ -15,65 +31,135 @@ error() { printf '\033[1;31merror:\033[0m %s\n' "$1" >&2; exit 1; }
 
 command_exists() { command -v "$1" >/dev/null 2>&1; }
 
-# --- checks ---
+# --- platform detection ---
 
-check_node() {
-  if ! command_exists node; then
-    error "Node.js is not installed. Install Node.js >= ${MIN_NODE_MAJOR} from https://nodejs.org or use a version manager (fnm, nvm, mise)"
-  fi
+detect_target() {
+  os="$(uname -s)"
+  arch="$(uname -m)"
 
-  local version major
-  version=$(node --version)
-  major=$(printf '%s' "$version" | sed 's/^v//' | cut -d. -f1)
+  case "$arch" in
+    x86_64 | amd64) cpu="x86_64" ;;
+    aarch64 | arm64) cpu="aarch64" ;;
+    *) error "unsupported architecture: ${arch}" ;;
+  esac
 
-  if [ "$major" -lt "$MIN_NODE_MAJOR" ] 2>/dev/null; then
-    error "Node.js ${version} is too old. kindling requires Node.js >= ${MIN_NODE_MAJOR}. Update via https://nodejs.org or your version manager"
-  fi
+  case "$os" in
+    Linux)
+      libc="gnu"
+      if [ -f /etc/alpine-release ] || (ldd --version 2>&1 | grep -qi musl); then
+        libc="musl"
+      fi
+      TARGET="${cpu}-unknown-linux-${libc}"
+      EXT="tar.gz"
+      ;;
+    Darwin)
+      TARGET="${cpu}-apple-darwin"
+      EXT="tar.gz"
+      ;;
+    MINGW* | MSYS* | CYGWIN* | Windows_NT)
+      TARGET="x86_64-pc-windows-gnu"
+      EXT="zip"
+      ;;
+    *) error "unsupported OS: ${os}" ;;
+  esac
 
-  info "Found Node.js ${version}"
+  info "Detected platform: ${TARGET}"
 }
 
-detect_package_manager() {
-  if command_exists pnpm; then
-    printf 'pnpm'
-  elif command_exists yarn; then
-    printf 'yarn'
-  elif command_exists bun; then
-    printf 'bun'
-  elif command_exists npm; then
-    printf 'npm'
+# --- version resolution ---
+
+resolve_version() {
+  if [ -n "${KINDLING_VERSION:-}" ]; then
+    TAG="${KINDLING_VERSION}"
   else
-    error "No package manager found. Install one of: pnpm, yarn, bun, npm"
+    command_exists curl || error "curl is required to resolve the latest release"
+    info "Resolving the latest release..."
+    TAG="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
+      | grep '"tag_name"' | head -1 \
+      | sed -E 's/.*"tag_name"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/')"
+    [ -n "$TAG" ] ||
+      error "could not resolve the latest release (set KINDLING_VERSION=vX.Y.Z to pin a version, e.g. a pre-release)"
   fi
+  VERSION="${TAG#v}"
 }
 
 # --- install ---
 
-install_kindling() {
-  local pm="$1"
-  info "Installing ${PACKAGE} with ${pm}..."
+cargo_fallback() {
+  if command_exists cargo; then
+    warn "Falling back to 'cargo install eddacraft-kindling'."
+    cargo install eddacraft-kindling
+    KINDLING_CMD="$BIN_NAME"
+  else
+    error "No prebuilt binary for ${TARGET}. Install Rust (https://rustup.rs) and run: cargo install eddacraft-kindling"
+  fi
+}
 
-  case "$pm" in
-    pnpm) pnpm add -g "$PACKAGE" ;;
-    yarn) yarn global add "$PACKAGE" ;;
-    bun)  bun add -g "$PACKAGE" ;;
-    npm)  npm install -g "$PACKAGE" ;;
-    *)    error "Unknown package manager: ${pm}" ;;
+install_binary() {
+  command_exists curl || error "curl is required to download the binary"
+
+  archive="${BIN_NAME}-${VERSION}-${TARGET}.${EXT}"
+  base_url="https://github.com/${REPO}/releases/download/${TAG}"
+
+  tmp="$(mktemp -d)"
+  trap 'rm -rf "$tmp"' EXIT
+
+  info "Downloading ${archive} (${TAG})..."
+  if ! curl -fsSL "${base_url}/${archive}" -o "${tmp}/${archive}"; then
+    warn "Could not download ${archive}."
+    cargo_fallback
+    return
+  fi
+
+  if curl -fsSL "${base_url}/${archive}.sha256" -o "${tmp}/${archive}.sha256" 2>/dev/null; then
+    info "Verifying checksum..."
+    (
+      cd "$tmp"
+      if command_exists sha256sum; then
+        sha256sum -c "${archive}.sha256"
+      elif command_exists shasum; then
+        shasum -a 256 -c "${archive}.sha256"
+      else
+        warn "no sha256 tool found; skipping verification"
+      fi
+    )
+  else
+    warn "No checksum sidecar found; skipping verification."
+  fi
+
+  info "Extracting..."
+  case "$EXT" in
+    tar.gz) tar -xzf "${tmp}/${archive}" -C "$tmp" ;;
+    zip)
+      command_exists unzip || error "unzip is required to extract ${archive}"
+      unzip -q "${tmp}/${archive}" -d "$tmp"
+      ;;
   esac
 
-  if ! command_exists kindling; then
-    warn "kindling command not found in PATH after install"
-    warn "You may need to configure your shell for global packages from ${pm}"
+  bin_file="$BIN_NAME"
+  [ "$EXT" = "zip" ] && bin_file="${BIN_NAME}.exe"
+
+  mkdir -p "$INSTALL_DIR"
+  if command_exists install; then
+    install -m 0755 "${tmp}/${bin_file}" "${INSTALL_DIR}/${bin_file}"
+  else
+    cp "${tmp}/${bin_file}" "${INSTALL_DIR}/${bin_file}"
+    chmod 0755 "${INSTALL_DIR}/${bin_file}"
   fi
+
+  KINDLING_CMD="${INSTALL_DIR}/${bin_file}"
+  info "Installed ${BIN_NAME} ${VERSION} to ${KINDLING_CMD}"
+
+  case ":${PATH}:" in
+    *":${INSTALL_DIR}:"*) ;;
+    *) warn "${INSTALL_DIR} is not on your PATH. Add it: export PATH=\"${INSTALL_DIR}:\$PATH\"" ;;
+  esac
 }
 
 # --- setup ---
 
 setup_claude_code() {
-  if ! command_exists kindling; then
-    warn "Skipping setup: kindling not found in PATH"
-    return
-  fi
+  [ -n "$KINDLING_CMD" ] || return
 
   printf '\n'
   printf '  Configure Claude Code integration?\n'
@@ -81,17 +167,17 @@ setup_claude_code() {
   printf '\n'
   printf '  Enable Claude Code integration? [y/N] '
 
-  local answer
-  read answer </dev/tty || answer="n"
+  answer="n"
+  read -r answer </dev/tty || answer="n"
 
   case "$answer" in
-    [yY]|[yY][eE][sS])
+    [yY] | [yY][eE][sS])
       info "Running kindling init --claude-code..."
-      kindling init --claude-code
+      "$KINDLING_CMD" init --claude-code
       ;;
     *)
       info "Running kindling init..."
-      kindling init
+      "$KINDLING_CMD" init
       ;;
   esac
 }
@@ -104,13 +190,9 @@ main() {
   printf '  Local memory for AI-assisted development\n'
   printf '\n'
 
-  check_node
-
-  local pm
-  pm=$(detect_package_manager)
-  info "Using package manager: ${pm}"
-
-  install_kindling "$pm"
+  detect_target
+  resolve_version
+  install_binary
   setup_claude_code
 
   printf '\n'

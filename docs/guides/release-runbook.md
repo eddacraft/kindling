@@ -1,18 +1,32 @@
 # kindling Release Runbook
 
-Purpose: ship kindling's npm packages safely and consistently.
+Purpose: ship kindling safely and consistently across its two distribution
+channels.
 
-kindling publishes 9 workspace packages to the `@eddacraft/*` scope on npm. All
-publishing is automated via `.github/workflows/publish.yml`, which is triggered
-by GitHub Releases.
+kindling is Rust-canonical and ships through two channels:
+
+1. **crates.io** — the seven Rust crates in `crates/` (the engine). Published
+   manually with `scripts/publish.sh` (credential-gated). See
+   [crates.io release](#cratesio-release) below.
+2. **npm** — the thin `@eddacraft/kindling` client plus the adapters, published
+   to the `@eddacraft/*` scope. Automated via `.github/workflows/publish.yml`,
+   triggered by GitHub Releases.
 
 ## Release policy
 
-- **Distribution:** npm registry, public scope `@eddacraft/*`, with provenance.
-- **Trigger:** GitHub Release published from a tag on `main`.
-- **Workflow source of truth:** `.github/workflows/publish.yml`.
-- **Version source of truth:** root `package.json` `version`. The publish
-  workflow asserts the release tag matches.
+- **Distribution:** crates.io (Rust crates) and the npm `@eddacraft/*` scope
+  (thin client + adapters), both public, npm with provenance.
+- **Trigger:** GitHub Release published from a tag on `main` (drives the npm
+  workflow; the crates.io publish is run by the maintainer).
+- **Workflow source of truth:** `.github/workflows/publish.yml` (npm),
+  `scripts/publish.sh` (crates.io).
+- **Version source of truth:** the Rust workspace version in the root
+  `Cargo.toml` for crates; root `package.json` `version` for npm. The npm
+  publish workflow asserts the release tag matches `package.json`.
+
+> The Rust workspace and the npm packages are versioned independently. Keep the
+> crates in lockstep with each other (one workspace version) and the npm
+> packages in lockstep with each other.
 
 See the [branching strategy](branching-strategy.md) for the branch model that
 this runbook assumes.
@@ -23,6 +37,15 @@ Run from the repo root with a clean working tree on the latest `main`:
 
 ```bash
 git switch main && git pull --ff-only origin main
+
+# Rust (engine)
+cargo fmt --all -- --check
+cargo clippy --all-targets --all-features -- -D warnings
+cargo build --release
+cargo test
+scripts/sync-vendored-schema.sh   # CI fails on schema drift
+
+# npm (thin client + adapters)
 pnpm install --frozen-lockfile
 pnpm run build
 pnpm run type-check
@@ -30,15 +53,17 @@ pnpm run lint
 pnpm run test
 ```
 
-All four checks must pass. If any fails, stop and fix on a branch targeting
-`main` before continuing.
+All checks must pass. If any fails, stop and fix on a branch targeting `main`
+before continuing.
 
 Sanity assertions before promoting:
 
+- Root `Cargo.toml` workspace version matches the crates you intend to publish.
 - Root `package.json` version matches the tag you intend to push.
-- All workspace packages share the same version (lockstep release).
-- `CHANGELOG.md` (if present) has notes for this version.
-- README install instructions still work.
+- All crates share one workspace version; all npm packages share one version
+  (lockstep within each channel).
+- `CHANGELOG.md` has notes for this release.
+- README install instructions (the install script, `cargo install eddacraft-kindling`, and npm) still work.
 
 ## 2. Stabilise the release
 
@@ -132,6 +157,46 @@ gh run watch
 - `npm view @eddacraft/kindling version` returns the new version.
 - `npx @eddacraft/kindling-cli@latest --version` works.
 - The GitHub Release page lists the tag and the publish workflow run is green.
+
+## crates.io release
+
+The Rust crates are published to crates.io by the maintainer with
+`scripts/publish.sh`. This step is **credential-gated** and is not run by CI.
+
+Prerequisites:
+
+- A crates.io account and API token: `cargo login <token>` (or set
+  `CARGO_REGISTRY_TOKEN`).
+- A clean, committed tree on the release commit/tag.
+- `scripts/sync-vendored-schema.sh` already run (CI enforces no drift).
+
+crates.io requires each crate's dependencies to be published first, so the
+script publishes in topological order (leaves first, the `kindling` binary
+last): `kindling-types` → `kindling-store` → `kindling-provider` →
+`kindling-service` → `kindling-client` → `kindling-server` → `eddacraft-kindling`.
+
+```bash
+# Dry run (cargo publish --dry-run for every crate)
+DRY_RUN=1 scripts/publish.sh
+
+# Real publish (pauses between crates so crates.io can index each one)
+scripts/publish.sh
+```
+
+Notes:
+
+- A dependent crate's `--dry-run` fails with "no matching package" until its
+  deps are actually on crates.io — that is expected for a not-yet-published
+  workspace and does not indicate a packaging problem. Verify packaging with
+  `cargo package --list -p <crate>` instead.
+- If a publish fails partway, wait for indexing and re-run from the failed
+  crate. crates.io does not allow republishing the same version — bump the
+  workspace version and re-release the full set if needed.
+
+Verify:
+
+- `cargo search kindling` (or the crate page) shows the new version.
+- `cargo install eddacraft-kindling` installs the new binary; `kindling --version` matches.
 
 ## Hotfix flow
 

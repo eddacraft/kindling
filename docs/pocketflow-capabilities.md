@@ -261,7 +261,16 @@ class StructuredNode extends Node<StructuredStore> {
 
 ## kindling + PocketFlow Integration
 
-The `@eddacraft/kindling-adapter-pocketflow` package provides `KindlingNode` and `KindlingFlow` that automatically capture observations:
+PocketFlow is a TypeScript framework, so the kindling integration ships as a
+published TS adapter: `@eddacraft/kindling-adapter-pocketflow` (v0.2.0). The
+adapter depends on the thin `@eddacraft/kindling` npm client, which speaks
+HTTP-over-UDS to the **Rust kindling daemon** — that is where capsules and
+observations are actually persisted. (kindling is Rust-canonical; the adapter no
+longer depends on any TypeScript implementation package such as
+`@eddacraft/kindling-core`.)
+
+The adapter provides `KindlingNode` and `KindlingFlow` that automatically
+capture observations via the thin client:
 
 ```typescript
 import {
@@ -289,14 +298,16 @@ const confidence = tracker.getConfidence('analyze-code'); // 0.6
 
 ### What Gets Captured
 
-For each node invocation:
+For each node invocation the adapter opens a capsule of type
+`pocketflow_node` and records these observation kinds:
 
 - `node_start`: When the node begins (with intent and parameters)
 - `node_output`: The truncated output of the node
 - `node_error`: If the node fails (with error details and retry count)
 - `node_end`: When the node completes (with duration and status)
 
-All observations are attached to a capsule scoped to that node invocation.
+All observations are attached to the `pocketflow_node` capsule scoped to that
+node invocation, and are persisted by the Rust daemon via the thin client.
 
 ### Intent Inference
 

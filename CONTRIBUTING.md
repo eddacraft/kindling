@@ -2,18 +2,50 @@
 
 Thank you for your interest in contributing to kindling! We welcome contributions from the community.
 
+## Project layout
+
+kindling is **Rust-canonical**. The engine lives in the Rust workspace under
+[`crates/`](crates); the npm packages under [`packages/`](packages) are a thin
+client over the Rust binary plus the adapters. Most contributions land in the
+crates.
+
+```
+kindling/
+├── crates/                 # Rust workspace (the canonical engine)
+│   ├── kindling/           #   CLI binary + Claude Code hooks (kindling, kindling-hook)
+│   ├── kindling-client/    #   daemon-backed Rust SDK (default for integrations)
+│   ├── kindling-service/   #   in-process orchestration (embedded, zero-IPC)
+│   ├── kindling-server/    #   daemon runtime (HTTP/1 over UDS)
+│   ├── kindling-store/     #   SQLite persistence (FTS5 + WAL)
+│   ├── kindling-provider/  #   deterministic local retrieval (FTS5 BM25 + recency)
+│   └── kindling-types/     #   shared domain types (+ ts-rs bindings)
+├── packages/               # npm: thin @eddacraft/kindling client + adapters
+├── schema/                 # cross-language schema contract (schema.sql, version.json)
+├── docs/                   # documentation
+└── plans/                  # planning documents (APS)
+```
+
+> The TypeScript implementation packages (`-core`, `-store-sqlite`,
+> `-store-sqljs`, `-provider-local`, `-server`, `-cli`) are **deprecated** and
+> will be removed at 1.0.0. New feature work targets the Rust crates.
+
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js >= 20.0.0
-- pnpm >= 8.0.0
+- Rust (stable) — the toolchain is pinned in [`rust-toolchain.toml`](rust-toolchain.toml); `rustup` installs it automatically.
+- Node.js >= 20.0.0 and pnpm >= 8.0.0 — only needed to work on the npm thin client / adapters.
 
 ### Development Setup
 
 ```bash
 git clone https://github.com/eddacraft/kindling.git
 cd kindling
+
+# Rust workspace (canonical engine)
+cargo build
+
+# npm packages (thin client + adapters), optional
 pnpm install
 pnpm build
 ```
@@ -21,45 +53,48 @@ pnpm build
 ### Running Tests
 
 ```bash
-# Run all tests
-pnpm test
+# Rust: all crates
+cargo test
 
-# Run tests for a specific package
-cd packages/kindling-core
-pnpm test
+# Rust: a single crate
+cargo test -p kindling-provider
 
-# Watch mode
-pnpm test:watch
+# Domain-type bindings (regenerates + checks the ts-rs projection)
+cargo test -p kindling-types --features ts-rs
+
+# npm packages
+pnpm test
 ```
 
-### Building
+### Checks before pushing
 
 ```bash
-# Build all packages
-pnpm build
+cargo fmt --all -- --check
+cargo clippy --all-targets --all-features -- -D warnings
+cargo test
 
-# Type-check without emitting
-pnpm type-check
-
-# Clean build artifacts
-pnpm clean
+# If you touched the npm packages:
+pnpm build && pnpm test
 ```
+
+If you changed the schema, run `scripts/sync-vendored-schema.sh` — CI fails on
+schema drift between `schema/` and the vendored copies. If you changed a type
+that has a ts-rs binding, regenerate it (CI fails on binding drift).
 
 ## Code Style
 
-- **TypeScript** for all source code
-- **Explicit types** for public APIs
-- **Descriptive names** - clarity over brevity
-- **Small, focused functions** - single responsibility
-- **Tests alongside implementation** - high coverage for core functionality
-- **ESM only** - use `.js` extensions in imports
+- **Rust** is the primary language: `rustfmt` formatting, `clippy`-clean (warnings denied).
+- **TypeScript** (thin client + adapters): explicit types for public APIs, ESM only — use `.js` extensions in imports.
+- **Descriptive names** — clarity over brevity.
+- **Small, focused functions** — single responsibility.
+- **Tests alongside implementation** — high coverage for the engine crates.
 
 ## Branching Model
 
 kindling uses a single permanent branch model with short-lived work branches:
 
 - `main` is the default branch, integration branch, and stable release branch.
-  Always publishable to npm.
+  Always releasable to crates.io and npm.
 - normal feat, fix, docs, and chore branches are created from `main`.
 - hotfix branches are created from `main` or the active `release/*` branch.
 
@@ -84,7 +119,7 @@ See the detailed guides for the full policy:
 3. **Write tests** for new functionality
 4. **Update documentation** if behavior changes
 5. **Keep PRs focused** — one logical change per PR
-6. **Run the full test suite**: `pnpm build && pnpm test && pnpm lint`
+6. **Run the checks**: `cargo fmt --all -- --check && cargo clippy --all-targets --all-features -- -D warnings && cargo test` (plus `pnpm build && pnpm test` if you touched the npm packages)
 7. **Ensure CI passes** before requesting review
 8. **Target `main`** — all PRs target `main` unless they are scoped to an
    active `release/*` branch.
@@ -134,8 +169,8 @@ These belong to downstream systems and will not be accepted:
 - Governance workflows (review, approval, promotion)
 - MemoryObject lifecycle management
 - Multi-user access control and permissions
-- Cloud/server deployment modes
-- Semantic/embedding-based retrieval (planned for Phase 2)
+- Cloud / hosted deployment modes (the local daemon is in scope; remote/multi-tenant hosting is not)
+- Semantic/embedding-based retrieval (planned for a later phase)
 - UI components
 
 If you're unsure whether something is in scope, open an issue to discuss before investing time.
@@ -150,21 +185,7 @@ For net-new functionality, start with a design conversation. Open an issue descr
 
 The maintainers will help decide whether it should move forward. Please wait for approval before opening a feature PR.
 
-## Project Structure
-
-```
-kindling/
-├── packages/
-│   ├── kindling/               # Main package (core + sqlite + provider + server)
-│   ├── kindling-core/          # Domain types & KindlingService
-│   ├── kindling-store-sqljs/   # Browser/WASM store
-│   ├── kindling-adapter-opencode/
-│   ├── kindling-adapter-pocketflow/
-│   ├── kindling-adapter-claude-code/
-│   └── kindling-cli/           # CLI tools
-├── docs/                       # Documentation
-└── plans/                      # Planning documents (APS)
-```
+For the repository layout, see [Project layout](#project-layout) above.
 
 ## Questions?
 

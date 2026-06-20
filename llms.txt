@@ -1,14 +1,25 @@
 # kindling
 
-> A lightweight library for adding durable memory and contextual continuity to AI-assisted workflows. Captures observations, organises into capsules, retrieves with provenance. Local-first, embedded SQLite, no external services.
+> Local-first memory and continuity for AI-assisted development. Captures observations (tool calls, diffs, commands, errors), organises them into capsules, and retrieves them with deterministic, explainable results. Rust-canonical: a `kindling` CLI/daemon, a daemon-backed Rust SDK, and an embedded in-process service. Local-first, embedded SQLite (FTS5 + WAL), no external services.
 
-kindling is infrastructure — it captures context but does not assert truth. Governance and promotion belong to downstream systems.
+kindling is infrastructure — it captures context but does not assert truth. Governance and promotion belong to downstream systems. The engine is the Rust workspace in `crates/`; the npm `@eddacraft/kindling` package is a thin client over the Rust binary (the older TypeScript implementation packages are deprecated, to be removed at 1.0.0). Canonical published docs: https://docs.eddacraft.ai/kindling/overview.
+
+## Crates
+
+- `eddacraft-kindling`: CLI binary (`init`, `log`, `search`, `capsule`, `pin`, `serve`, `hook`, …) + Claude Code hooks. Installed command: `kindling`.
+- `kindling-client`: daemon-backed Rust SDK (HTTP/1 over UDS); the default for integrations.
+- `kindling-service`: embedded, in-process orchestration (capsule lifecycle, capture, retrieval, pins).
+- `kindling-server`: the daemon runtime (`kindling serve`); per-project routing.
+- `kindling-store`: SQLite persistence (FTS5 + WAL); schema contract in `schema/`.
+- `kindling-provider`: deterministic local retrieval (FTS5 BM25 + recency).
+- `kindling-types`: shared domain types (optional ts-rs bindings).
 
 ## Docs
 
-- [Architecture](docs/architecture.md): System design and package boundaries
-- [Data Model](docs/data-model.md): Core types (Observation, Capsule, Summary, Pin)
+- [Architecture](docs/architecture.md): Crate topology, daemon model, data flow
+- [Data Model](docs/data-model.md): Core types (Observation, Capsule, Summary, Pin, ScopeIds)
 - [Retrieval Contract](docs/retrieval-contract.md): Query behaviour and determinism guarantees
+- [Use Cases](docs/use-cases.md): When kindling fits, and getting started
 
 ## Plan
 
@@ -17,3 +28,4 @@ kindling is infrastructure — it captures context but does not assert truth. Go
 ## Optional
 
 - [Contributing](CONTRIBUTING.md): PR process and scope guardrails
+- [Changelog](CHANGELOG.md): Notable changes, including the Rust cutover

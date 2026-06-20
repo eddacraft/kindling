@@ -115,66 +115,90 @@ All data is stored locally using embedded SQLite with FTS5—no cloud dependenci
 
 ## Integration Points
 
-kindling integrates through **adapters**:
+kindling integrates through **adapters**. Each adapter now runs over the thin
+`@eddacraft/kindling` npm client, which speaks HTTP-over-UDS to the Rust
+daemon:
 
-| Adapter                                   | Use Case                                            |
-| ----------------------------------------- | --------------------------------------------------- |
-| `@eddacraft/kindling-adapter-opencode`    | OpenCode session integration                        |
-| `@eddacraft/kindling-adapter-pocketflow`  | PocketFlow workflow nodes                           |
-| `@eddacraft/kindling-adapter-claude-code` | Claude Code hooks integration                       |
-| Custom adapters                           | Any AI system with tool calls, commands, or outputs |
+| Adapter                                   | Use Case                                             |
+| ----------------------------------------- | ---------------------------------------------------- |
+| `@eddacraft/kindling-adapter-opencode`    | OpenCode session integration (thin client → daemon)  |
+| `@eddacraft/kindling-adapter-pocketflow`  | PocketFlow workflow nodes (thin client → daemon)     |
+| `@eddacraft/kindling-adapter-claude-code` | Claude Code hooks integration (thin client → daemon) |
+| Custom adapters                           | Any AI system with tool calls, commands, or outputs  |
 
 ## Key Concepts
 
 - **Observation**: Atomic unit of captured context (tool_call, command, file_diff, error, message, node events)
 - **Capsule**: Bounded unit grouping observations (session, workflow node, custom)
-- **Retrieval**: Three-tiered system with pins (user-controlled), summaries (session context), and FTS hits (ranked search)
+- **Retrieval**: Three-tiered system with pins (user-controlled), summaries (session context), and FTS5 BM25 + recency candidates (ranked search)
 - **Provenance**: Metadata explaining where each piece of context came from
+- **Scope**: Five optional scope IDs attach to observations and capsules — `sessionId`, `repoId`, `agentId`, `userId`, `taskId`
 
 ## Getting Started
 
-```typescript
-import {
-  KindlingService,
-  SqliteKindlingStore,
-  LocalFtsProvider,
-  openDatabase,
-} from '@eddacraft/kindling';
+kindling is **Rust-canonical**. The fastest path is the CLI; Rust projects
+embed it via a crate.
 
-// Initialize
-const db = openDatabase({ path: './kindling.db' });
-const store = new SqliteKindlingStore(db);
-const provider = new LocalFtsProvider(db);
-const service = new KindlingService({ store, provider });
+### Fast path (CLI)
 
-// Open a session capsule
-const capsule = service.openCapsule({
-  type: 'session',
-  intent: 'debug',
-  scopeIds: { sessionId: 'session-1', repoId: 'my-project' },
-});
+```bash
+# Install the CLI binary (published as the `eddacraft-kindling` crate)
+cargo install eddacraft-kindling
 
-// Capture an observation
-service.appendObservation(
-  {
-    id: 'obs-1',
-    kind: 'command',
-    content: 'npm test failed with ECONNREFUSED',
-    provenance: { command: 'npm test', exitCode: 1 },
-    ts: Date.now(),
-    scopeIds: { sessionId: 'session-1' },
-    redacted: false,
-  },
-  { capsuleId: capsule.id },
-);
+# Initialize a local store
+kindling init
 
-// Later, retrieve context
-const results = await service.retrieve({
-  query: 'connection refused',
-  scopeIds: { repoId: 'my-project' },
-  limit: 10,
-});
+# Capture an observation
+kindling log --kind command "npm test failed with ECONNREFUSED"
+
+# Retrieve context later
+kindling search "connection refused"
 ```
+
+### Rust (daemon-backed client)
+
+The default integration is `kindling-client`, a daemon-backed SDK. It talks to
+a local kindling daemon (`kindling serve`) over HTTP-over-UDS.
+
+The client methods are `async`; the snippet below uses placeholder values
+(`scope_ids`, `observation_input`, `retrieve_options`) to focus on the shape —
+see the [README](../README.md#programmatic-usage) for a complete example.
+
+```rust
+use kindling_client::{Client, CapsuleType};
+
+// Connect to the local daemon (auto-spawned on first use).
+let client = Client::new()?;
+
+// Open a session capsule.
+let capsule = client.open_capsule(
+    CapsuleType::Session,      // kind
+    "debug",                   // intent
+    scope_ids,                 // sessionId / repoId / agentId / userId / taskId
+    None,                      // id (auto-generated when None)
+).await?;
+
+// Capture an observation.
+client.append_observation(
+    observation_input,         // ObservationInput { kind, content, scope_ids, ... }
+    Some(capsule.id),          // capsule_id
+    Some(true),                // validate
+).await?;
+
+// Later, retrieve context (deterministic + explainable).
+let results = client.retrieve(retrieve_options).await?; // query, scope_ids, max_candidates
+```
+
+For in-process use without a daemon, depend on `kindling-service` instead and
+call `KindlingService::open(path)?` directly — it exposes the same lifecycle
+(`open_capsule`, `close_capsule`, `append_observation`, `retrieve`, `pin`,
+`unpin`, `forget`).
+
+> For Node/TypeScript callers, `@eddacraft/kindling` is a thin HTTP-over-UDS
+> client over the same Rust binary. The legacy TS implementation packages
+> (including the standalone CLI `@eddacraft/kindling-cli`) are **deprecated** and
+> will be removed at 1.0.0; prefer `cargo install eddacraft-kindling` (or the
+> install script) for the CLI.
 
 ## Summary
 
