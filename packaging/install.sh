@@ -1,7 +1,7 @@
 #!/bin/sh
 # kindling native-binary installer.
 #
-#   curl -sSL https://install.kindling.dev | sh
+#   curl -fsSL https://raw.githubusercontent.com/eddacraft/kindling/main/packaging/install.sh | sh
 #
 # Downloads the prebuilt `kindling` binary for your OS/arch from the latest
 # GitHub Release, verifies its SHA256 against the published sidecar, and installs
