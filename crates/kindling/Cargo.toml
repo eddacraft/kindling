@@ -11,24 +11,32 @@ homepage = "https://github.com/eddacraft/kindling"
 keywords = ["memory", "ai", "context", "sqlite", "cli"]
 categories = ["command-line-utilities", "development-tools"]
 
+[lib]
+name = "kindling"
+path = "src/lib.rs"
+
 [[bin]]
 name = "kindling"
 path = "src/main.rs"
 
 [dependencies]
-# The umbrella reuses the CLI's clap dispatch and the hook's self-contained
-# `run_hook` (which owns its own current-thread Tokio runtime). The umbrella
-# `main` is a plain `fn main() -> ExitCode` — no second Tokio runtime macro.
-kindling-cli = { path = "../kindling-cli", version = "0.1.0" }
-kindling-hook = { path = "../kindling-hook", version = "0.1.0" }
+kindling-types = { path = "../kindling-types", version = "0.1.0" }
+kindling-store = { path = "../kindling-store", version = "0.1.0" }
+kindling-service = { path = "../kindling-service", version = "0.1.0" }
+kindling-client = { path = "../kindling-client", version = "0.1.0" }
+kindling-server = { path = "../kindling-server", version = "0.1.0" }
+clap = { version = "4", features = ["derive"] }
+rusqlite = { version = "0.40", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "net", "time", "io-std", "io-util"] }
+thiserror = "2"
+anyhow = "1"
+regex = "1"
 
 [dev-dependencies]
-kindling-server = { path = "../kindling-server", version = "0.1.0" }
-kindling-store = { path = "../kindling-store", version = "0.1.0" }
-kindling-types = { path = "../kindling-types", version = "0.1.0" }
-serde_json = { version = "1", features = ["preserve_order"] }
 tempfile = "3"
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time", "process", "io-util"] }
 
 [lints]
 workspace = true

@@ -8,7 +8,7 @@
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::error::HookError;
+use crate::hook::error::HookError;
 
 /// The seven Claude Code hook types this binary handles. The string forms are
 /// the `argv[1]` values the umbrella `kindling hook <type>` passes (PORT-013).

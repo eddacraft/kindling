@@ -575,20 +575,6 @@ dependencies = [
 name = "kindling"
 version = "0.1.0"
 dependencies = [
- "kindling-cli",
- "kindling-hook",
- "kindling-server",
- "kindling-store",
- "kindling-types",
- "serde_json",
- "tempfile",
- "tokio",
-]
-
-[[package]]
-name = "kindling-cli"
-version = "0.1.0"
-dependencies = [
  "anyhow",
  "clap",
  "kindling-client",
@@ -596,6 +582,7 @@ dependencies = [
  "kindling-service",
  "kindling-store",
  "kindling-types",
+ "regex",
  "rusqlite",
  "serde",
  "serde_json",
@@ -620,22 +607,6 @@ dependencies = [
  "thiserror",
  "tokio",
  "uuid",
-]
-
-[[package]]
-name = "kindling-hook"
-version = "0.1.0"
-dependencies = [
- "kindling-client",
- "kindling-server",
- "kindling-store",
- "kindling-types",
- "regex",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror",
- "tokio",
 ]
 
 [[package]]
