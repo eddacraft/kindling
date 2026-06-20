@@ -32,11 +32,11 @@ Start here:
 The fastest way to use kindling — automatic memory for every Claude Code session.
 
 ```bash
-# Install and set up in one step
+# Install and set up in one step (downloads the prebuilt binary, no toolchain needed)
 curl -fsSL https://raw.githubusercontent.com/eddacraft/kindling/main/install.sh | sh
 
-# Or with npx (no global install)
-npx @eddacraft/kindling-cli init --claude-code
+# Or, if you have Rust:
+cargo install eddacraft-kindling && kindling init --claude-code
 ```
 
 That's it. kindling now captures your Claude Code sessions automatically — tool calls, file edits, commands, errors — all searchable across sessions.
@@ -55,15 +55,25 @@ That's it. kindling now captures your Claude Code sessions automatically — too
 
 ## Install
 
+### Prebuilt binary (recommended)
+
+The one-line installer downloads the prebuilt `kindling` binary for your platform —
+no Node.js or Rust toolchain required:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/eddacraft/kindling/main/install.sh | sh
+```
+
 ### Rust / Cargo
+
+The CLI is published as the [`eddacraft-kindling`](https://crates.io/crates/eddacraft-kindling)
+crate (the installed binary is `kindling`):
 
 ```bash
 cargo install eddacraft-kindling
 ```
 
-This installs the `kindling` binary (the crate is published as
-`eddacraft-kindling` — the bare `kindling` name on crates.io is taken by an
-unrelated project; the command you run is still `kindling`):
+Then:
 
 ```bash
 kindling init
@@ -90,52 +100,36 @@ Full setup guide: [docs.eddacraft.ai/kindling/quickstart/install](https://docs.e
 
 ### Node.js / npm
 
-Node.js >= 20 required. Prebuilt binaries ship for Linux (glibc), macOS (Intel + Apple Silicon), and Windows (x64).
+The canonical CLI is the Rust binary. The one-line installer above downloads the
+prebuilt binary and sets up the Claude Code integration — no Node.js or Rust
+toolchain required.
+
+For Node.js applications, install the thin client library — it talks to the same
+Rust daemon over a Unix domain socket (Node.js >= 20):
 
 ```bash
-# Recommended: one-line installer (installs CLI + Claude Code plugin)
-curl -fsSL https://raw.githubusercontent.com/eddacraft/kindling/main/install.sh | sh
-
-# Or install with your preferred package manager
-npm install -g @eddacraft/kindling-cli    # CLI (global)
-npm install @eddacraft/kindling            # Library (project-local)
-
-pnpm add -g @eddacraft/kindling-cli
+npm install @eddacraft/kindling     # thin client library
 pnpm add @eddacraft/kindling
-
-yarn global add @eddacraft/kindling-cli
 yarn add @eddacraft/kindling
-
-bun add -g @eddacraft/kindling-cli
 bun add @eddacraft/kindling
 ```
 
-### Platform Notes
-
-<details>
-<summary>If prebuilt binaries aren't available for your platform</summary>
-
-kindling uses [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) which needs a C++ compiler to build from source:
-
-- **Debian/Ubuntu:** `sudo apt-get install build-essential python3`
-- **Fedora/RHEL:** `sudo dnf groupinstall "Development Tools"`
-- **Alpine (musl):** `apk add build-base python3`
-- **macOS:** `xcode-select --install`
-- **Windows (Admin):** `npm install -g windows-build-tools`
-
-</details>
+> `@eddacraft/kindling` is a thin TypeScript client over the Rust binary. The
+> older implementation packages — including the standalone CLI
+> `@eddacraft/kindling-cli` — are **deprecated** and will be removed at 1.0.0;
+> prefer `cargo install eddacraft-kindling` (or the installer above) for the CLI.
 
 ## Which crate should I use?
 
-| Crate | Use it when |
-| --- | --- |
-| [`eddacraft-kindling`](https://crates.io/crates/eddacraft-kindling) | You want the CLI binary `kindling` (`cargo install eddacraft-kindling`): `kindling init`, `kindling log`, `kindling search`, `kindling serve`, or Claude Code hook support. |
-| [`kindling-client`](https://crates.io/crates/kindling-client) | You are building a Rust integration that should talk to the kindling daemon safely across concurrent tools. This is the default SDK choice. |
-| [`kindling-service`](https://crates.io/crates/kindling-service) | You need embedded, in-process access to capsule lifecycle, observation capture, retrieval and pins. |
-| [`kindling-server`](https://crates.io/crates/kindling-server) | You are extending or embedding the daemon/runtime layer. Most users should run `kindling serve` instead. |
-| [`kindling-store`](https://crates.io/crates/kindling-store) | You are working directly with the SQLite persistence layer. Most applications should use `kindling-client` or `kindling-service`. |
-| [`kindling-provider`](https://crates.io/crates/kindling-provider) | You are working on deterministic local retrieval and ranking. |
-| [`kindling-types`](https://crates.io/crates/kindling-types) | You need shared domain types directly. Most client users get these re-exported from `kindling-client`. |
+| Crate                                                               | Use it when                                                                                                                                                 |
+| ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`eddacraft-kindling`](https://crates.io/crates/eddacraft-kindling) | You want the CLI binary (installed command: `kindling`): `kindling init`, `kindling log`, `kindling search`, `kindling serve`, or Claude Code hook support. |
+| [`kindling-client`](https://crates.io/crates/kindling-client)       | You are building a Rust integration that should talk to the kindling daemon safely across concurrent tools. This is the default SDK choice.                 |
+| [`kindling-service`](https://crates.io/crates/kindling-service)     | You need embedded, in-process access to capsule lifecycle, observation capture, retrieval and pins.                                                         |
+| [`kindling-server`](https://crates.io/crates/kindling-server)       | You are extending or embedding the daemon/runtime layer. Most users should run `kindling serve` instead.                                                    |
+| [`kindling-store`](https://crates.io/crates/kindling-store)         | You are working directly with the SQLite persistence layer. Most applications should use `kindling-client` or `kindling-service`.                           |
+| [`kindling-provider`](https://crates.io/crates/kindling-provider)   | You are working on deterministic local retrieval and ranking.                                                                                               |
+| [`kindling-types`](https://crates.io/crates/kindling-types)         | You need shared domain types directly. Most client users get these re-exported from `kindling-client`.                                                      |
 
 ## CLI Usage
 
@@ -212,107 +206,116 @@ kindling captures context automatically through adapters:
 
 Or capture manually with the CLI (`kindling log`, `kindling capsule open/close`).
 
-## Packages
-
-| Package                                                                              | Description                                                              |
-| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
-| [`@eddacraft/kindling`](./packages/kindling)                                         | **Main package**: re-exports core + SQLite store + local FTS provider    |
-| [`@eddacraft/kindling-core`](./packages/kindling-core)                               | Domain types, KindlingService, validation (for adapter authors, browser) |
-| [`@eddacraft/kindling-store-sqlite`](./packages/kindling-store-sqlite)               | SQLite persistence with FTS5 and WAL mode                                |
-| [`@eddacraft/kindling-store-sqljs`](./packages/kindling-store-sqljs)                 | sql.js WASM store for browser compatibility                              |
-| [`@eddacraft/kindling-provider-local`](./packages/kindling-provider-local)           | Local FTS-based retrieval provider with deterministic ranking            |
-| [`@eddacraft/kindling-server`](./packages/kindling-server)                           | HTTP API server for multi-agent concurrency (Fastify)                    |
-| [`@eddacraft/kindling-cli`](./packages/kindling-cli)                                 | CLI tools for inspection, search, and management                         |
-| [`@eddacraft/kindling-adapter-opencode`](./packages/kindling-adapter-opencode)       | OpenCode session integration                                             |
-| [`@eddacraft/kindling-adapter-pocketflow`](./packages/kindling-adapter-pocketflow)   | PocketFlow workflow integration with intent and confidence tracking      |
-| [`@eddacraft/kindling-adapter-claude-code`](./packages/kindling-adapter-claude-code) | Claude Code hooks integration                                            |
+The adapters are thin TypeScript packages that talk to the kindling daemon
+through the [`@eddacraft/kindling`](./packages/kindling) client. They live under
+[`packages/`](./packages) and are published to npm.
 
 ## Programmatic Usage
 
-For building on kindling as a library:
+kindling is Rust-canonical. For most integrations, use the daemon-backed client
+([`kindling-client`](https://crates.io/crates/kindling-client)) — it speaks to
+the daemon started by `kindling serve`, so several tools can share the same
+project memory safely:
 
-```typescript
-import { randomUUID } from 'node:crypto';
-import {
-  KindlingService,
-  openDatabase,
-  SqliteKindlingStore,
-  LocalFtsProvider,
-} from '@eddacraft/kindling';
+```rust
+use kindling_client::{Client, CapsuleType, ObservationInput, ObservationKind, RetrieveOptions, ScopeIds};
 
-const db = openDatabase({ path: './my-memory.db' });
-const store = new SqliteKindlingStore(db);
-const provider = new LocalFtsProvider(db);
-const service = new KindlingService({ store, provider });
+#[tokio::main]
+async fn main() -> Result<(), kindling_client::ClientError> {
+    // Auto-spawns the daemon on first use.
+    let client = Client::new()?;
 
-// Open a session capsule
-const capsule = service.openCapsule({
-  type: 'session',
-  intent: 'debug authentication issue',
-  scopeIds: { sessionId: 'session-1', repoId: 'my-project' },
-});
+    let scope = ScopeIds { session_id: Some("session-1".into()), ..Default::default() };
 
-// Capture observations
-service.appendObservation(
-  {
-    id: randomUUID(),
-    kind: 'error',
-    content: 'JWT validation failed: token expired',
-    provenance: { stack: 'Error: Token expired\n  at validateToken.ts:42' },
-    scopeIds: { sessionId: 'session-1' },
-    ts: Date.now(),
-    redacted: false,
-  },
-  { capsuleId: capsule.id },
-);
+    // Open a session capsule.
+    let capsule = client
+        .open_capsule(CapsuleType::Session, "debug authentication issue", scope.clone(), None)
+        .await?;
 
-// Search
-const results = await service.retrieve({
-  query: 'authentication token',
-  scopeIds: { sessionId: 'session-1' },
-});
+    // Capture an observation.
+    client
+        .append_observation(
+            ObservationInput {
+                id: None,
+                kind: ObservationKind::Error,
+                content: "JWT validation failed: token expired".into(),
+                provenance: None,
+                ts: None,
+                scope_ids: scope.clone(),
+                redacted: None,
+            },
+            Some(capsule.id.clone()),
+            Some(true),
+        )
+        .await?;
 
-// Close with summary
-service.closeCapsule(capsule.id, {
-  generateSummary: true,
-  summaryContent: 'Fixed JWT expiration check in token validation middleware',
-});
+    // Search.
+    let results = client
+        .retrieve(RetrieveOptions {
+            query: "authentication token".into(),
+            scope_ids: scope,
+            token_budget: None,
+            max_candidates: None,
+            include_redacted: None,
+        })
+        .await?;
+    println!("{} candidates", results.candidates.len());
 
-db.close();
+    // Close with a summary.
+    client.close_capsule(&capsule.id, Default::default()).await?;
+    Ok(())
+}
 ```
+
+For embedded, single-process use (no daemon, zero IPC), use
+[`kindling-service`](https://crates.io/crates/kindling-service) instead — it
+exposes the same capsule/observation/retrieval/pin operations in-process.
+
+> **Node.js:** `@eddacraft/kindling` is a thin client over the same Rust binary.
+> The older TypeScript implementation packages (`-core`, `-store-sqlite`,
+> `-store-sqljs`, `-provider-local`, `-server`, `-cli`) are **deprecated** and
+> will be removed at 1.0.0.
 
 ## Architecture
 
+Rust is the engine. Adapters, the CLI, and Claude Code hooks reach project
+memory through the daemon (`kindling serve`, HTTP/1 over a Unix domain socket),
+which owns the local SQLite store and keeps concurrent access safe. Integrations
+that want embedded access skip the daemon and link `kindling-service` directly.
+
 ```diagram
-                           Adapters
-  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐
-  │  OpenCode    │  │  Claude Code │  │  PocketFlow Nodes    │
-  │  Sessions    │  │  (Hooks)     │  │  (Workflows)         │
-  └──────┬───────┘  └──────┬───────┘  └──────────┬───────────┘
-         │                 │                     │
-         └─────────────────┴─────────────────────┘
-                   ▼
-     ┌──────────────────────────────┐
-     │  @eddacraft/kindling         │  ← Main package
-     │  ┌────────────────────────┐  │
-     │  │  KindlingService       │  │
-     │  │  (kindling-core)       │  │
-     │  └──────────┬─────────────┘  │
-     │             │                │
-     │  ┌──────────┴────────────┐   │
-     │  ▼                       ▼   │
-     │  SqliteStore    LocalFts     │
-     │  (persistence)  Provider     │
-     │  └──────┬───────┴──────┘     │
-     │         ▼                    │
-     │  ┌─────────────────────┐     │
-     │  │  SQLite Database    │     │
-     │  │  (WAL + FTS5)       │     │
-     │  └─────────────────────┘     │
-     │                              │
-     │  API Server (Fastify)        │
-     └──────────────────────────────┘
+        Adapters / hooks                CLI
+  ┌──────────────────────────┐   ┌──────────────┐
+  │ OpenCode · Claude Code · │   │  kindling    │
+  │ PocketFlow               │   │  <command>   │
+  └────────────┬─────────────┘   └──────┬───────┘
+               │  kindling-client       │  in-process
+               │  (HTTP/1 over UDS)     │  (kindling-service)
+               ▼                        │
+   ┌──────────────────────────┐         │
+   │  kindling-server          │         │
+   │  (daemon: kindling serve) │         │
+   │  per-project routing      │         │
+   └────────────┬─────────────┘         │
+                ▼                        ▼
+        ┌──────────────────────────────────┐
+        │  kindling-service                 │
+        │  capsule lifecycle · capture ·    │
+        │  retrieval · pins · redaction     │
+        └───────┬──────────────────┬────────┘
+                ▼                  ▼
+         kindling-store     kindling-provider
+         (SQLite,FTS5,WAL)  (FTS5 BM25 + recency)
+                └────────┬─────────┘
+                         ▼
+              ┌────────────────────┐
+              │  SQLite database   │
+              │  (WAL + FTS5,      │
+              │   schema v5)       │
+              └────────────────────┘
 ```
+
+See [`docs/architecture.md`](./docs/architecture.md) for the full topology.
 
 ## Core Concepts
 
@@ -334,14 +337,14 @@ Atomic units of captured context:
 
 Bounded units of meaning that group observations:
 
-- **Session** - Interactive development session
-- **PocketFlowNode** - Single workflow node execution
+- **`session`** - Interactive development session
+- **`pocketflow_node`** - Single workflow node execution
 
 Each capsule has:
 
 - Type and intent (debug, implement, test, etc.)
-- Open/close lifecycle with automatic summary generation
-- Scope (sessionId, repoId, agentId, userId)
+- Open/close lifecycle with optional summary generation
+- Scope (`sessionId`, `repoId`, `agentId`, `userId`, `taskId`)
 
 ### Retrieval Tiers
 
@@ -355,69 +358,49 @@ Deterministic, explainable retrieval with 3 tiers:
 
 ### Session Continuity
 
-Resume work without re-explaining context:
+Resume work without re-explaining context. Install the Claude Code plugin (or any
+adapter) and sessions are captured automatically; later, retrieve what you were
+doing:
 
-```typescript
-import { SessionManager } from '@eddacraft/kindling-adapter-opencode';
+```bash
+kindling search "authentication bug" --session session-1
+```
 
-const manager = new SessionManager(store);
+The same retrieval is available from Rust via `kindling-client`:
 
-// Start session
-manager.onSessionStart({
-  sessionId: 'session-1',
-  intent: 'Fix authentication bug',
-  repoId: '/home/user/my-project',
-});
-
-// Events flow in automatically...
-
-// Later: retrieve session context
-const context = service.retrieve({
-  scopeIds: { sessionId: 'session-1' },
-});
+```rust
+let results = client
+    .retrieve(RetrieveOptions {
+        query: "authentication bug".into(),
+        scope_ids: ScopeIds { session_id: Some("session-1".into()), ..Default::default() },
+        ..Default::default()
+    })
+    .await?;
 ```
 
 ### Workflow Memory
 
-Capture high-signal workflow executions with PocketFlow nodes:
-
-```typescript
-import { KindlingNode, KindlingFlow } from '@eddacraft/kindling-adapter-pocketflow';
-import type { KindlingNodeContext } from '@eddacraft/kindling-adapter-pocketflow';
-
-// Define a node that auto-captures its lifecycle as observations
-class TestRunnerNode extends KindlingNode<KindlingNodeContext> {
-  constructor() {
-    super({ name: 'run-integration-tests', intent: 'test' });
-  }
-
-  async exec(): Promise<unknown> {
-    // Your node logic here — prep/exec/post are auto-instrumented
-    return { passed: 42, failed: 0 };
-  }
-}
-
-// Run inside a flow with a kindling-aware shared store
-const node = new TestRunnerNode();
-const flow = new KindlingFlow(node);
-await flow.run({ store, scopeIds: { repoId: 'my-app' } });
-```
+Capture high-signal workflow executions. The PocketFlow adapter opens a
+`pocketflow_node` capsule per node and records `node_start` / `node_output` /
+`node_error` / `node_end` observations through the thin client to the daemon —
+see [`docs/pocketflow-capabilities.md`](./docs/pocketflow-capabilities.md).
 
 ### Pin Critical Findings
 
-Mark important discoveries for non-evictable retrieval:
+Mark important discoveries for non-evictable retrieval. Pins always appear first,
+ahead of ranked results:
 
-```typescript
-service.pin({
-  targetType: 'observation',
-  targetId: errorObs.id,
-  note: 'Root cause of production outage',
-  ttlMs: 7 * 24 * 60 * 60 * 1000, // 1 week
-});
+```bash
+kindling pin observation obs_abc123 --note "Root cause of production outage" --ttl 7d
+kindling search "outage"   # the pinned error is returned first
+```
 
-// Pins always appear first in retrieval
-const results = service.retrieve({ query: 'outage' });
-console.log(results.pins); // Includes the pinned error
+From Rust:
+
+```rust
+let mut pin = CreatePinBody::new(PinTargetType::Observation, error_obs_id);
+pin.note = Some("Root cause of production outage".into());
+client.pin(pin).await?;
 ```
 
 ## Design Principles
@@ -438,16 +421,25 @@ Learn more at [eddacraft.ai](https://eddacraft.ai).
 
 ## Development
 
+kindling is Rust-canonical; the Rust workspace is the primary build. The npm
+packages (thin client + adapters) live alongside it.
+
 ```bash
 git clone https://github.com/eddacraft/kindling.git
 cd kindling
+
+# Rust workspace (canonical engine)
+cargo build
+cargo test
+
+# npm packages (thin client + adapters)
 pnpm install
 pnpm run build
 pnpm run test
-pnpm run type-check
 ```
 
-This project uses [anvil Plan Spec (APS)](https://github.com/eddacraft/anvil-plan-spec) for planning.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow. This project uses
+[anvil Plan Spec (APS)](https://github.com/eddacraft/anvil-plan-spec) for planning.
 
 ## Contributing
 

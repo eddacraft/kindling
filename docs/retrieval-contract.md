@@ -4,96 +4,109 @@
 
 kindling retrieval is **deterministic**, **scoped**, and **explainable**. The same query with the same context always produces the same results. All results include provenance, explaining why they were returned.
 
+Rust is canonical: retrieval is implemented in the `kindling-provider` crate (default provider id `"local-fts"`), exposed through `kindling-service` (embedded) and `kindling-client` (daemon). Domain types come from `kindling-types` (camelCase JSON; ts-rs bindings checked for drift in CI).
+
 Retrieval combines three sources in a tiered structure:
 
 1. **Pins** — User-marked important items (non-evictable)
-2. **Current Summary** — Summary of the open capsule (non-evictable)
+2. **Current Summary** — Latest closed-capsule summary (non-evictable)
 3. **Provider Candidates** — FTS-ranked observations and summaries (evictable)
 
 ## Core Interface
 
 ### Retrieve Function
 
-```typescript
-interface RetrieveOptions {
-  query: string; // Search query
-  scopeIds: ScopeIds; // Isolation dimensions
-  tokenBudget?: number; // Max tokens in response (for truncation)
-  maxCandidates?: number; // Max candidates from provider (default: 50)
-  includeRedacted?: boolean; // Include redacted observations (default: false)
+```rust
+pub struct RetrieveOptions {
+    pub query: String,                  // Search query
+    pub scope_ids: ScopeIds,            // Isolation dimensions (camelCase: scopeIds)
+    pub token_budget: Option<usize>,    // DEPRECATED — see "Token Budget and Truncation"
+    pub max_candidates: Option<usize>,  // Max candidates from provider (the bounded-result knob)
+    pub include_redacted: Option<bool>, // Include redacted observations (default: false)
 }
 
-interface RetrieveResult {
-  pins: PinResult[]; // Active pins
-  currentSummary?: Summary; // Summary for open capsule (if any)
-  candidates: CandidateResult[]; // Provider results
-  provenance: RetrieveProvenance; // Explain how results were generated
+pub struct RetrieveResult {
+    pub pins: Vec<PinResult>,            // Active pins
+    pub current_summary: Option<Summary>, // Latest closed-capsule summary (if any)
+    pub candidates: Vec<CandidateResult>, // Provider results
+    pub provenance: RetrieveProvenance,   // Explains how results were generated
 }
 
-interface PinResult {
-  pin: Pin; // The pin itself
-  target: Observation | Summary; // The pinned entity
+pub struct PinResult {
+    pub pin: Pin,                 // The pin itself
+    pub target: RetrievalEntity,  // The pinned Observation or Summary
 }
 
-interface CandidateResult {
-  entity: Observation | Summary; // The matched entity
-  score: number; // Relevance score (0.0-1.0)
-  matchContext?: string; // Snippet showing match
+pub struct CandidateResult {
+    pub entity: RetrievalEntity,      // The matched Observation or Summary
+    pub score: f64,                   // Relevance score (0.0..=1.0)
+    pub match_context: Option<String>, // Snippet showing the match
 }
 
-interface RetrieveProvenance {
-  query: string; // Original query
-  scopeIds: ScopeIds; // Applied scope filters
-  totalCandidates: number; // Total candidates before truncation
-  returnedCandidates: number; // Actual candidates returned
-  truncatedDueToTokenBudget: boolean; // Whether truncation occurred
-  providerUsed: string; // Provider name (e.g., "local-fts")
+pub struct RetrieveProvenance {
+    pub query: String,                    // Original query
+    pub scope_ids: ScopeIds,              // Applied scope filters
+    pub total_candidates: usize,          // Total candidates before bounding
+    pub returned_candidates: usize,       // Actual candidates returned
+    pub truncated_due_to_token_budget: bool, // Legacy flag (see note below)
+    pub provider_used: String,            // Provider id (e.g., "local-fts")
 }
 ```
 
+All fields serialize as camelCase (`scopeIds`, `currentSummary`, `matchContext`, `totalCandidates`, `truncatedDueToTokenBudget`, `providerUsed`, …).
+
 ### Example Usage
 
-```typescript
-const result = await kindling.retrieve({
-  query: 'authentication bug',
-  scopeIds: { repoId: '/repo', sessionId: 's1' },
-  tokenBudget: 8000
-});
+Embedded (`kindling-service`):
 
-// Result structure:
+```rust
+use kindling_service::KindlingService;
+
+let svc = KindlingService::open("./.kindling/kindling.db")?;
+let result = svc.retrieve(retrieve_options)?; // query, scopeIds { repoId, sessionId }, max_candidates
+```
+
+Daemon (`kindling-client`):
+
+```rust
+use kindling_client::Client;
+
+let client = Client::new()?;
+let result = client.retrieve(retrieve_options).await?; // client methods are async
+```
+
+The `RetrieveResult` (serialized JSON):
+
+```jsonc
 {
-  pins: [
+  "pins": [
     {
-      pin: { id: 'pin1', targetType: 'observation', targetId: 'obs1', ... },
-      target: { id: 'obs1', kind: 'file_diff', content: '...', ... }
-    }
-  ],
-  currentSummary: {
-    id: 'sum1',
-    capsuleId: 'cap1',
-    content: 'Working on fixing authentication bug...',
-    confidence: 0.85,
-    ...
-  },
-  candidates: [
-    {
-      entity: { id: 'obs2', kind: 'tool_call', content: '...', ... },
-      score: 0.92,
-      matchContext: '...authentication bug...'
+      "pin": { "id": "pin1", "targetType": "observation", "targetId": "obs1" /* … */ },
+      "target": { "id": "obs1", "kind": "file_diff", "content": "…" },
     },
-    {
-      entity: { id: 'sum2', content: '...auth flow...', ... },
-      score: 0.78
-    }
   ],
-  provenance: {
-    query: 'authentication bug',
-    scopeIds: { repoId: '/repo', sessionId: 's1' },
-    totalCandidates: 25,
-    returnedCandidates: 15,
-    truncatedDueToTokenBudget: true,
-    providerUsed: 'local-fts'
-  }
+  "currentSummary": {
+    "id": "sum1",
+    "capsuleId": "cap1",
+    "content": "Worked on fixing the authentication bug…",
+    "confidence": 0.85,
+  },
+  "candidates": [
+    {
+      "entity": { "id": "obs2", "kind": "tool_call", "content": "…" },
+      "score": 0.92,
+      "matchContext": "…authentication bug…",
+    },
+    { "entity": { "id": "sum2", "content": "…auth flow…" }, "score": 0.78 },
+  ],
+  "provenance": {
+    "query": "authentication bug",
+    "scopeIds": { "repoId": "/repo", "sessionId": "s1" },
+    "totalCandidates": 25,
+    "returnedCandidates": 15,
+    "truncatedDueToTokenBudget": false,
+    "providerUsed": "local-fts",
+  },
 }
 ```
 
@@ -103,128 +116,118 @@ Retrieval results are organized in a **three-tier structure**:
 
 ### Tier 1: Pins (Non-evictable)
 
-**Source:** Store (pins table)
+**Source:** Store (`pins` table)
 
 **Filtering:**
 
 - Active pins only (`expiresAt` is null or `> now`)
-- Scoped by `scopeIds`
-- Excludes redacted targets (unless `includeRedacted=true`)
+- Scoped by `scopeIds` (filterable dimensions only)
+- Excludes redacted targets (unless `include_redacted = true`)
 
 **Ordering:** By `createdAt` (most recent first)
 
 **Characteristics:**
 
-- **Always included** (not subject to token budget truncation)
+- **Always included** (not bounded by `max_candidates`)
 - **User-curated** (explicitly marked important)
 - **Provenance:** Pin reason + creation timestamp
 
 ### Tier 2: Current Summary (Non-evictable)
 
-**Source:** Store (summaries table)
+**Source:** Store (`summaries` table)
 
 **Filtering:**
 
-- Summary for the currently open capsule (if any)
+- The latest closed-capsule summary in scope (if any)
 - Scoped by `scopeIds`
 
 **Characteristics:**
 
-- **At most one** (one summary per capsule)
-- **Always included** (not subject to token budget truncation)
-- **Context-aware** (reflects ongoing work in the session)
-- **Provenance:** Capsule ID + evidence refs + confidence
+- **At most one**
+- **Always included** (not bounded by `max_candidates`)
+- **Context-aware** (reflects recent work in the session)
+- **Provenance:** Capsule id + evidence refs + confidence
 
 ### Tier 3: Provider Candidates (Evictable)
 
-**Source:** Provider (e.g., local FTS + recency scoring)
+**Source:** Provider (`local-fts` — FTS5 + recency scoring)
 
 **Filtering:**
 
-- FTS query match
+- FTS query match (over `observations_fts` and `summaries_fts`)
 - Scoped by `scopeIds`
-- Excludes redacted observations (unless `includeRedacted=true`)
-- Excludes observations already in pins or current summary (deduplication)
+- Excludes redacted observations (unless `include_redacted = true`)
+- Excludes entities already in pins or current summary (deduplication)
 
 **Ordering:** By relevance score (highest first)
 
 **Characteristics:**
 
-- **Ranked by provider** (FTS relevance + recency)
-- **Subject to truncation** (token budget applies)
+- **Ranked by provider** (FTS relevance blended with recency)
+- **Bounded** by `max_candidates`
 - **Explainable scoring** (score + match context)
-- **Provenance:** Query + provider name + score
+- **Provenance:** Query + provider id + score
 
 ## Provider Contract
 
-Providers implement the retrieval search logic. The default provider is `LocalFtsProvider` (FTS + recency-based).
+The retrieval search logic is implemented by a provider. The default — and only stable — provider is `local-fts` in the `kindling-provider` crate (FTS5 + recency).
 
-### Provider Interface
+Conceptually a provider is a search function: given a query, scope filters, a
+result bound, a set of ids to exclude (for deduplication), a redaction flag, and
+an explicit `now` clock, it returns scored entities. In Rust this is expressed as
+a trait implemented by the local provider.
 
-```typescript
-interface RetrievalProvider {
-  name: string; // Provider identifier (e.g., "local-fts")
+```rust
+// Conceptual — the provider trait as implemented by the local FTS provider.
+pub trait RetrievalProvider {
+    fn name(&self) -> &str; // e.g., "local-fts"
 
-  search(options: ProviderSearchOptions): Promise<ProviderSearchResult[]>;
+    fn search(&self, options: ProviderSearchOptions) -> Result<Vec<ProviderSearchResult>>;
 }
 
-interface ProviderSearchOptions {
-  query: string; // Search query
-  scopeIds: ScopeIds; // Scope filters
-  maxResults?: number; // Max results to return
-  excludeIds?: string[]; // IDs to exclude (for deduplication)
-  includeRedacted?: boolean; // Include redacted observations
+pub struct ProviderSearchOptions {
+    pub query: String,
+    pub scope_ids: ScopeIds,        // filterable dimensions only
+    pub max_results: Option<usize>,
+    pub exclude_ids: Vec<String>,   // for deduplication
+    pub include_redacted: bool,
+    pub retrieve_at: i64,           // explicit "now" (epoch ms) — recency + determinism
 }
 
-interface ProviderSearchResult {
-  entity: Observation | Summary; // The matched entity
-  score: number; // Relevance score (0.0-1.0)
-  matchContext?: string; // Snippet showing match
+pub struct ProviderSearchResult {
+    pub entity: RetrievalEntity,      // matched Observation or Summary
+    pub score: f64,                   // 0.0..=1.0
+    pub match_context: Option<String>,
 }
 ```
 
+> The provider trait is an internal extension point, not a published plugin API. Treat custom providers as a conceptual/future capability — see [Extension Points](#extension-points).
+
 ### Local FTS Provider
 
-The default provider uses SQLite FTS5 + recency scoring.
+The default provider uses SQLite FTS5 (tokenizer `porter unicode61`) blended with recency.
 
 **Scoring formula:**
 
 ```
-score = (fts_relevance * 0.7) + (recency_score * 0.3)
+score = (fts_relevance * 0.7) + (recency * 0.3)
 
 where:
-  fts_relevance = BM25 score from FTS5 (normalized to 0.0-1.0)
-  recency_score = 1.0 - (age_days / max_age_days)
+  fts_relevance = BM25 score from FTS5, normalized to [0, 1]
+                  across observations + summaries
+  recency       = MAX(0, 1 - (age_ms / max_age_ms))
+  max_age_ms    = 30-day window
+  age_ms        = retrieve_at - entity.ts
 ```
 
 **Characteristics:**
 
-- **FTS-based:** Uses `observations_fts` and `summaries_fts` tables
-- **Recency-weighted:** Recent observations score higher
-- **Deterministic:** Same query + context → same results
+- **FTS-based:** Uses `observations_fts` and `summaries_fts`
+- **Recency-weighted:** Recent entities score higher (30-day window)
+- **Deterministic:** Same query + scope + data + `retrieve_at` → same results
 - **Fast:** Leverages SQLite FTS5 indexes
 
-**Example:**
-
-```typescript
-// FTS query: "authentication"
-// Scope: { repoId: '/repo' }
-// Max results: 50
-
-// Provider returns:
-[
-  {
-    entity: { id: 'obs1', content: 'Fixed authentication bug', ... },
-    score: 0.95,
-    matchContext: '...authentication bug...'
-  },
-  {
-    entity: { id: 'sum1', content: 'Updated auth flow', ... },
-    score: 0.82
-  },
-  // ... up to 50 results
-]
-```
+The provider takes an explicit `retrieve_at` (the `now` clock) so recency scoring is testable and reproducible; nothing reads the wall clock implicitly.
 
 ## Scoping
 
@@ -232,140 +235,99 @@ All retrieval queries are **scoped** to prevent cross-contamination.
 
 ### Scope Dimensions
 
-```typescript
-interface ScopeIds {
-  sessionId?: string; // Session isolation
-  repoId?: string; // Repository isolation
-  agentId?: string; // Agent isolation (future)
-  userId?: string; // User isolation (future)
+```rust
+pub struct ScopeIds {
+    pub session_id: Option<String>, // FILTERABLE
+    pub repo_id: Option<String>,    // FILTERABLE
+    pub agent_id: Option<String>,   // FILTERABLE
+    pub user_id: Option<String>,    // FILTERABLE
+    pub task_id: Option<String>,    // NOT filterable — provenance/grouping only
 }
 ```
+
+`sessionId`, `repoId`, `agentId`, and `userId` are denormalized into real columns and are matched directly. **`taskId` has no column and is never used as a filter** — supplying it in `scopeIds` does not affect the result set (it is carried for provenance/grouping only).
 
 ### Scope Filtering
 
 **Behavior:**
 
-- **AND semantics:** All specified dimensions must match
+- **AND semantics:** All specified filterable dimensions must match
 - **Partial matching:** Unspecified dimensions are ignored
 - **Exact match:** No wildcards or prefixes
+- **No `taskId` filtering:** Ignored even if present
 
-**Examples:**
+**Examples (JSON):**
 
-```typescript
-// Example 1: Session-only scope
-scopeIds: { sessionId: 's1' }
-// Returns: All entities where scope_ids->>'sessionId' = 's1'
+```jsonc
+// Session-only scope → entities WHERE session_id = 's1'
+{ "sessionId": "s1" }
 
-// Example 2: Repo-only scope
-scopeIds: { repoId: '/repo' }
-// Returns: All entities where scope_ids->>'repoId' = '/repo'
+// Repo-only scope → entities WHERE repo_id = '/repo'
+{ "repoId": "/repo" }
 
-// Example 3: Session + Repo scope
-scopeIds: { sessionId: 's1', repoId: '/repo' }
-// Returns: All entities where BOTH conditions match
+// Session + repo → entities WHERE BOTH columns match
+{ "sessionId": "s1", "repoId": "/repo" }
 
-// Example 4: Global (unscoped)
-scopeIds: {}
-// Returns: All entities (no filtering)
+// taskId is ignored for filtering (carried for provenance only)
+{ "repoId": "/repo", "taskId": "t1" }  // same result set as { "repoId": "/repo" }
+
+// Global (unscoped) → all entities, no filtering
+{ }
 ```
 
 ### Default Scoping
 
 Adapters typically scope retrieval to:
 
-```typescript
-{
-  sessionId: currentSessionId,
-  repoId: currentRepoPath
-}
+```jsonc
+{ "sessionId": "<currentSessionId>", "repoId": "<currentRepoPath>" }
 ```
 
-This ensures:
-
-- Session isolation (no cross-session leakage)
-- Repository isolation (no cross-repo leakage)
+This ensures session isolation (no cross-session leakage) and repository isolation (no cross-repo leakage).
 
 ## Token Budget and Truncation
 
-Retrieval supports **token budget truncation** to limit result size.
+> **`token_budget` is DEPRECATED.** Token-budget assembly is a **downstream-system responsibility**, not the retrieval engine's. The engine does not pack results to a token target. Prefer **`max_candidates`** to bound result size.
 
-### Truncation Behavior
+### Bounding behavior (current)
 
-1. **Pins and Current Summary:** Never truncated (non-evictable)
-2. **Candidates:** Truncated to fit within budget
+1. **Pins and Current Summary:** Always returned (non-evictable, not bounded)
+2. **Candidates:** Bounded to `max_candidates` from the provider, ordered by score
 
-**Algorithm:**
+The engine returns the top-scoring candidates up to `max_candidates`. Deciding how
+many of those to actually feed into a prompt — and any token accounting — is left
+to the consumer (an adapter or a downstream context-assembly system), which can
+apply whatever tokenizer it prefers (e.g., `tiktoken`).
 
-```typescript
-function applyTokenBudget(result: RetrieveResult, budget: number): RetrieveResult {
-  let usedTokens = 0;
+### `truncatedDueToTokenBudget` in provenance
 
-  // 1. Count tokens for pins (non-evictable)
-  for (const pin of result.pins) {
-    usedTokens += estimateTokens(pin.target);
-  }
-
-  // 2. Count tokens for current summary (non-evictable)
-  if (result.currentSummary) {
-    usedTokens += estimateTokens(result.currentSummary);
-  }
-
-  // 3. Add candidates until budget exhausted
-  const truncatedCandidates = [];
-  for (const candidate of result.candidates) {
-    const candidateTokens = estimateTokens(candidate.entity);
-    if (usedTokens + candidateTokens <= budget) {
-      truncatedCandidates.push(candidate);
-      usedTokens += candidateTokens;
-    } else {
-      break; // Budget exhausted
-    }
-  }
-
-  return {
-    ...result,
-    candidates: truncatedCandidates,
-    provenance: {
-      ...result.provenance,
-      truncatedDueToTokenBudget: truncatedCandidates.length < result.candidates.length,
-    },
-  };
-}
-```
-
-### Token Estimation
-
-Token count is estimated using a simple heuristic:
-
-```typescript
-function estimateTokens(entity: Observation | Summary): number {
-  // Rough estimate: 1 token H 4 characters
-  return Math.ceil(entity.content.length / 4);
-}
-```
-
-**Note:** Adapters can use more sophisticated token counting (e.g., `tiktoken`) if needed.
+The field **still exists** in `RetrieveProvenance` for wire/back-compat stability, but it reflects the legacy token-budget path. With `max_candidates`-based bounding it is typically `false`. Consumers should rely on `totalCandidates` vs. `returnedCandidates` to detect that more candidates were available than were returned, rather than on this flag.
 
 ## Deduplication
 
-Retrieval automatically deduplicates results:
+Retrieval automatically deduplicates across tiers:
 
-- **Pins vs. Candidates:** If an observation is pinned, it won't appear in candidates
-- **Current Summary vs. Candidates:** If a summary is the current summary, it won't appear in candidates
+- **Pins vs. Candidates:** A pinned entity will not appear in candidates
+- **Current Summary vs. Candidates:** The current summary will not appear in candidates
 
-**Implementation:**
+The engine collects the ids already present in pins and the current summary and passes them as `exclude_ids` to the provider:
 
-```typescript
-const excludeIds = [...result.pins.map((p) => p.target.id), result.currentSummary?.id].filter(
-  Boolean,
-);
+```rust
+// Conceptual
+let mut exclude_ids: Vec<String> =
+    result.pins.iter().map(|p| p.target.id().to_string()).collect();
+if let Some(summary) = &result.current_summary {
+    exclude_ids.push(summary.id.clone());
+}
 
-const candidates = await provider.search({
-  query,
-  scopeIds,
-  maxResults: maxCandidates,
-  excludeIds, // Provider excludes these IDs
-});
+let candidates = provider.search(ProviderSearchOptions {
+    query,
+    scope_ids,
+    max_results: max_candidates,
+    exclude_ids,            // provider omits these
+    include_redacted,
+    retrieve_at,
+})?;
 ```
 
 ## Redaction Handling
@@ -374,21 +336,21 @@ By default, **redacted observations are excluded** from retrieval.
 
 **Behavior:**
 
-- `redacted=true` observations are filtered out
-- Redacted observations in capsules still preserve provenance (IDs retained)
-- Content shown as `[redacted]` if explicitly requested
+- `redacted = true` observations are filtered out of all tiers
+- Redaction is performed via `forget`: content is moved to a redacted state, the entity is removed from FTS, and provenance/references are preserved
+- Set `include_redacted = true` to include them (content appears as `[redacted]`)
 
-**Override:**
+**Override (JSON options):**
 
-```typescript
-retrieve({
-  query: 'auth',
-  scopeIds: { repoId: '/repo' },
-  includeRedacted: true, // Include redacted observations
-});
+```jsonc
+{
+  "query": "auth",
+  "scopeIds": { "repoId": "/repo" },
+  "includeRedacted": true,
+}
 ```
 
-**Use case:** Debugging or auditing (to see that redacted content existed)
+**Use case:** Debugging or auditing (to confirm redacted content existed).
 
 ## Provenance
 
@@ -396,20 +358,20 @@ All retrieval results include **provenance** explaining how they were generated.
 
 ### Provenance Structure
 
-```typescript
-interface RetrieveProvenance {
-  query: string; // Original query
-  scopeIds: ScopeIds; // Applied scope filters
-  totalCandidates: number; // Total candidates before truncation
-  returnedCandidates: number; // Actual candidates returned
-  truncatedDueToTokenBudget: boolean; // Whether truncation occurred
-  providerUsed: string; // Provider name (e.g., "local-fts")
+```rust
+pub struct RetrieveProvenance {
+    pub query: String,                       // Original query
+    pub scope_ids: ScopeIds,                 // Applied scope filters
+    pub total_candidates: usize,             // Total candidates before bounding
+    pub returned_candidates: usize,          // Actual candidates returned
+    pub truncated_due_to_token_budget: bool, // Legacy flag (see Token Budget section)
+    pub provider_used: String,               // Provider id (e.g., "local-fts")
 }
 ```
 
 ### Entity-Level Provenance
 
-Each result type has built-in provenance:
+Each result type carries its own provenance:
 
 - **Pins:** `pin.reason` + `pin.createdAt`
 - **Summary:** `summary.evidenceRefs` + `summary.confidence` + `summary.capsuleId`
@@ -417,88 +379,87 @@ Each result type has built-in provenance:
 
 ### Example Provenance
 
-```typescript
+```jsonc
 {
-  query: 'authentication',
-  scopeIds: { sessionId: 's1', repoId: '/repo' },
-  totalCandidates: 25,
-  returnedCandidates: 10,
-  truncatedDueToTokenBudget: true,
-  providerUsed: 'local-fts'
+  "query": "authentication",
+  "scopeIds": { "sessionId": "s1", "repoId": "/repo" },
+  "totalCandidates": 25,
+  "returnedCandidates": 10,
+  "truncatedDueToTokenBudget": false,
+  "providerUsed": "local-fts",
 }
 ```
 
 **Interpretation:**
 
 - Query was "authentication"
-- Scoped to session 's1' in repo '/repo'
-- Provider found 25 candidates
-- Token budget limited results to 10 candidates
-- Used local FTS provider
+- Scoped to session `s1` in repo `/repo`
+- Provider found 25 candidates, returned 10 (bounded by `max_candidates`)
+- Used the local FTS provider
 
 ## Determinism Guarantees
 
 kindling retrieval is **deterministic** under these conditions:
 
 1. **Same query** — Identical query string
-2. **Same scope** — Identical `scopeIds`
-3. **Same data** — No new observations, capsules, or pins created
-4. **Same time** — TTL-based pins use `now` parameter (must be same)
-5. **Same provider** — Same provider with same configuration
+2. **Same scope** — Identical `scopeIds` (filterable dimensions)
+3. **Same data** — No new observations, capsules, summaries, or pins
+4. **Same clock** — Same `retrieve_at` (the explicit `now`; pin expiry and recency depend on it)
+5. **Same provider** — Same provider with the same configuration
 
 **Violation examples:**
 
-- Time-based pins expired → results change
+- Time-based pins expire → results change
 - New observations added → FTS index updated → results change
-- Provider algorithm updated → scoring changes → results change
+- Provider scoring updated → results change
+
+Because the provider takes an explicit `retrieve_at`, tests can pin the clock and assert byte-for-byte stable results.
 
 ## Performance Considerations
 
 ### Query Optimization
 
-- **FTS indexes:** Maintained on `observations.content` and `summaries.content`
-- **Scope indexes:** JSON path indexes on `scope_ids->>'sessionId'`, etc.
-- **Pin TTL index:** Index on `pins.expires_at` for fast filtering
+- **FTS indexes:** `observations_fts` and `summaries_fts` (tokenizer `porter unicode61`)
+- **Scope indexes:** Indexes over the denormalized `session_id` / `repo_id` columns (e.g., `idx_obs_session_ts`, `idx_obs_repo_ts`)
+- **Pin filtering:** `expires_at` is checked against `retrieve_at`
 
 ### Caching
 
-kindling does **not cache retrieval results** by default (to preserve determinism).
-
-Adapters may implement caching if:
-
-- Cache key includes all determinism inputs (query, scope, time)
-- Cache invalidation on data changes
+kindling does **not cache retrieval results** by default (to preserve determinism). A consumer may cache only if the cache key includes all determinism inputs (query, scope, `retrieve_at`) and is invalidated on data changes.
 
 ### Latency Targets
 
-- **FTS query:** < 50ms (for typical dataset < 100k observations)
+- **FTS query:** < 50ms (typical dataset < 100k observations)
 - **Pin lookup:** < 10ms
 - **End-to-end retrieval:** < 100ms
 
 ## Extension Points
 
-### Custom Providers
+### Custom Providers (conceptual / future)
 
-Providers can be swapped or extended:
+The `RetrievalProvider` trait is an internal seam, not a stable, published plugin API. A future custom provider (e.g., embeddings + vector search) would implement the same trait, returning scored entities for a query+scope:
 
-```typescript
-interface CustomProvider extends RetrievalProvider {
-  name: 'custom-semantic';
+```rust
+// Conceptual sketch — NOT a stable API.
+struct SemanticProvider;
 
-  async search(options: ProviderSearchOptions): Promise<ProviderSearchResult[]> {
-    // Use embeddings + vector search
-    // Return scored results
-  }
+impl RetrievalProvider for SemanticProvider {
+    fn name(&self) -> &str { "custom-semantic" }
+
+    fn search(&self, options: ProviderSearchOptions) -> Result<Vec<ProviderSearchResult>> {
+        // embeddings + vector search, then return scored results
+        todo!()
+    }
 }
 ```
 
-**Requirements:**
+**Requirements for any provider:**
 
-- Must return scored results (0.0-1.0)
-- Must respect scope filters
-- Should be deterministic (or document non-determinism)
+- Must return scores in `[0.0, 1.0]`
+- Must respect scope filters (filterable dimensions only)
+- Should be deterministic given the same inputs + `retrieve_at` (or document non-determinism)
 
-### Future Enhancements (Not v0.1)
+### Future Enhancements
 
 - **Hybrid search** — FTS + semantic embeddings
 - **Re-ranking** — LLM-based relevance scoring
@@ -507,56 +468,68 @@ interface CustomProvider extends RetrievalProvider {
 
 ## Testing Retrieval
 
-### Determinism Tests
+Examples use `kindling-service`; the same assertions hold via `kindling-client`. A pinned `retrieve_at` makes results reproducible.
 
-```typescript
-test('retrieval is deterministic', async () => {
-  const result1 = await kindling.retrieve({ query: 'auth', scopeIds: { repoId: '/repo' } });
-  const result2 = await kindling.retrieve({ query: 'auth', scopeIds: { repoId: '/repo' } });
+### Determinism Test
 
-  expect(result1).toEqual(result2); // Exact match
-});
+```rust
+#[test]
+fn retrieval_is_deterministic() -> anyhow::Result<()> {
+    let svc = KindlingService::open(":memory:")?;
+    // … seed identical data …
+
+    let r1 = svc.retrieve(opts.clone())?; // same query + scope + retrieve_at
+    let r2 = svc.retrieve(opts.clone())?;
+
+    assert_eq!(r1, r2); // exact match
+    Ok(())
+}
 ```
 
-### Scoping Tests
+### Scoping Test
 
-```typescript
-test('retrieval respects scope isolation', async () => {
-  const result1 = await kindling.retrieve({ query: 'auth', scopeIds: { sessionId: 's1' } });
-  const result2 = await kindling.retrieve({ query: 'auth', scopeIds: { sessionId: 's2' } });
+```rust
+#[test]
+fn retrieval_respects_scope_isolation() -> anyhow::Result<()> {
+    let svc = KindlingService::open(":memory:")?;
+    // … seed s1 and s2 with distinct data …
 
-  // No overlap (assuming sessions are distinct)
-  const ids1 = result1.candidates.map((c) => c.entity.id);
-  const ids2 = result2.candidates.map((c) => c.entity.id);
-  expect(intersection(ids1, ids2)).toEqual([]);
-});
+    let r1 = svc.retrieve(opts_for_session("s1"))?;
+    let r2 = svc.retrieve(opts_for_session("s2"))?;
+
+    let ids1: Vec<_> = r1.candidates.iter().map(|c| c.entity.id().to_string()).collect();
+    let ids2: Vec<_> = r2.candidates.iter().map(|c| c.entity.id().to_string()).collect();
+    assert!(ids1.iter().all(|id| !ids2.contains(id))); // no overlap
+    Ok(())
+}
 ```
 
-### Truncation Tests
+### Bounding Test
 
-```typescript
-test('retrieval respects token budget', async () => {
-  const result = await kindling.retrieve({
-    query: 'auth',
-    scopeIds: { repoId: '/repo' },
-    tokenBudget: 1000,
-  });
+```rust
+#[test]
+fn retrieval_respects_max_candidates() -> anyhow::Result<()> {
+    let svc = KindlingService::open(":memory:")?;
+    // … seed > 5 matching observations …
 
-  const totalTokens = estimateTokens(result);
-  expect(totalTokens).toBeLessThanOrEqual(1000);
-  expect(result.provenance.truncatedDueToTokenBudget).toBe(true);
-});
+    let result = svc.retrieve(opts_with_max_candidates(5))?;
+
+    assert!(result.candidates.len() <= 5);
+    assert!(result.provenance.total_candidates >= result.provenance.returned_candidates);
+    Ok(())
+}
 ```
 
 ## Contract Summary
 
-| Property          | Requirement                                 |
-| ----------------- | ------------------------------------------- |
-| **Determinism**   | Same query + scope + data → same results    |
-| **Scoping**       | All results respect `scopeIds` filters      |
-| **Tiering**       | Pins → Summary → Candidates (in that order) |
-| **Non-eviction**  | Pins and current summary never truncated    |
-| **Provenance**    | All results include explanation             |
-| **Redaction**     | Redacted observations excluded by default   |
-| **Deduplication** | No entity appears in multiple tiers         |
-| **Performance**   | < 100ms for typical queries                 |
+| Property          | Requirement                                                        |
+| ----------------- | ------------------------------------------------------------------ |
+| **Determinism**   | Same query + scope + data + `retrieve_at` → same results           |
+| **Scoping**       | All results respect filterable `scopeIds` (`taskId` ignored)       |
+| **Tiering**       | Pins → Current Summary → Candidates (in that order)                |
+| **Non-eviction**  | Pins and current summary always returned                           |
+| **Bounding**      | Candidates bounded by `max_candidates` (`token_budget` deprecated) |
+| **Provenance**    | All results include explanation                                    |
+| **Redaction**     | Redacted observations excluded by default                          |
+| **Deduplication** | No entity appears in multiple tiers                                |
+| **Performance**   | < 100ms for typical queries                                        |

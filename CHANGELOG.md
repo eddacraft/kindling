@@ -14,6 +14,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > until the Rust cutover lands. See
 > `plans/specs/2026-05-03-rust-canonical-thin-client-design.md`.
 
+## [Unreleased]
+
+The Rust cutover. kindling is now Rust-canonical: the engine ships as a Cargo
+workspace (`crates/`) publishing to crates.io, and the npm `@eddacraft/kindling`
+package is a thin client over the Rust binary. The Rust workspace is versioned
+independently and lands its first crates.io publish at `0.1.0`.
+
+### Added
+
+- **Rust engine** published to crates.io: `eddacraft-kindling` (the `kindling`
+  CLI binary + Claude Code hooks), `kindling-client` (daemon-backed SDK, the
+  default for integrations), `kindling-service` (embedded, in-process),
+  `kindling-server` (daemon runtime, HTTP/1 over a Unix domain socket),
+  `kindling-store` (SQLite + FTS5 + WAL), `kindling-provider` (deterministic
+  FTS5 BM25 + recency retrieval) and `kindling-types` (shared domain types with
+  optional `ts-rs` bindings). The binary crate is named `eddacraft-kindling`
+  because `kindling` is taken on crates.io by an unrelated project; the
+  installed command stays `kindling`.
+- **`kindling serve`** daemon with per-project routing (`X-Kindling-Project`),
+  auto-spawn on first client use, UDS transport (TCP loopback fallback on
+  Windows), PID lock, and idle shutdown (default 30 min). Adds a `--daemonize`
+  flag (PORT-016/017).
+- **`kindling-client`** re-exports the domain types so it is a standalone SDK.
+- **`kindling forget`** verb / `POST /v1/observations/:id/forget` for redaction;
+  plugin `/memory` commands now run against the `kindling` binary (PORT-015).
+- **Public crate READMEs and metadata** for the crates.io launch, plus
+  cargo-publish readiness and install channels (PORT-014); `install.sh`.
+- **Intent-capture health report** (KINTENT-006).
+
+### Changed
+
+- **Crate consolidation (11 → 7):** `filter` folded into `kindling-service`,
+  `spool` into `kindling-client` (as an opt-in durable-emit feature), and
+  `cli` + `hook` + the umbrella crate into a single `kindling` crate.
+- **Adapters** (OpenCode, PocketFlow) and the **Claude Code hooks** were cut over
+  to the thin client / `kindling` binary (PORT-015, PORT-019); the npm adapters
+  now depend on `@eddacraft/kindling` rather than the TS core.
+- **Branding:** lowercase `kindling`, `eddacraft`, and `anvil` in prose.
+
+### Deprecated
+
+- The TypeScript implementation packages (`-core`, `-store-sqlite`,
+  `-store-sqljs`, `-provider-local`, `-server`, `-cli`) are deprecated (PORT-020)
+  and will be removed at 1.0.0.
+
 ## [0.1.3] - 2026-05-08
 
 ### Added
