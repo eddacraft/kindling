@@ -7,7 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 > **Heads-up on the road to 1.0.0.** kindling is being re-implemented in Rust
 > as the canonical engine, with `@eddacraft/kindling` repurposed as a thin
-> HTTP-over-UDS client that downloads the Rust binary at install time. The
+> HTTP-over-UDS client for the Rust `kindling` binary (installed separately via
+> `cargo install eddacraft-kindling` or the install script). The
 > existing TypeScript implementation packages (`-core`, `-store-sqlite`,
 > `-store-sqljs`, `-provider-local`, `-server`, `-cli`) are deprecated and
 > will be removed at 1.0.0. The 0.1.x line continues to receive maintenance

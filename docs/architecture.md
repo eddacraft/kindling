@@ -8,7 +8,7 @@ kindling is Rust-canonical: the engine is a workspace of seven Rust crates, fron
 
 > The canonical published docs live at **docs.eddacraft.ai/kindling**.
 >
-> The npm package `@eddacraft/kindling` is now a **thin HTTP-over-UDS client** that downloads the Rust binary at install time. The legacy TypeScript implementation packages (`-core`, `-store-sqlite`, `-store-sqljs`, `-provider-local`, `-server`, `-cli`) are deprecated and will be removed at 1.0.0.
+> The npm package `@eddacraft/kindling` is now a **thin HTTP-over-UDS client** for the Rust `kindling` binary — it does not bundle the binary, which is installed separately (`cargo install eddacraft-kindling` or the install script) and auto-spawned when on `PATH`. The legacy TypeScript implementation packages (`-core`, `-store-sqlite`, `-store-sqljs`, `-provider-local`, `-server`, `-cli`) are deprecated and will be removed at 1.0.0.
 
 The architecture is deliberately layered to separate concerns:
 
