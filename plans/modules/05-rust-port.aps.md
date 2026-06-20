@@ -4,6 +4,8 @@
 | ---- | ------ | ----------- |
 | PORT | @aneki | In Progress |
 
+**Last reviewed:** 2026-06-20
+
 ## Purpose
 
 Port kindling to Rust as the **only** implementation. Non-Rust consumers reach kindling via a long-running local daemon (`kindling serve`) over a Unix domain socket, accessed by a thin TypeScript HTTP client distributed as `@eddacraft/kindling` on npm. The current TypeScript implementation packages are deprecated and removed after the cutover.
@@ -71,7 +73,7 @@ Supersedes `02-rust-hook-binary` and `03-rust-cli`. Replaces the dual-maintain p
 | 3     | PORT-012..015 | CLI + umbrella binary + cross-platform builds + native distribution (cargo, brew, curl)             |
 | 4     | PORT-016..020 | Thin TS client SDK + npm postinstall release; deprecate TS implementation packages and anvil bridge |
 
-## Tasks
+## Work Items
 
 ### Phase 1 — Foundation
 
