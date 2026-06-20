@@ -51,7 +51,7 @@ Replace the Node.js hook scripts with a single statically-linked Rust binary (`k
 - [x] Dependencies identified
 - [x] At least one task defined
 
-## Tasks
+## Work Items
 
 ### HOOK-001: Scaffold Rust project
 

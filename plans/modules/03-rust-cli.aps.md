@@ -49,7 +49,7 @@ Extend the Rust binary from a hook-only tool to a full CLI replacing the TypeScr
 - [x] Dependencies identified
 - [ ] Tasks need refinement after module 02 completes
 
-## Tasks
+## Work Items
 
 ### CLI-001: FTS retrieval provider
 

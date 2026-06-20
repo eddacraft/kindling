@@ -97,7 +97,7 @@ interface IntentEvent {
 }
 ```
 
-## Tasks
+## Work Items
 
 ### KINTENT-001: Finalize canonical `IntentEvent` schema
 

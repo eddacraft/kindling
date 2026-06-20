@@ -40,7 +40,7 @@ Get all kindling packages published to npm so users can install them. This inclu
 - [x] Dependencies identified
 - [x] At least one task defined
 
-## Tasks
+## Work Items
 
 ### PUBLISH-001: Merge open PRs
 

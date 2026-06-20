@@ -51,7 +51,7 @@ This work was requested by the anvil agents after reviewing what the Rust crate 
 - [x] Dependencies identified
 - [x] At least one task defined
 
-## Tasks
+## Work Items
 
 ### SCHEMA-001: Extract schema to schema/schema.sql
 
