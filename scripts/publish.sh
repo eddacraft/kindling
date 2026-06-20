@@ -5,13 +5,18 @@
 # can be published, so the order below is a topological sort of the intra-
 # workspace dependency graph (leaves first, umbrella last):
 #
-#   kindling-types     (no intra-workspace deps)
-#   kindling-store     -> types
-#   kindling-provider  -> store, types
-#   kindling-service   -> types, store, provider   (filter folded in)
-#   kindling-client    -> types   (durable-emit spool is an opt-in feature)
-#   kindling-server    -> types, store, service
-#   kindling           -> types, store, service, client, server   (the binary; cli + hook folded in)
+#   kindling-types       (no intra-workspace deps)
+#   kindling-store       -> types
+#   kindling-provider    -> store, types
+#   kindling-service     -> types, store, provider   (filter folded in)
+#   kindling-server      -> types, store, service
+#   kindling-client      -> types   (spool is an opt-in feature). NOTE: a
+#                          versioned dev-dependency on kindling-server forces
+#                          server to publish FIRST, even though it's not a prod dep.
+#   eddacraft-kindling   -> types, store, service, client, server   (the binary,
+#                          installs as `kindling`; cli + hook folded in. Published
+#                          under `eddacraft-` because the bare `kindling` crate
+#                          name on crates.io is owned by an unrelated project.)
 #
 # Prerequisites (CREDENTIAL-GATED — the maintainer must do these):
 #   * A crates.io account + API token: `cargo login <token>`
@@ -42,9 +47,9 @@ kindling-types
 kindling-store
 kindling-provider
 kindling-service
-kindling-client
 kindling-server
-kindling
+kindling-client
+eddacraft-kindling
 "
 
 DRY_RUN="${DRY_RUN:-0}"
