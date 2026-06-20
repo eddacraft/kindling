@@ -12,7 +12,7 @@ use std::path::PathBuf;
 use serde::Deserialize;
 use serde_json::Value;
 
-use kindling_filter::{
+use kindling_service::filter::{
     contains_secrets, filter_content, filter_tool_result, is_excluded_path, mask_secrets,
 };
 

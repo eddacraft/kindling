@@ -142,6 +142,26 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --workspace --release
 
+  thin-client-deps:
+    name: thin client stays thin
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # The whole point of kindling-client is a dependency-light SDK: it must
+      # never transitively pull the daemon/persistence stack (rusqlite, axum) or
+      # the CLI/codegen deps (clap, ts-rs). Guard the invariant so no future
+      # dep-add silently fattens the SDK. Checks the default (no-feature) tree.
+      - name: kindling-client must not pull heavy deps
+        run: |
+          tree="$(cargo tree -p kindling-client -e normal)"
+          if printf '%s\n' "$tree" | grep -qiE '(^|[^[:alnum:]_])(rusqlite|axum|clap|ts-rs)([^[:alnum:]_]|$)'; then
+            echo "::error::kindling-client transitively pulls a heavy dependency (rusqlite/axum/clap/ts-rs); the thin-SDK invariant is broken."
+            printf '%s\n' "$tree"
+            exit 1
+          fi
+
   # Exercises the thin TS client (@eddacraft/kindling) AND the live TS adapters
   # (opencode, pocketflow) against a REAL daemon. Their integration tests skip
   # when target/debug/kindling is absent (e.g. the TS-only `pnpm -r test`); this

@@ -356,7 +356,7 @@ fn append_observation_masks_secrets_at_service_boundary() {
     let svc = service();
     // Pattern + expected mask come straight from the kindling-filter fixtures.
     let raw = "api_key=abcdef123456789 and more text";
-    let expected = kindling_filter::mask_secrets(raw);
+    let expected = kindling_service::filter::mask_secrets(raw);
     assert_eq!(expected, "api_key=[REDACTED] and more text");
 
     let obs = svc
@@ -387,7 +387,7 @@ fn append_observation_masks_anthropic_key() {
     assert!(!obs
         .content
         .contains("sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWxYz1234"));
-    assert_eq!(obs.content, kindling_filter::mask_secrets(raw));
+    assert_eq!(obs.content, kindling_service::filter::mask_secrets(raw));
 }
 
 // ===== pin / unpin / list_pins =====

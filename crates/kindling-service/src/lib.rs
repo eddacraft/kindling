@@ -24,6 +24,7 @@
 mod context;
 mod error;
 mod export;
+pub mod filter;
 mod service;
 mod validation;
 

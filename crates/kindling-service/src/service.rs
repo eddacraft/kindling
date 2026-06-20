@@ -5,7 +5,7 @@
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use kindling_filter::mask_secrets;
+use crate::filter::mask_secrets;
 use kindling_provider::{retrieve_at, LocalFtsProvider};
 use kindling_store::{SqliteKindlingStore, StoreError, StoreOptions};
 use kindling_types::{
