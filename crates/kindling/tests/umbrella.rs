@@ -323,7 +323,9 @@ impl Daemon {
             socket_path: socket_path.clone(),
             kindling_home: home_path.clone(),
             pid_path: home_path.join("k.pid"),
+            port_path: home_path.join("k.port"),
             idle_timeout: Duration::from_secs(3600),
+            transport: kindling_server::Transport::default(),
         };
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)

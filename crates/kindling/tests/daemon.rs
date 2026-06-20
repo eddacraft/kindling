@@ -70,7 +70,9 @@ async fn via_daemon_log_roundtrip() {
         socket_path: socket.clone(),
         kindling_home: home_path.clone(),
         pid_path: home_path.join("kindling.pid"),
+        port_path: home_path.join("kindling.port"),
         idle_timeout: Duration::from_secs(3600),
+        transport: kindling_server::Transport::default(),
     };
     let handle = tokio::spawn(async move { serve(config).await });
 

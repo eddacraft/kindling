@@ -79,6 +79,28 @@ const fn parse_schema_version() -> u32 {
 /// Default file name of the daemon socket under the kindling home.
 const SOCKET_FILE: &str = "kindling.sock";
 
+/// Default file name of the daemon TCP port file under the kindling home.
+const PORT_FILE: &str = "kindling.port";
+
+/// Which transport the client uses to reach the daemon.
+///
+/// Mirrors `kindling_server::Transport` (each crate keeps its own copy so the
+/// client need not depend on the server). `Uds` exists only on Unix; `Tcp`
+/// exists everywhere and is the Windows default. Defaults to UDS on Unix and
+/// TCP on Windows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum Transport {
+    /// Unix domain socket at [`ClientConfig::socket_path`] (Unix only; the
+    /// platform default there).
+    #[cfg(unix)]
+    #[cfg_attr(unix, default)]
+    Uds,
+    /// Loopback TCP; the port is read from [`ClientConfig::port_path`]. The
+    /// platform default on non-Unix (Windows).
+    #[cfg_attr(not(unix), default)]
+    Tcp,
+}
+
 /// How the client starts the daemon when it is not already running.
 ///
 /// The default execs the real `kindling` binary; tests inject a closure that
@@ -106,8 +128,6 @@ impl Spawner {
     }
 
     /// Run the spawn action once.
-    // Only the unix transport auto-spawns; the non-unix request path is a stub.
-    #[cfg_attr(not(unix), allow(dead_code))]
     pub(crate) fn spawn(&self) -> io::Result<()> {
         match self {
             Spawner::Command => {
@@ -150,8 +170,13 @@ impl std::fmt::Debug for Spawner {
 #[derive(Clone, Debug)]
 pub struct ClientConfig {
     /// Unix domain socket the daemon listens on
-    /// (`~/.kindling/kindling.sock` by default).
+    /// (`~/.kindling/kindling.sock` by default). Used when [`Self::transport`]
+    /// is [`Transport::Uds`].
     pub socket_path: PathBuf,
+    /// File the daemon publishes its TCP port to
+    /// (`~/.kindling/kindling.port` by default). Read when [`Self::transport`]
+    /// is [`Transport::Tcp`].
+    pub port_path: PathBuf,
     /// Project root string, sent as the `X-Kindling-Project` header on every
     /// data endpoint. The daemon hashes it to route to a per-project DB.
     /// Defaults to the current working directory.
@@ -168,6 +193,9 @@ pub struct ClientConfig {
     /// How to start the daemon when it is not running. Defaults to the real
     /// `kindling serve --daemonize` binary.
     pub spawn: Spawner,
+    /// Transport to reach the daemon. Defaults to [`Transport::default`] (UDS
+    /// on Unix, TCP on Windows).
+    pub transport: Transport,
 }
 
 impl ClientConfig {
@@ -184,14 +212,22 @@ impl ClientConfig {
                 "could not determine kindling home (no HOME/USERPROFILE)",
             )
         })?;
+        let port_path = default_port_path().ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::NotFound,
+                "could not determine kindling home (no HOME/USERPROFILE)",
+            )
+        })?;
         let project_root = std::env::current_dir()?.to_string_lossy().into_owned();
         Ok(Self {
             socket_path,
+            port_path,
             project_root,
             expected_schema_version: EXPECTED_SCHEMA_VERSION,
             connect_timeout: Duration::from_secs(1),
             poll_interval: Duration::from_millis(10),
             spawn: Spawner::default(),
+            transport: Transport::default(),
         })
     }
 }
@@ -206,6 +242,18 @@ pub fn default_socket_path() -> Option<PathBuf> {
         .filter(|v| !v.is_empty())
         .or_else(|| std::env::var_os("USERPROFILE").filter(|v| !v.is_empty()))?;
     Some(PathBuf::from(home).join(".kindling").join(SOCKET_FILE))
+}
+
+/// Default daemon TCP port file path: `~/.kindling/kindling.port`.
+///
+/// Mirrors [`default_socket_path`] (same HOME/USERPROFILE resolution) but points
+/// at the side-channel file the TCP-transport daemon publishes its bound port
+/// to.
+pub fn default_port_path() -> Option<PathBuf> {
+    let home = std::env::var_os("HOME")
+        .filter(|v| !v.is_empty())
+        .or_else(|| std::env::var_os("USERPROFILE").filter(|v| !v.is_empty()))?;
+    Some(PathBuf::from(home).join(".kindling").join(PORT_FILE))
 }
 
 #[cfg(test)]

@@ -64,7 +64,10 @@ pub mod spool;
 mod transport;
 
 pub use body::{CloseCapsuleBody, CreatePinBody};
-pub use config::{default_socket_path, ClientConfig, Spawner, EXPECTED_SCHEMA_VERSION};
+pub use config::{
+    default_port_path, default_socket_path, ClientConfig, Spawner, Transport,
+    EXPECTED_SCHEMA_VERSION,
+};
 pub use error::ClientError;
 
 use hyper::StatusCode;
