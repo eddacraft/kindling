@@ -1,6 +1,11 @@
 [package]
 name = "kindling-types"
-description = "Internal building block of kindling — these types are re-exported by the `kindling-client` SDK, so depend on that, not this crate directly. Canonical domain types (observations, capsules, retrieval); ts-rs derives generate the TypeScript projection."
+description = "Shared domain types for kindling: observations, capsules, summaries, pins and retrieval results."
+homepage.workspace = true
+documentation = "https://docs.rs/kindling-types"
+readme = "README.md"
+keywords = ["types", "memory", "ai", "context", "serde"]
+categories = ["development-tools", "data-structures"]
 version.workspace = true
 edition.workspace = true
 license.workspace = true

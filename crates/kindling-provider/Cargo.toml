@@ -1,6 +1,11 @@
 [package]
 name = "kindling-provider"
-description = "Internal building block of kindling — app authors want the `kindling` binary or the `kindling-client` SDK. Local FTS5 retrieval provider — BM25 normalization, tiered retrieval (pins → current summary → ranked candidates)."
+description = "Deterministic local retrieval provider for kindling memory using SQLite FTS."
+homepage.workspace = true
+documentation = "https://docs.rs/kindling-provider"
+readme = "README.md"
+keywords = ["search", "memory", "ai", "context", "sqlite"]
+categories = ["development-tools"]
 version.workspace = true
 edition.workspace = true
 license.workspace = true

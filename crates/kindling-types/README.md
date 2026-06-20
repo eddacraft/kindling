@@ -1,33 +1,46 @@
 # kindling-types
 
-Canonical Rust types for kindling — observations, capsules, summaries, pins,
-retrieval. The wire format mirrors the existing TypeScript shapes in
-`packages/kindling-core/src/types/` and is the contract every consumer
-(Rust, TS-via-daemon, future bindings) must agree on.
+**Shared domain types for kindling** — local-first memory for AI-assisted development.
 
-## TypeScript projection
+`kindling-types` defines the core data shapes used across kindling: observations, capsules, summaries, pins, retrieval results, scope identifiers and related API types.
 
-The `ts-rs` feature derives a TypeScript projection of every public type and
-writes it under `bindings/` when tests run:
+Most Rust integrations should depend on [`kindling-client`](https://crates.io/crates/kindling-client), which re-exports these types. Use this crate directly only when you need the domain model without the client, service or storage layers.
+
+## Install
+
+```toml
+[dependencies]
+kindling-types = "0.1"
+```
+
+## When to use this crate
+
+Use `kindling-types` when you are:
+
+- Building a custom integration around kindling's data model.
+- Sharing kindling types across crates without pulling in client or storage code.
+- Generating or validating bindings.
+- Working on protocol-level compatibility.
+
+## TypeScript bindings
+
+The crate supports optional TypeScript projection generation through the `ts-rs` feature:
 
 ```sh
 cargo test -p kindling-types --features ts-rs
 ```
 
-The resulting `.ts` files are checked in. CI runs the same command and fails
-if any binding has drifted, so a contributor changing a type cannot land the
-Rust change without also refreshing the bindings.
+The resulting `.ts` files are checked in under `bindings/`; CI fails if any binding drifts from its Rust type.
 
-## Wire-format conventions
+## Documentation
 
-- All structs are camelCase on the wire (`scope_ids` → `scopeIds`).
-- Enum variants are snake_case strings (`ToolCall` → `tool_call`).
-- Optional fields are omitted from JSON when `None`, never serialised as `null`.
-- `Timestamp` and counts are plain JSON numbers. `Timestamp` is an `i64`
-  alias (epoch milliseconds) and is the only integer wider than `i32` in
-  public types; every field that holds a `Timestamp` carries a
-  `#[ts(type = "number")]` override so the TypeScript projection emits
-  `number`, not `bigint`. New fields with `Timestamp` must carry the same
-  override — the round-trip and bindings tests will fail otherwise.
-- `RetrievedEntity` is an untagged union of `Observation | Summary` so it
-  matches the structural union TS already uses.
+Full docs: **[docs.eddacraft.ai/kindling](https://docs.eddacraft.ai/kindling/overview)**
+
+Relevant docs:
+
+- [Core concepts](https://docs.eddacraft.ai/kindling/concepts/capsules)
+- [Writing adapters](https://docs.eddacraft.ai/kindling/adapters/custom)
+
+## Licence
+
+Apache-2.0

@@ -1,13 +1,31 @@
 # kindling
 
-**Local memory and continuity engine for AI-assisted development**
+**Local-first memory and continuity for AI-assisted development**
 
-kindling captures what happens during AI-assisted development — tool calls, diffs, commands, errors — and makes it retrievable across sessions. All data stays local in embedded SQLite.
+kindling gives AI coding tools a memory of what happened: tool calls, file edits, commands, errors, decisions, summaries and pinned findings. It stores that context locally, organises it into meaningful sessions, and retrieves it later with deterministic, explainable results.
 
+Use kindling from the CLI, as a daemon-backed Rust SDK, or as an embedded in-process service.
+
+- **Local-first:** project memory is stored locally in SQLite.
+- **Deterministic retrieval:** pins, current summaries and ranked provider hits are returned in a predictable order.
+- **Built for AI coding workflows:** Claude Code hooks today, with a crate-level API for other tools and agents.
+- **Public docs:** [docs.eddacraft.ai/kindling](https://docs.eddacraft.ai/kindling/overview)
+
+[![crates.io](https://img.shields.io/crates/v/kindling.svg)](https://crates.io/crates/kindling)
 [![npm version](https://img.shields.io/npm/v/@eddacraft/kindling.svg)](https://www.npmjs.com/package/@eddacraft/kindling)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue)](https://www.typescriptlang.org/)
-[![Node.js](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen)](https://nodejs.org/)
+
+## Documentation
+
+The full guide lives at **[docs.eddacraft.ai/kindling](https://docs.eddacraft.ai/kindling/overview)**.
+
+Start here:
+
+- [Install kindling](https://docs.eddacraft.ai/kindling/quickstart/install)
+- [Core concepts](https://docs.eddacraft.ai/kindling/concepts/capsules)
+- [CLI reference](https://docs.eddacraft.ai/kindling/reference/cli)
+- [Configuration](https://docs.eddacraft.ai/kindling/reference/config)
+- [Writing adapters](https://docs.eddacraft.ai/kindling/adapters/custom)
 
 ## Quick Start: Claude Code
 
@@ -36,6 +54,39 @@ That's it. kindling now captures your Claude Code sessions automatically — too
 ```
 
 ## Install
+
+### Rust / Cargo
+
+```bash
+cargo install kindling
+```
+
+This installs the `kindling` binary:
+
+```bash
+kindling init
+kindling log "JWT tokens expire after 15 minutes, not 1 hour"
+kindling search "JWT"
+kindling serve
+```
+
+For Rust applications, prefer the daemon-backed client:
+
+```toml
+[dependencies]
+kindling-client = "0.1"
+```
+
+Or use the in-process service when you explicitly want embedded, single-process access:
+
+```toml
+[dependencies]
+kindling-service = "0.1"
+```
+
+Full setup guide: [docs.eddacraft.ai/kindling/quickstart/install](https://docs.eddacraft.ai/kindling/quickstart/install)
+
+### Node.js / npm
 
 Node.js >= 20 required. Prebuilt binaries ship for Linux (glibc), macOS (Intel + Apple Silicon), and Windows (x64).
 
@@ -71,6 +122,18 @@ kindling uses [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) which
 - **Windows (Admin):** `npm install -g windows-build-tools`
 
 </details>
+
+## Which crate should I use?
+
+| Crate | Use it when |
+| --- | --- |
+| [`kindling`](https://crates.io/crates/kindling) | You want the CLI binary: `kindling init`, `kindling log`, `kindling search`, `kindling serve`, or Claude Code hook support. |
+| [`kindling-client`](https://crates.io/crates/kindling-client) | You are building a Rust integration that should talk to the kindling daemon safely across concurrent tools. This is the default SDK choice. |
+| [`kindling-service`](https://crates.io/crates/kindling-service) | You need embedded, in-process access to capsule lifecycle, observation capture, retrieval and pins. |
+| [`kindling-server`](https://crates.io/crates/kindling-server) | You are extending or embedding the daemon/runtime layer. Most users should run `kindling serve` instead. |
+| [`kindling-store`](https://crates.io/crates/kindling-store) | You are working directly with the SQLite persistence layer. Most applications should use `kindling-client` or `kindling-service`. |
+| [`kindling-provider`](https://crates.io/crates/kindling-provider) | You are working on deterministic local retrieval and ranking. |
+| [`kindling-types`](https://crates.io/crates/kindling-types) | You need shared domain types directly. Most client users get these re-exported from `kindling-client`. |
 
 ## CLI Usage
 
@@ -363,11 +426,13 @@ console.log(results.pins); // Includes the pinned error
 4. **Privacy-Aware** — automatic redaction of secrets, bounded output capture
 5. **Provenance Always** — every piece of context points to concrete evidence
 
-## kindling + anvil
+## kindling and anvil
 
-**kindling** captures what happened. **anvil** enforces what should happen.
+kindling captures what happened. anvil governs what should happen.
 
-Request access to the anvil closed beta → [eddacraft.ai](https://eddacraft.ai)
+kindling provides local memory, session continuity and explainable retrieval. anvil builds on that foundation with governed plans, quality gates, provenance and policy enforcement for software teams.
+
+Learn more at [eddacraft.ai](https://eddacraft.ai).
 
 ## Development
 
@@ -381,16 +446,6 @@ pnpm run type-check
 ```
 
 This project uses [anvil Plan Spec (APS)](https://github.com/eddacraft/anvil-plan-spec) for planning.
-
-## Documentation
-
-Full docs at **[docs.eddacraft.ai/kindling/overview](https://docs.eddacraft.ai/kindling/overview)**:
-
-- [Quickstart](https://docs.eddacraft.ai/kindling/quickstart/install)
-- [Core Concepts](https://docs.eddacraft.ai/kindling/concepts/capsules)
-- [CLI Reference](https://docs.eddacraft.ai/kindling/reference/cli)
-- [Configuration](https://docs.eddacraft.ai/kindling/reference/config)
-- [Writing Adapters](https://docs.eddacraft.ai/kindling/adapters/custom)
 
 ## Contributing
 
