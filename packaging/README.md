@@ -8,11 +8,14 @@ target on release `published` and attaches
 `kindling-<version>-<target>.tar.gz` archives plus `.sha256` sidecars as release
 assets.
 
-| Channel                | Artefact in this repo                                     | What the user runs                             |
-| ---------------------- | --------------------------------------------------------- | ---------------------------------------------- |
-| crates.io              | `scripts/publish.sh` (order), vendored `crates/*/schema/` | `cargo install kindling`                       |
-| `curl \| sh` installer | `packaging/install.sh`                                    | `curl -sSL https://install.kindling.dev \| sh` |
-| Homebrew               | `packaging/homebrew/kindling.rb`                          | `brew install eddacraft/tap/kindling`          |
+| Channel                | Artefact in this repo                                     | What the user runs                                                                                |
+| ---------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| crates.io              | `scripts/publish.sh` (order), vendored `crates/*/schema/` | `cargo install eddacraft-kindling`                                                                |
+| `curl \| sh` installer | `packaging/install.sh`                                    | `curl -fsSL https://raw.githubusercontent.com/eddacraft/kindling/main/packaging/install.sh \| sh` |
+| Homebrew (planned)     | `packaging/homebrew/kindling.rb`                          | `brew install eddacraft/tap/kindling` _(once the tap is published)_                               |
+
+> The CLI binary publishes to crates.io as **`eddacraft-kindling`** because the
+> bare `kindling` name is taken; the installed command is still `kindling`.
 
 ## 1. crates.io
 
@@ -31,17 +34,18 @@ Publishing readiness (done in-repo by PORT-014):
 
 1. `cargo login <crates.io-token>` (or export `CARGO_REGISTRY_TOKEN`).
 2. Run [`scripts/publish.sh`](../scripts/publish.sh) — it publishes in
-   dependency order: `types → filter → store → provider → service → client →
-server → hook → cli → kindling`. crates.io needs a few seconds to index each
-   crate before the next dependent one resolves; the script pauses between
-   publishes.
+   dependency order: `kindling-types → kindling-store → kindling-provider →
+kindling-service → kindling-server → kindling-client → eddacraft-kindling`
+   (server publishes before client because client carries a versioned
+   dev-dependency on server). crates.io needs a few seconds to index each crate
+   before the next dependent one resolves; the script pauses between publishes.
 
 > `cargo publish --dry-run` of a dependent crate fails with
 > `no matching package named ...` until its deps are actually on crates.io. That
 > is expected for a not-yet-published workspace and is **not** a packaging
 > problem — packaging is verified with `cargo package --list -p <crate>`.
 
-## 2. `curl … | sh` installer (`install.kindling.dev`)
+## 2. `curl … | sh` installer
 
 [`packaging/install.sh`](./install.sh) detects OS/arch, resolves the latest release
 (or `KINDLING_VERSION`), downloads the matching tarball + `.sha256`, **verifies
@@ -53,15 +57,16 @@ covered; Windows is not (use the `*-pc-windows-gnu.zip` release asset).
 
 1. Cut a GitHub Release so `release.yml` attaches the assets the script
    downloads.
-2. Point `install.kindling.dev` at a copy of `packaging/install.sh` — e.g. a Cloudflare
-   Worker / Pages redirect, or serve the raw file. (Until the domain exists,
-   users can run
-   `curl -sSL https://raw.githubusercontent.com/eddacraft/kindling/main/packaging/install.sh | sh`.)
+2. Until/unless a dedicated vanity domain is set up, users run the installer
+   straight from the repo:
+   `curl -fsSL https://raw.githubusercontent.com/eddacraft/kindling/main/packaging/install.sh | sh`.
 
-## 3. Homebrew (`eddacraft/tap`)
+## 3. Homebrew (`eddacraft/tap`) — planned, not yet published
 
 [`packaging/homebrew/kindling.rb`](./homebrew/kindling.rb) is a macOS-only formula
-with a per-arch `url` + `sha256`.
+with a per-arch `url` + `sha256`. The `eddacraft/homebrew-tap` repository does
+not exist yet, so `brew install eddacraft/tap/kindling` is not available until
+the steps below are done.
 
 **Credential-gated maintainer steps:**
 
@@ -76,7 +81,6 @@ with a per-arch `url` + `sha256`.
 
 - [ ] Tag `vX.Y.Z` on `main` and publish a GitHub Release → `release.yml`
       attaches all target archives + `.sha256` sidecars.
-- [ ] `cargo login` + `scripts/publish.sh` → crates.io (`cargo install kindling`).
+- [ ] `cargo login` + `scripts/publish.sh` → crates.io (`cargo install eddacraft-kindling`).
 - [ ] Update `packaging/homebrew/kindling.rb` (`version` + darwin SHA256s), push to
-      `eddacraft/homebrew-tap`.
-- [ ] Ensure `install.kindling.dev` serves the current `packaging/install.sh`.
+      `eddacraft/homebrew-tap` (create the tap repo first; not done yet).
