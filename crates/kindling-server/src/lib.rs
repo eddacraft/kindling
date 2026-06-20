@@ -50,7 +50,7 @@ pub mod inject;
 mod pid;
 mod state;
 
-pub use config::{ServerConfig, DEFAULT_IDLE_TIMEOUT};
+pub use config::{ServerConfig, Transport, DEFAULT_IDLE_TIMEOUT};
 pub use error::{ApiError, ServerError};
 pub use handlers::{PROJECT_HEADER, SESSION_HEADER};
 pub use pid::{acquire_pid_lock, PidGuard};
@@ -119,10 +119,18 @@ pub async fn serve(config: ServerConfig) -> Result<(), ServerError> {
     let state = AppState::new(config.kindling_home.clone());
     let app = build_router(state.clone());
 
-    serve_on_socket(&config, app, state.activity().clone()).await?;
-
-    // Best-effort socket cleanup; the PID guard removes the PID file on drop.
-    let _ = remove_socket(&config.socket_path);
+    match config.transport {
+        #[cfg(unix)]
+        Transport::Uds => {
+            serve_on_uds(&config, app, state.activity().clone()).await?;
+            // Best-effort socket cleanup; the PID guard removes the PID file on
+            // drop.
+            let _ = remove_socket(&config.socket_path);
+        }
+        Transport::Tcp => {
+            serve_on_tcp(&config, app, state.activity().clone()).await?;
+        }
+    }
     Ok(())
 }
 
@@ -143,7 +151,7 @@ async fn wait_until_idle(activity: Arc<state::Activity>, idle_timeout: Duration)
 }
 
 #[cfg(unix)]
-async fn serve_on_socket(
+async fn serve_on_uds(
     config: &ServerConfig,
     app: Router,
     activity: Arc<state::Activity>,
@@ -178,23 +186,38 @@ async fn serve_on_socket(
     Ok(())
 }
 
-#[cfg(windows)]
-async fn serve_on_socket(
+/// Serve over loopback TCP on an ephemeral `127.0.0.1` port.
+///
+/// Compiled on all platforms (it is the Windows default, and is exercised by
+/// the Linux test suite). Binds `127.0.0.1:0`, reads back the OS-assigned port,
+/// and publishes it as decimal text to [`ServerConfig::port_path`] so the
+/// client can discover where to connect — TCP has no filesystem rendezvous like
+/// a UDS path. The port file is removed (best-effort) on shutdown.
+async fn serve_on_tcp(
     config: &ServerConfig,
     app: Router,
     activity: Arc<state::Activity>,
 ) -> Result<(), ServerError> {
-    // Windows fallback: localhost TCP. The socket_path is reinterpreted as a
-    // marker only; we bind an ephemeral loopback port. This path is
-    // intentionally minimal (development happens on Unix); PORT-013 can
-    // formalise it.
     use tokio::net::TcpListener;
 
     let listener = TcpListener::bind(("127.0.0.1", 0)).await?;
+    let port = listener.local_addr()?.port();
+
+    if let Some(parent) = config.port_path.parent() {
+        if !parent.as_os_str().is_empty() {
+            std::fs::create_dir_all(parent)?;
+        }
+    }
+    std::fs::write(&config.port_path, port.to_string())?;
+
     let idle_timeout = config.idle_timeout;
-    axum::serve(listener, app)
+    let serve_result = axum::serve(listener, app)
         .with_graceful_shutdown(wait_until_idle(activity, idle_timeout))
-        .await?;
+        .await;
+
+    // Best-effort port-file cleanup; mirrors the UDS socket cleanup.
+    let _ = remove_socket(&config.port_path);
+    serve_result?;
     Ok(())
 }
 

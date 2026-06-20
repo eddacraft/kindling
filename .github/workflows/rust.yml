@@ -162,6 +162,20 @@ jobs:
             exit 1
           fi
 
+  # Builds the whole workspace on real Windows and runs the platform-agnostic
+  # TCP round-trip, exercising the cfg(windows) Transport::Tcp defaults end to
+  # end. The full client suite is NOT run here: tests/client.rs is cfg(unix)
+  # (it binds a Unix domain socket), so only the TCP test applies on Windows.
+  windows-tcp:
+    name: windows tcp transport
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --workspace
+      - run: cargo test -p kindling-client --test tcp
+
   # Exercises the thin TS client (@eddacraft/kindling) AND the live TS adapters
   # (opencode, pocketflow) against a REAL daemon. Their integration tests skip
   # when target/debug/kindling is absent (e.g. the TS-only `pnpm -r test`); this

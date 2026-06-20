@@ -1,4 +1,9 @@
 //! Integration tests for `kindling-client` against a real in-process daemon.
+//!
+//! UDS-specific: `TestDaemon` binds a Unix domain socket, so the whole suite is
+//! Unix-only. The platform-agnostic TCP transport (the Windows path) is covered
+//! by `tests/tcp.rs`, which runs on every platform.
+#![cfg(unix)]
 
 mod support;
 
@@ -8,7 +13,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use kindling_client::{
-    Client, ClientConfig, ClientError, CloseCapsuleBody, CreatePinBody, Spawner,
+    Client, ClientConfig, ClientError, CloseCapsuleBody, CreatePinBody, Spawner, Transport,
 };
 use kindling_server::serve;
 use kindling_types::{CapsuleType, ObservationInput, ObservationKind, PinTargetType, ScopeIds};
@@ -252,11 +257,13 @@ async fn cold_spawn_starts_daemon() {
 
     let client = Client::with_config(ClientConfig {
         socket_path: socket_path.clone(),
+        port_path: socket_path.with_extension("port"),
         project_root: PROJECT_A.to_string(),
         expected_schema_version: schema_version_u32(),
         connect_timeout: Duration::from_secs(1),
         poll_interval: Duration::from_millis(5),
         spawn: spawner,
+        transport: Transport::Uds,
     });
 
     assert!(!socket_path.exists(), "socket must not pre-exist");
@@ -296,6 +303,7 @@ async fn refused_without_binary_is_unavailable() {
 
     let client = Client::with_config(ClientConfig {
         socket_path: socket_path.clone(),
+        port_path: dir.path().join("nonexistent.port"),
         project_root: PROJECT_A.to_string(),
         expected_schema_version: schema_version_u32(),
         connect_timeout: Duration::from_millis(200),
@@ -307,6 +315,7 @@ async fn refused_without_binary_is_unavailable() {
                 "kindling binary not found",
             ))
         }),
+        transport: Transport::Uds,
     });
 
     // Wrap in a timeout so a hang fails the test rather than blocking forever.
@@ -332,11 +341,13 @@ async fn default_spawner_missing_binary_is_unavailable() {
 
     let client = Client::with_config(ClientConfig {
         socket_path,
+        port_path: dir.path().join("nonexistent.port"),
         project_root: PROJECT_A.to_string(),
         expected_schema_version: schema_version_u32(),
         connect_timeout: Duration::from_millis(200),
         poll_interval: Duration::from_millis(10),
         spawn: Spawner::Command, // execs `kindling`, not on PATH in CI
+        transport: Transport::Uds,
     });
 
     let result = tokio::time::timeout(Duration::from_secs(3), client.health()).await;
