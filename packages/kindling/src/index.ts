@@ -43,6 +43,7 @@ export {
   defaultSocketPath,
   resolveProjectRoot,
   resolveConfig,
+  platformPackageName,
   type KindlingOptions,
   type ResolvedConfig,
 } from './config.js';

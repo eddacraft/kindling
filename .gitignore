@@ -171,3 +171,7 @@ target/
 # SQLite side-files of committed test fixtures (recreated on open)
 crates/**/tests/fixtures/*.db-wal
 crates/**/tests/fixtures/*.db-shm
+
+# Generated per-platform binary packages (materialized at publish time by
+# packages/kindling/scripts/build-platform-packages.mjs)
+packages/kindling/platforms/
