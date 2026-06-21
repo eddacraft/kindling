@@ -25,11 +25,11 @@ name = "kindling"
 path = "src/main.rs"
 
 [dependencies]
-kindling-types = { path = "../kindling-types", version = "0.1.0" }
-kindling-store = { path = "../kindling-store", version = "0.1.0" }
-kindling-service = { path = "../kindling-service", version = "0.1.0" }
-kindling-client = { path = "../kindling-client", version = "0.1.0" }
-kindling-server = { path = "../kindling-server", version = "0.1.0" }
+kindling-types = { path = "../kindling-types", version = "0.2.0" }
+kindling-store = { path = "../kindling-store", version = "0.2.0" }
+kindling-service = { path = "../kindling-service", version = "0.2.0" }
+kindling-client = { path = "../kindling-client", version = "0.2.0" }
+kindling-server = { path = "../kindling-server", version = "0.2.0" }
 clap = { version = "4", features = ["derive"] }
 rusqlite = { version = "0.40", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
