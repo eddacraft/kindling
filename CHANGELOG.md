@@ -42,6 +42,14 @@ independently and lands its first crates.io publish at `0.1.0`.
   plugin `/memory` commands now run against the `kindling` binary (PORT-015).
 - **Public crate READMEs and metadata** for the crates.io launch, plus
   cargo-publish readiness and install channels (PORT-014); `install.sh`.
+- **Self-contained npm install:** `@eddacraft/kindling` now ships the `kindling`
+  binary through per-platform `optionalDependencies`
+  (`@eddacraft/kindling-<os>-<arch>[-musl]`, one prebuilt binary each with
+  `os`/`cpu`/`libc` fields). Your package manager downloads only the matching
+  one — no postinstall, works under `--ignore-scripts`. `$KINDLING_BIN` and a
+  `kindling` on `PATH` still override the bundled binary. The packages are
+  generated and published from the same cross-built artifacts as the GitHub
+  Release (`scripts/build-platform-packages.mjs`).
 - **Intent-capture health report** (KINTENT-006).
 
 ### Changed

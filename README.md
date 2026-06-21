@@ -114,6 +114,15 @@ yarn add @eddacraft/kindling
 bun add @eddacraft/kindling
 ```
 
+The install brings its own `kindling` binary: `@eddacraft/kindling` declares a
+per-platform `optionalDependencies` entry (`@eddacraft/kindling-linux-x64`,
+`@eddacraft/kindling-darwin-arm64`, …) and your package manager downloads only
+the one matching your OS/arch/libc — no postinstall script, works under
+`--ignore-scripts`. The client auto-spawns that binary on first use. To point it
+at a different build instead, set `$KINDLING_BIN` or install the CLI on `PATH`
+(via `cargo install eddacraft-kindling` or the one-line installer); both take
+precedence over the bundled binary.
+
 > `@eddacraft/kindling` is a thin TypeScript client over the Rust binary. The
 > older implementation packages — including the standalone CLI
 > `@eddacraft/kindling-cli` — are **deprecated** and will be removed at 1.0.0;

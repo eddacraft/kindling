@@ -9,7 +9,8 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -51,9 +52,7 @@ function loadExpectedSchemaVersion(): number {
       // try next candidate
     }
   }
-  throw new Error(
-    'could not locate schema/version.json to determine the expected schema version',
-  );
+  throw new Error('could not locate schema/version.json to determine the expected schema version');
 }
 
 /**
@@ -67,9 +66,7 @@ export function defaultSocketPath(): string {
   }
   const home =
     (process.env.HOME && process.env.HOME.length > 0 && process.env.HOME) ||
-    (process.env.USERPROFILE &&
-      process.env.USERPROFILE.length > 0 &&
-      process.env.USERPROFILE) ||
+    (process.env.USERPROFILE && process.env.USERPROFILE.length > 0 && process.env.USERPROFILE) ||
     homedir();
   return join(home, '.kindling', SOCKET_FILE);
 }
@@ -117,7 +114,9 @@ export interface KindlingOptions {
   projectRoot?: string;
   /**
    * Path to the `kindling` binary used for auto-spawn. Default resolution:
-   * `$KINDLING_BIN` → `node_modules/@eddacraft/kindling/bin/kindling` → `kindling` on PATH.
+   * `$KINDLING_BIN` → the matching `@eddacraft/kindling-<platform>` optional
+   * dependency → a legacy binary bundled under this package's `bin/` →
+   * `kindling` on `PATH`.
    */
   binaryPath?: string;
   /** Schema version to require from `/v1/health`. Default {@link EXPECTED_SCHEMA_VERSION}. */
@@ -141,25 +140,116 @@ export interface ResolvedConfig {
   autoSpawn: boolean;
 }
 
-/** Resolve the bundled binary path under this package's `bin/` directory. */
-function packagedBinaryPath(): string {
-  const here = dirname(fileURLToPath(import.meta.url));
-  // dist/config.js -> ../bin/kindling ; src/config.ts -> ../bin/kindling
-  return join(here, '..', 'bin', 'kindling');
+/**
+ * The npm platform-package that ships the prebuilt `kindling` binary for the
+ * current host, or `null` when the host isn't one of our published targets.
+ *
+ * These mirror the 7 release-build targets one-to-one (see `install.sh`'s
+ * `detect_target` and `.github/workflows/release.yml`). On Linux the glibc/musl
+ * split is detected via `process.report` (`glibcVersionRuntime` is present on
+ * glibc, absent on musl); an unavailable report API assumes glibc, the common
+ * case.
+ */
+export function platformPackageName(): string | null {
+  const libc = process.platform === 'linux' ? linuxLibc() : null;
+  return platformPackageNameFor(process.platform, process.arch, libc);
 }
 
 /**
- * Resolve the binary path for auto-spawn:
- *   `$KINDLING_BIN` → packaged `bin/kindling` → `kindling` on PATH.
- *
- * Returns `null` when none can be statically determined (PATH lookup is
- * deferred to spawn time, represented by the bare name `"kindling"`).
+ * Pure mapping from `(platform, arch, libc)` to the platform-package name, or
+ * `null` for an unsupported host. `libc` is only consulted on Linux. Exported
+ * for exhaustive testing; production code calls {@link platformPackageName}.
  */
-function resolveBinaryPath(explicit?: string): string {
+export function platformPackageNameFor(
+  platform: NodeJS.Platform,
+  arch: string,
+  libc: 'glibc' | 'musl' | null,
+): string | null {
+  if (platform === 'linux') {
+    const suffix = libc === 'musl' ? '-musl' : '';
+    if (arch === 'x64') return `@eddacraft/kindling-linux-x64${suffix}`;
+    if (arch === 'arm64') return `@eddacraft/kindling-linux-arm64${suffix}`;
+    return null;
+  }
+  if (platform === 'darwin') {
+    if (arch === 'x64') return '@eddacraft/kindling-darwin-x64';
+    if (arch === 'arm64') return '@eddacraft/kindling-darwin-arm64';
+    return null;
+  }
+  if (platform === 'win32') {
+    if (arch === 'x64') return '@eddacraft/kindling-win32-x64';
+    return null;
+  }
+  return null;
+}
+
+/** The binary file name inside a platform package (`.exe` on Windows). */
+function platformBinaryName(): string {
+  return process.platform === 'win32' ? 'kindling.exe' : 'kindling';
+}
+
+/**
+ * Detect the active C library on Linux. `process.report` exposes
+ * `header.glibcVersionRuntime` on glibc systems and omits it on musl. When the
+ * report API is entirely unavailable we assume glibc (the common case).
+ */
+function linuxLibc(): 'glibc' | 'musl' {
+  const report = process.report?.getReport?.() as
+    | { header?: { glibcVersionRuntime?: string } }
+    | undefined;
+  if (report === undefined) return 'glibc';
+  return report.header?.glibcVersionRuntime ? 'glibc' : 'musl';
+}
+
+/**
+ * Resolve the binary shipped by the matching `@eddacraft/kindling-<platform>`
+ * optional dependency, or `null` when that package isn't installed (e.g. the
+ * host platform has no published binary, or `--no-optional` was used).
+ */
+function platformBinaryPath(): string | null {
+  const pkg = platformPackageName();
+  if (pkg === null) return null;
+  try {
+    const require = createRequire(import.meta.url);
+    const manifest = require.resolve(`${pkg}/package.json`);
+    const candidate = join(dirname(manifest), 'bin', platformBinaryName());
+    return existsSync(candidate) ? candidate : null;
+  } catch {
+    // MODULE_NOT_FOUND: the optional dependency isn't installed.
+    return null;
+  }
+}
+
+/** Resolve the legacy bundled binary path under this package's `bin/` directory. */
+function packagedBinaryPath(): string {
+  const here = dirname(fileURLToPath(import.meta.url));
+  // dist/config.js -> ../bin/kindling ; src/config.ts -> ../bin/kindling
+  return join(here, '..', 'bin', platformBinaryName());
+}
+
+/**
+ * Resolve the binary path for auto-spawn, in order:
+ *   1. explicit `binaryPath` option
+ *   2. `$KINDLING_BIN`
+ *   3. the matching `@eddacraft/kindling-<platform>` optional dependency
+ *   4. a legacy binary bundled under this package's `bin/`
+ *   5. `null` → `kindling` resolved from `PATH` at spawn time
+ *
+ * Each filesystem candidate is existence-checked so resolution genuinely falls
+ * through to the next; only step 5 returns `null`.
+ */
+function resolveBinaryPath(explicit?: string): string | null {
   if (explicit && explicit.length > 0) return explicit;
   const env = process.env.KINDLING_BIN;
   if (env && env.length > 0) return env;
-  return packagedBinaryPath();
+
+  const fromPlatform = platformBinaryPath();
+  if (fromPlatform !== null) return fromPlatform;
+
+  const legacy = packagedBinaryPath();
+  if (existsSync(legacy)) return legacy;
+
+  return null;
 }
 
 /** Apply defaults to {@link KindlingOptions}. */
@@ -168,8 +258,7 @@ export function resolveConfig(options: KindlingOptions = {}): ResolvedConfig {
     socketPath: options.socketPath ?? defaultSocketPath(),
     projectRoot: options.projectRoot ?? resolveProjectRoot(),
     binaryPath: resolveBinaryPath(options.binaryPath),
-    expectedSchemaVersion:
-      options.expectedSchemaVersion ?? EXPECTED_SCHEMA_VERSION,
+    expectedSchemaVersion: options.expectedSchemaVersion ?? EXPECTED_SCHEMA_VERSION,
     connectTimeoutMs: options.connectTimeoutMs ?? 1000,
     pollIntervalMs: options.pollIntervalMs ?? 10,
     autoSpawn: options.autoSpawn ?? true,

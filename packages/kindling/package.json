@@ -41,6 +41,8 @@
   "license": "Apache-2.0",
   "scripts": {
     "sync-types": "node scripts/sync-types.mjs",
+    "platform-packages": "node scripts/build-platform-packages.mjs",
+    "check:platform-packages": "node scripts/build-platform-packages.mjs --check",
     "copy:schema": "node -e \"require('node:fs').mkdirSync('dist/schema',{recursive:true});require('node:fs').copyFileSync('schema/version.json','dist/schema/version.json')\"",
     "build": "tsc --build && pnpm run copy:schema",
     "test": "vitest run --passWithNoTests",

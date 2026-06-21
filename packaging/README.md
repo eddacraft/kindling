@@ -1,18 +1,20 @@
 # kindling distribution
 
 This directory holds the native-binary distribution artefacts for the `kindling`
-umbrella binary. They are consumed by end users through three channels, all of
-which depend on a **GitHub Release** having been cut: the
-[`release.yml`](../.github/workflows/release.yml) workflow cross-builds every
-target on release `published` and attaches
-`kindling-<version>-<target>.tar.gz` archives plus `.sha256` sidecars as release
-assets.
+umbrella binary. They are consumed by end users through four channels. The
+binary is cross-built once by the reusable
+[`_cross-build.yml`](../.github/workflows/_cross-build.yml) workflow (all 7
+targets, packaged as `kindling-<version>-<target>.tar.gz` + `.sha256`);
+[`release.yml`](../.github/workflows/release.yml) attaches those archives to the
+**GitHub Release**, and [`publish.yml`](../.github/workflows/publish.yml) feeds
+the same archives into the npm platform packages.
 
-| Channel                | Artefact in this repo                                     | What the user runs                                                                                |
-| ---------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| crates.io              | `scripts/publish.sh` (order), vendored `crates/*/schema/` | `cargo install eddacraft-kindling`                                                                |
+| Channel                | Artefact in this repo                                     | What the user runs                                                                      |
+| ---------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| crates.io              | `scripts/publish.sh` (order), vendored `crates/*/schema/` | `cargo install eddacraft-kindling`                                                      |
 | `curl \| sh` installer | [`install.sh`](../install.sh) (repo root)                 | `curl -fsSL https://raw.githubusercontent.com/eddacraft/kindling/main/install.sh \| sh` |
-| Homebrew (planned)     | `packaging/homebrew/kindling.rb`                          | `brew install eddacraft/tap/kindling` _(once the tap is published)_                               |
+| npm (self-contained)   | `packages/kindling/scripts/build-platform-packages.mjs`   | `npm install @eddacraft/kindling` (bundles the matching prebuilt binary)                |
+| Homebrew (planned)     | `packaging/homebrew/kindling.rb`                          | `brew install eddacraft/tap/kindling` _(once the tap is published)_                     |
 
 > The CLI binary publishes to crates.io as **`eddacraft-kindling`** because the
 > bare `kindling` name is taken; the installed command is still `kindling`.
@@ -64,7 +66,53 @@ Code setup). If no prebuilt binary matches the platform it falls back to
    straight from the repo:
    `curl -fsSL https://raw.githubusercontent.com/eddacraft/kindling/main/install.sh | sh`.
 
-## 3. Homebrew (`eddacraft/tap`) — planned, not yet published
+## 3. npm (self-contained thin client)
+
+`@eddacraft/kindling` is a thin TypeScript client, but it brings its own binary
+so a plain `npm install` works with no extra steps. The mechanism is the
+esbuild-style `optionalDependencies` split:
+
+- The **published** package declares one optional dependency per host —
+  `@eddacraft/kindling-<os>-<arch>[-musl]` — pinned to the same version. Each is
+  a tiny package carrying a single prebuilt `kindling` binary plus `os`/`cpu`/
+  `libc` fields, so npm/pnpm/yarn/bun install **only** the matching one and skip
+  the rest. No postinstall; works under `--ignore-scripts`.
+- These `optionalDependencies` are **injected at publish time, never committed**.
+  The platform packages don't exist on the registry until a release publishes
+  them, so committing the specifiers would break `pnpm install --frozen-lockfile`
+  (the lockfile can't record packages that 404). The committed `package.json`
+  omits them; `publish.yml` runs the generator's `--write` to inject them right
+  before `pnpm publish -r`, and `--check` guards that they stay out of source.
+- At runtime `config.ts:resolveBinaryPath` resolves the matching package via
+  `require.resolve`. Resolution order: `$KINDLING_BIN` → the platform package →
+  a legacy bundled `bin/kindling` → `kindling` on `PATH`. So a globally-installed
+  CLI (cargo / install.sh) or `$KINDLING_BIN` still overrides the bundled binary.
+
+The 7 platform packages map one-to-one to the release targets and are generated
+by [`build-platform-packages.mjs`](../packages/kindling/scripts/build-platform-packages.mjs):
+
+| npm package                            | os / cpu / libc       | rust target                  |
+| -------------------------------------- | --------------------- | ---------------------------- |
+| `@eddacraft/kindling-linux-x64`        | linux / x64 / glibc   | `x86_64-unknown-linux-gnu`   |
+| `@eddacraft/kindling-linux-arm64`      | linux / arm64 / glibc | `aarch64-unknown-linux-gnu`  |
+| `@eddacraft/kindling-linux-x64-musl`   | linux / x64 / musl    | `x86_64-unknown-linux-musl`  |
+| `@eddacraft/kindling-linux-arm64-musl` | linux / arm64 / musl  | `aarch64-unknown-linux-musl` |
+| `@eddacraft/kindling-darwin-x64`       | darwin / x64          | `x86_64-apple-darwin`        |
+| `@eddacraft/kindling-darwin-arm64`     | darwin / arm64        | `aarch64-apple-darwin`       |
+| `@eddacraft/kindling-win32-x64`        | win32 / x64           | `x86_64-pc-windows-gnu`      |
+
+> **Windows is x64-only** (no win-arm64), matching the release build matrix. On a
+> Windows arm64 host no optional dependency installs, and the client falls back
+> to `$KINDLING_BIN` / a `kindling` on `PATH`.
+
+At release, [`publish.yml`](../.github/workflows/publish.yml) downloads the
+cross-built archives, verifies their `.sha256`, runs the generator with
+`--write --bin-dir` to inject the `optionalDependencies` and materialize the 7
+packages under `packages/kindling/platforms/` (git-ignored), and `npm publish`es
+each (with provenance) **before** the workspace packages so the optional deps
+resolve on the registry. The platform packages are not pnpm workspace members.
+
+## 4. Homebrew (`eddacraft/tap`) — planned, not yet published
 
 [`packaging/homebrew/kindling.rb`](./homebrew/kindling.rb) is a macOS-only formula
 with a per-arch `url` + `sha256`. The `eddacraft/homebrew-tap` repository does
@@ -83,7 +131,9 @@ the steps below are done.
 ## Maintainer checklist (per release)
 
 - [ ] Tag `vX.Y.Z` on `main` and publish a GitHub Release → `release.yml`
-      attaches all target archives + `.sha256` sidecars.
+      attaches all target archives + `.sha256` sidecars, and `publish.yml`
+      publishes the npm thin client + the 7 `@eddacraft/kindling-<platform>`
+      binary packages from the same archives.
 - [ ] `cargo login` + `scripts/publish.sh` → crates.io (`cargo install eddacraft-kindling`).
 - [ ] Update `packaging/homebrew/kindling.rb` (`version` + darwin SHA256s), push to
       `eddacraft/homebrew-tap` (create the tap repo first; not done yet).

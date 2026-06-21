@@ -23,8 +23,23 @@ jobs:
       contents: read
     uses: ./.github/workflows/ci.yml
 
-  publish:
+  # Cross-build the 7 prebuilt `kindling` binaries that back the npm platform
+  # packages. Only needed for a real release; the dry-run path publishes nothing.
+  binaries:
     needs: ci
+    if: ${{ github.event_name == 'release' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/_cross-build.yml
+
+  publish:
+    needs: [ci, binaries]
+    # Run when CI passed and the binaries job either succeeded (release) or was
+    # skipped (workflow_dispatch dry-run, which publishes nothing).
+    if: >-
+      always() &&
+      needs.ci.result == 'success' &&
+      (needs.binaries.result == 'success' || needs.binaries.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -65,11 +80,63 @@ jobs:
             exit 1
           fi
 
+      - name: Verify platform-package optionalDependencies are in sync
+        run: node packages/kindling/scripts/build-platform-packages.mjs --check
+
+      # ---- Platform binary packages (release only) --------------------------
+      # Download the cross-built archives, verify their checksums, extract each
+      # binary, materialize the @eddacraft/kindling-<platform> packages, and
+      # publish them BEFORE the workspace so the main package's
+      # optionalDependencies resolve on the registry.
+      - name: Download built binaries
+        if: ${{ github.event_name == 'release' }}
+        uses: actions/download-artifact@v4
+        with:
+          pattern: kindling-bin-*
+          merge-multiple: true
+          path: dist-bin
+
+      - name: Assemble and publish platform packages
+        if: ${{ github.event_name == 'release' }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true
+          VERSION: ${{ needs.binaries.outputs.version }}
+        run: |
+          set -euo pipefail
+          BIN_DIR="${RUNNER_TEMP}/bindir"
+          mkdir -p "$BIN_DIR"
+
+          # Verify every archive against its SHA256 sidecar, then extract the
+          # binary into <bindir>/<rust-target>/ (the layout the generator reads).
+          ( cd dist-bin && for s in *.sha256; do sha256sum -c "$s"; done )
+          for f in dist-bin/*.tar.gz; do
+            base="$(basename "$f" .tar.gz)"
+            target="${base#kindling-${VERSION}-}"
+            mkdir -p "$BIN_DIR/$target"
+            tar -xzf "$f" -C "$BIN_DIR/$target"
+          done
+          for f in dist-bin/*.zip; do
+            [ -e "$f" ] || continue
+            base="$(basename "$f" .zip)"
+            target="${base#kindling-${VERSION}-}"
+            mkdir -p "$BIN_DIR/$target"
+            unzip -o "$f" -d "$BIN_DIR/$target"
+          done
+
+          node packages/kindling/scripts/build-platform-packages.mjs --write --bin-dir "$BIN_DIR"
+
+          for d in packages/kindling/platforms/*/; do
+            echo "::group::publish ${d}"
+            npm publish "$d" --access public
+            echo "::endgroup::"
+          done
+
       - name: Dry run — pack all packages
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run }}
         run: pnpm -r exec npm pack --dry-run 2>&1
 
-      - name: Publish to npm
+      - name: Publish workspace packages to npm
         if: ${{ github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && !inputs.dry-run) }}
         run: pnpm publish -r --access public --no-git-checks --report-summary
         env:
