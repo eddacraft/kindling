@@ -8,8 +8,7 @@
  * start the daemon. No native Node modules are involved.
  */
 
-import { spawnSync } from 'node:child_process';
-import { mkdtempSync, existsSync, rmSync } from 'node:fs';
+import { mkdtempSync, existsSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -199,9 +198,10 @@ describe.skipIf(!HAS_BINARY)('Kindling thin client — error mapping', () => {
 
 describe('@eddacraft/kindling package — no native modules', () => {
   it('declares zero native dependencies', () => {
-    const pkg = JSON.parse(
-      spawnSync('cat', [join(here, '..', 'package.json')], { encoding: 'utf8' }).stdout,
-    ) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
+    const pkg = JSON.parse(readFileSync(join(here, '..', 'package.json'), 'utf8')) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
     const deps = { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) };
     const native = ['better-sqlite3', 'sqlite3', 'node-gyp', 'bindings', 'sql.js'];
     for (const name of native) {
