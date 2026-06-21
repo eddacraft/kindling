@@ -22,64 +22,70 @@ npm install @eddacraft/kindling-adapter-pocketflow
 
 ## Usage
 
-### Node Adapter
+Capture is driven by extending `KindlingNode` (and optionally `KindlingFlow`).
+Each node opens a `pocketflow_node` capsule on `prep`, records `node_start` /
+`node_output` / `node_end` (or `node_error`) observations, then closes the
+capsule on `post`. Persistence is delegated to the kindling daemon (Rust) via
+the `@eddacraft/kindling` thin client, which is threaded through PocketFlow's
+shared store as a `KindlingNodeContext`.
+
+### Node-Level Capture
 
 ```typescript
-import { NodeAdapter, NodeStatus } from '@eddacraft/kindling-adapter-pocketflow';
-import { SqliteKindlingStore } from '@eddacraft/kindling-store-sqlite';
+import { KindlingNode, type KindlingNodeContext } from '@eddacraft/kindling-adapter-pocketflow';
+import { Kindling } from '@eddacraft/kindling';
 
-const store = new SqliteKindlingStore(db);
-const adapter = new NodeAdapter({
-  store,
-  repoId: '/home/user/my-project',
-});
+// The shared store carries the daemon client + scope for every node.
+const shared: KindlingNodeContext = {
+  kindling: new Kindling(),
+  scopeIds: { repoId: '/home/user/my-project' },
+};
 
-// When a node starts
-adapter.onNodeStart({
-  node: { id: 'test-1', name: 'run-integration-tests' },
-  status: NodeStatus.Running,
-  input: { testPattern: '**/*.test.ts' },
-});
+// Extend KindlingNode for automatic capture.
+class RunTestsNode extends KindlingNode<KindlingNodeContext> {
+  async exec(): Promise<unknown> {
+    const results = await runTests('**/*.test.ts');
+    return { passed: results.passed, failed: results.failed };
+  }
+}
 
-// When a node produces output
-adapter.onNodeOutput({
-  node: { id: 'test-1', name: 'run-integration-tests' },
-  output: { passed: 42, failed: 0 },
-});
+// metadata.name drives intent inference; the capsule is created automatically.
+const node = new RunTestsNode({ name: 'run-integration-tests' });
 
-// When a node ends
-adapter.onNodeEnd({
-  node: { id: 'test-1', name: 'run-integration-tests' },
-  status: NodeStatus.Success,
-  output: { passed: 42, failed: 0, duration: 3500 },
-});
+// Running the node opens/closes its capsule and records observations.
+await node.run(shared);
 ```
 
 ### Flow Integration
 
 ```typescript
-import { KindlingFlow, KindlingNode } from '@eddacraft/kindling-adapter-pocketflow';
+import {
+  KindlingFlow,
+  KindlingNode,
+  type KindlingNodeContext,
+} from '@eddacraft/kindling-adapter-pocketflow';
+import { Kindling } from '@eddacraft/kindling';
 
-// Extend KindlingNode for automatic capture
-class MyTestNode extends KindlingNode {
-  async exec(input: TestInput): Promise<TestOutput> {
-    const results = await runTests(input.pattern);
+class RunTestsNode extends KindlingNode<KindlingNodeContext> {
+  async exec(): Promise<unknown> {
+    const results = await runTests('**/*.test.ts');
     return { passed: results.passed, failed: results.failed };
   }
 }
 
-// Create a flow
-const flow = new KindlingFlow({
-  store,
-  repoId: '/repo',
-});
+const testNode = new RunTestsNode({ name: 'run-integration-tests' });
+testNode.next(new DeployNode({ name: 'deploy-production' }));
 
-flow.addNode('test', new MyTestNode());
-flow.addNode('deploy', new DeployNode());
-flow.connect('test', 'deploy', 'success');
+// A KindlingFlow wraps the start node and records flow-level capsules.
+const flow = new KindlingFlow(testNode, { name: 'ci-pipeline' });
 
-// Run the flow (capsules created automatically)
-await flow.run({ pattern: '**/*.test.ts' });
+const shared: KindlingNodeContext = {
+  kindling: new Kindling(),
+  scopeIds: { repoId: '/repo' },
+};
+
+// Run the flow (capsules created automatically per node and for the flow).
+await flow.run(shared);
 ```
 
 ## Captured Events
@@ -126,20 +132,24 @@ Confidence is tracked based on node success/failure history:
 
 ## Configuration
 
+Nodes receive their daemon client and scope through the shared
+`KindlingNodeContext`:
+
 ```typescript
-interface NodeAdapterOptions {
-  store: KindlingStore;
-  repoId: string;
-  agentId?: string;
-  userId?: string;
+interface KindlingNodeContext {
+  kindling: Kindling; // @eddacraft/kindling thin client (daemon-backed)
+  scopeIds: ScopeIds; // { sessionId?, repoId?, agentId?, userId? }
+  capsuleId?: string; // set by the node while it is active
+}
 
-  // Intent inference
-  intentMapping?: Record<string, string>;
-
-  // Confidence tracking
-  confidenceWindow?: number; // Default: 10 runs
+interface NodeMetadata {
+  name: string; // drives intent inference
+  intent?: string; // explicit override for the inferred intent
 }
 ```
+
+Intent inference and confidence scoring are configurable through the
+`inferIntent` / `ConfidenceTracker` helpers exported by this package.
 
 ## PocketFlow Concepts
 
@@ -154,8 +164,7 @@ See the [PocketFlow documentation](./vendor/pocketflow/docs/) for details.
 
 ## Related Packages
 
-- [`@eddacraft/kindling-core`](../kindling-core) - Domain types and capsule lifecycle
-- [`@eddacraft/kindling-store-sqlite`](../kindling-store-sqlite) - SQLite persistence
+- [`@eddacraft/kindling`](../kindling) - Thin client for the kindling daemon (domain types + capsule lifecycle)
 - [`@eddacraft/kindling-adapter-opencode`](../kindling-adapter-opencode) - OpenCode session adapter
 
 ## License
