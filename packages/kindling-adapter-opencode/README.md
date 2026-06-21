@@ -86,17 +86,16 @@ Large outputs are automatically truncated to **50,000 characters** to prevent ex
 
 ```typescript
 import { SessionManager } from '@eddacraft/kindling-adapter-opencode';
-import { SqliteKindlingStore, initializeDatabase } from '@eddacraft/kindling-store-sqlite';
+import { Kindling } from '@eddacraft/kindling';
 
-// Initialize store
-const db = initializeDatabase(':memory:');
-const store = new SqliteKindlingStore(db);
+// Connect to the kindling daemon (auto-spawns `kindling serve` on first use)
+const kindling = new Kindling();
 
-// Create session manager
-const manager = new SessionManager(store);
+// Create session manager backed by the daemon client
+const manager = new SessionManager(kindling);
 
 // Start session
-const context = manager.onSessionStart({
+const context = await manager.onSessionStart({
   sessionId: 'session-123',
   intent: 'Fix authentication bug',
   repoId: '/home/user/my-project',
@@ -107,7 +106,7 @@ const context = manager.onSessionStart({
 
 ```typescript
 // Process tool call event
-manager.onEvent({
+await manager.onEvent({
   type: 'tool_call',
   timestamp: Date.now(),
   sessionId: 'session-123',
@@ -117,7 +116,7 @@ manager.onEvent({
 });
 
 // Process command event
-manager.onEvent({
+await manager.onEvent({
   type: 'command',
   timestamp: Date.now(),
   sessionId: 'session-123',
@@ -131,7 +130,7 @@ manager.onEvent({
 
 ```typescript
 // End session with optional summary
-manager.onSessionEnd('session-123', {
+await manager.onSessionEnd('session-123', {
   reason: 'completed',
   summaryContent: 'Fixed JWT validation in auth middleware',
   summaryConfidence: 0.9,
@@ -163,7 +162,7 @@ Currently, safety filters are applied by default and cannot be disabled. Future 
 
 ## Data Storage
 
-All captured observations are stored locally in SQLite via `@eddacraft/kindling-store-sqlite`. No data is sent to external services.
+All captured observations are stored locally by the kindling daemon (Rust), which the adapter reaches through the `@eddacraft/kindling` thin client. No data is sent to external services.
 
 Observations are:
 

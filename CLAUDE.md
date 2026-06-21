@@ -6,71 +6,51 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 kindling is a local memory and continuity engine for AI-assisted development. It captures observations (tool calls, diffs, commands, errors) from AI workflows, organizes them into capsules (bounded units of meaning), and makes context retrievable with deterministic, explainable results. All data is stored locally using embedded SQLite with FTS5.
 
+**kindling is Rust-canonical.** The engine is a Cargo workspace in `crates/`; the binary is `kindling` (published as the `eddacraft-kindling` crate — the bare `kindling` name is taken on crates.io). The npm `@eddacraft/kindling` package is a thin HTTP-over-UDS client for that binary; the older TypeScript implementation packages were removed (they live on only as the already-published, deprecated 0.1.x npm versions).
+
 ## Commands
 
 ```bash
-# Install dependencies (uses pnpm)
+# --- Rust engine (canonical) ---
+cargo build
+cargo test
+cargo fmt --all
+cargo clippy --all-targets --all-features -- -D warnings
+cargo test -p kindling-types --features ts-rs   # regenerate + check ts-rs bindings
+
+# --- npm packages (thin client + adapters) ---
 pnpm install
-
-# Build all packages
 pnpm run build
-
-# Run all tests
 pnpm run test
-
-# Type-check all packages
 pnpm run type-check
-
-# Lint all packages
 pnpm run lint
-
-# Clean build artifacts
-pnpm run clean
-
-# Work with a specific package
-cd packages/kindling-core
-pnpm run build
-pnpm run test
-pnpm run test:watch  # Watch mode
-pnpm run type-check
 ```
 
 ## Architecture
 
-### Package Structure
-
-The monorepo (pnpm workspaces) has the following packages:
+### Crates (the engine, `crates/`)
 
 ```
-@eddacraft/kindling                    → Main package (re-exports core + SQLite store + local FTS provider)
-@eddacraft/kindling-core               → Domain types, capsule lifecycle, retrieval orchestration
-@eddacraft/kindling-store-sqlite       → SQLite persistence with FTS5 and WAL mode
-@eddacraft/kindling-store-sqljs        → Browser/WASM store (sql.js)
-@eddacraft/kindling-provider-local     → Local FTS-based retrieval provider
-@eddacraft/kindling-server             → HTTP API server (Fastify) for multi-agent concurrency
-@eddacraft/kindling-cli                → CLI tools (Commander.js)
-@eddacraft/kindling-adapter-opencode   → Session integration for OpenCode
-@eddacraft/kindling-adapter-pocketflow → Workflow node integration (PocketFlow)
-@eddacraft/kindling-adapter-claude-code → Claude Code hooks integration
+eddacraft-kindling   → the `kindling` CLI binary + Claude Code hooks (lib + bin)
+kindling-client      → daemon-backed Rust SDK (HTTP/1 over UDS); default for integrations
+kindling-service     → in-process orchestration (embedded, zero-IPC)
+kindling-server      → daemon runtime (`kindling serve`); per-project routing
+kindling-store       → SQLite persistence (FTS5 + WAL); schema in `schema/`
+kindling-provider    → deterministic local retrieval (FTS5 BM25 + recency)
+kindling-types       → shared domain types (+ optional ts-rs bindings)
 ```
 
-The main `@eddacraft/kindling` package is what most users install. It re-exports everything from core, bundles the SQLite store (better-sqlite3, FTS5, WAL mode), the local FTS provider, and the API server. Adapter authors and browser users can depend on the lighter `@eddacraft/kindling-core` instead.
+Dependency flow: `types ← store ← provider`; `service → types,store,provider`; `server → types,store,service`; `client → types`; the binary → all. Most integrations use `kindling-client` (daemon) or `kindling-service` (embedded). The daemon makes concurrent multi-tool access safe.
 
-### Dependency Flow
+### npm packages (`packages/`)
 
 ```
-                     adapters (opencode, pocketflow, claude-code)
-                              ↓
-                        kindling-core (types + service)
-                              ↑
-                     @eddacraft/kindling (main package)
-                       ↙       |        ↘
-            store-sqlite   provider-local  server
-                       ↘       |        ↙
-                         SQLite DB
+@eddacraft/kindling                    → thin HTTP-over-UDS client for the Rust daemon (no native deps)
+@eddacraft/kindling-adapter-opencode   → OpenCode session integration (over the thin client)
+@eddacraft/kindling-adapter-pocketflow → PocketFlow workflow integration (over the thin client)
 ```
 
-The main package (`@eddacraft/kindling`) bundles core, store, provider, and server. Adapters depend on core only. Browser users use `@eddacraft/kindling-core` + `@eddacraft/kindling-store-sqljs`.
+The adapters depend only on `@eddacraft/kindling`. Claude Code integration is built into the `kindling` binary (hooks), not a TS package.
 
 ### Domain Model
 
@@ -81,9 +61,9 @@ The main package (`@eddacraft/kindling`) bundles core, store, provider, and serv
 
 **Capsules** are bounded units that group observations:
 
-- Types: `session`, `pocketflow_node`, `custom`
+- Types: `session`, `pocketflow_node`
 - Lifecycle: open → close (with optional summary generation)
-- Scope: `sessionId`, `repoId`, `agentId`, `userId`
+- Scope: `sessionId`, `repoId`, `agentId`, `userId`, `taskId` (`taskId` is carried for provenance and is not retrieval-filterable)
 
 **Retrieval** is three-tiered:
 
@@ -93,37 +73,24 @@ The main package (`@eddacraft/kindling`) bundles core, store, provider, and serv
 
 ### Key Abstractions
 
-**KindlingService** (`@eddacraft/kindling-core`) orchestrates:
+**KindlingService** (`kindling-service` crate) orchestrates the in-process engine:
 
-- `openCapsule()`, `closeCapsule()` - lifecycle management
-- `appendObservation()` - capture events
+- `open_capsule()`, `close_capsule()` - lifecycle management
+- `append_observation()` - capture events (masks secrets at the service boundary)
 - `retrieve()` - deterministic search with provenance
-- `pin()`, `unpin()` - priority content management
+- `pin()`, `unpin()`, `forget()` - priority content + redaction
 
-**SqliteKindlingStore** (bundled in `@eddacraft/kindling`):
+**Client** (`kindling-client` crate) is the daemon-backed SDK with the same surface over HTTP/1-over-UDS; it auto-spawns the daemon and re-exports the domain types.
 
-- Implements persistence with FTS5 indexing
-- WAL mode for concurrent access
-- Migrations in `packages/kindling-store-sqlite/migrations/`
+**Store** (`kindling-store` crate): SQLite persistence with FTS5 + WAL. The schema is the cross-language contract in `schema/schema.sql` + `schema/version.json`.
 
-**PocketFlow Integration** (`@eddacraft/kindling-adapter-pocketflow`):
-
-- `KindlingNode` and `KindlingFlow` extend PocketFlow's Node/Flow
-- Auto-creates capsules per node execution
-- Records `node_start`, `node_output`, `node_error`, `node_end` observations
+**PocketFlow integration** (`@eddacraft/kindling-adapter-pocketflow`, npm): `KindlingNode`/`KindlingFlow` extend PocketFlow's Node/Flow, auto-create a `pocketflow_node` capsule per node, and record `node_start`/`node_output`/`node_error`/`node_end` — written through the `@eddacraft/kindling` thin client to the daemon.
 
 ### Code Patterns
 
-Types are defined in `packages/kindling-core/src/types/`:
+Domain types live in `crates/kindling-types/src/` (`observation.rs`, `capsule.rs`, `retrieval.rs`, `common.rs`). They serialize as camelCase JSON; the optional `ts-rs` feature emits TypeScript bindings under `crates/kindling-types/bindings/` (CI fails on drift), which the thin TS client consumes.
 
-- `common.ts` - ID, Timestamp, ScopeIds, Result<T>
-- `observation.ts` - ObservationKind, Observation
-- `capsule.ts` - CapsuleType, CapsuleStatus, Capsule
-- `retrieval.ts` - RetrieveOptions, RetrieveResult, RetrievalProvider
-
-Validation uses a Result type pattern (`ok()` / `err()`) rather than exceptions.
-
-ESM-only (`"type": "module"`) with `.js` extensions in imports.
+The npm packages are ESM-only (`"type": "module"`) with `.js` extensions in imports.
 
 ## Branching Workflow
 
@@ -142,7 +109,9 @@ Release guidance:
 - small releases may tag directly from `main` after release prep lands
 - larger releases should use a short-lived `release/*` branch cut from `main`
 - tagging `vX.Y.Z` on `main` and creating a GitHub Release triggers
-  `.github/workflows/publish.yml`, which publishes all packages to npm
+  `.github/workflows/publish.yml` (publishes the npm packages) and
+  `.github/workflows/release.yml` (uploads the prebuilt `kindling` binaries).
+  The Rust crates are published to crates.io separately via `scripts/publish.sh`.
 
 See the detailed guides for the full policy:
 

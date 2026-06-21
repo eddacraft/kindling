@@ -198,17 +198,18 @@ When you search, kindling returns results in three tiers:
 
 kindling captures context automatically through adapters:
 
-| Adapter                                                | What it captures                                                      |
-| ------------------------------------------------------ | --------------------------------------------------------------------- |
-| [Claude Code](./packages/kindling-adapter-claude-code) | Tool calls, file edits, commands, user messages, subagent completions |
-| [OpenCode](./packages/kindling-adapter-opencode)       | Session events and tool activity                                      |
-| [PocketFlow](./packages/kindling-adapter-pocketflow)   | Workflow node lifecycle and outputs                                   |
+| Adapter                                              | What it captures                                                      |
+| ---------------------------------------------------- | --------------------------------------------------------------------- |
+| [Claude Code](#quick-start-claude-code)              | Tool calls, file edits, commands, user messages, subagent completions |
+| [OpenCode](./packages/kindling-adapter-opencode)     | Session events and tool activity                                      |
+| [PocketFlow](./packages/kindling-adapter-pocketflow) | Workflow node lifecycle and outputs                                   |
+
+Claude Code support is built into the `kindling` binary (hooks — see
+[Quick Start](#quick-start-claude-code) above). OpenCode and PocketFlow are thin
+TypeScript adapters that talk to the kindling daemon through the
+[`@eddacraft/kindling`](./packages/kindling) client (published to npm).
 
 Or capture manually with the CLI (`kindling log`, `kindling capsule open/close`).
-
-The adapters are thin TypeScript packages that talk to the kindling daemon
-through the [`@eddacraft/kindling`](./packages/kindling) client. They live under
-[`packages/`](./packages) and are published to npm.
 
 ## Programmatic Usage
 
