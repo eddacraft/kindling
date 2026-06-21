@@ -68,6 +68,19 @@ independently and lands its first crates.io publish at `0.1.0`.
   `-store-sqljs`, `-provider-local`, `-server`, `-cli`) are deprecated (PORT-020)
   and will be removed at 1.0.0.
 
+### Security
+
+- **Dev-toolchain CVE sweep.** Cleared all 16 Dependabot alerts (1 critical, 7
+  high, 6 moderate, 2 low), every one a development-only dependency — none ship
+  in any published package (the thin client has no runtime deps). Bumped
+  `vitest` to `^3.2.6` (clears the critical Vitest-UI RCE and pulls patched
+  vite/rollup/postcss/picomatch), dropped a vestigial direct `esbuild` devDep,
+  and pinned the remaining transitives to patched versions via `pnpm.overrides`
+  (esbuild, vite, rollup, postcss, flatted, js-yaml, minimatch, picomatch, yaml,
+  brace-expansion). One unrelated `ajv` advisory (via `eslint`, `$data` ReDoS) is
+  left as-is: eslint pins `ajv@^6` with no in-range fix, the option isn't used,
+  and forcing a major would break linting.
+
 ## [0.1.3] - 2026-05-08
 
 ### Added
