@@ -1,6 +1,6 @@
 //! `demo` — load sample memory so you can try search and browse immediately.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
@@ -53,30 +53,13 @@ pub fn run(args: DemoArgs) -> CliResult {
     let (service, _) = open_service(Some(db_path.to_string_lossy().as_ref()))?;
 
     let bundle = ExportBundle::from_json(DEMO_FIXTURE)?;
-    let result = service.import(
-        &bundle,
-        ImportOptions {
-            dry_run: false,
-        },
-    )?;
+    let result = service.import(&bundle, ImportOptions { dry_run: false })?;
 
     let try_next = vec![
-        format!(
-            "kindling search \"JWT\" --db {}",
-            shell_quote(&db_path)
-        ),
-        format!(
-            "kindling browse --db {}",
-            shell_quote(&db_path)
-        ),
-        format!(
-            "kindling list observations --db {}",
-            shell_quote(&db_path)
-        ),
-        format!(
-            "kindling status --db {}",
-            shell_quote(&db_path)
-        ),
+        format!("kindling search \"JWT\" --db {}", shell_quote(&db_path)),
+        format!("kindling browse --db {}", shell_quote(&db_path)),
+        format!("kindling list observations --db {}", shell_quote(&db_path)),
+        format!("kindling status --db {}", shell_quote(&db_path)),
     ];
 
     if args.common.json {
@@ -116,7 +99,7 @@ pub fn run(args: DemoArgs) -> CliResult {
     Ok(())
 }
 
-fn shell_quote(path: &PathBuf) -> String {
+fn shell_quote(path: &Path) -> String {
     let s = path.to_string_lossy();
     if s.contains(' ') {
         format!("'{s}'")

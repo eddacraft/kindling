@@ -415,8 +415,14 @@ fn demo_loads_sample_memory_and_search_finds_jwt() {
     assert_success(&search);
     let hits = json_stdout(&search);
     assert!(
-        hits["candidates"].as_array().map(|a| !a.is_empty()).unwrap_or(false)
-            || hits["pins"].as_array().map(|a| !a.is_empty()).unwrap_or(false)
+        hits["candidates"]
+            .as_array()
+            .map(|a| !a.is_empty())
+            .unwrap_or(false)
+            || hits["pins"]
+                .as_array()
+                .map(|a| !a.is_empty())
+                .unwrap_or(false)
     );
 }
 

@@ -21,8 +21,8 @@ mod output;
 
 pub use cli::{
     BrowseArgs, CapsuleCloseArgs, CapsuleCommand, CapsuleOpenArgs, Cli, Command, CommonOpts,
-    DemoArgs, ExportArgs, ForgetArgs, ImportArgs, InitArgs, ListArgs, LogArgs, PinArgs,
-    SearchArgs, ServeArgs, StatusArgs, UnpinArgs,
+    DemoArgs, ExportArgs, ForgetArgs, ImportArgs, InitArgs, ListArgs, LogArgs, PinArgs, SearchArgs,
+    ServeArgs, StatusArgs, UnpinArgs,
 };
 
 use std::path::PathBuf;

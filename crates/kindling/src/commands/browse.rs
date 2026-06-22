@@ -25,10 +25,7 @@ pub fn run(args: BrowseArgs) -> CliResult {
     let output_path = if let Some(path) = &args.output {
         PathBuf::from(path)
     } else {
-        std::env::temp_dir().join(format!(
-            "kindling-browse-{}.html",
-            std::process::id()
-        ))
+        std::env::temp_dir().join(format!("kindling-browse-{}.html", std::process::id()))
     };
 
     if let Some(parent) = output_path.parent() {
