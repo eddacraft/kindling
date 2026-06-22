@@ -173,7 +173,10 @@ Prerequisites:
 crates.io requires each crate's dependencies to be published first, so the
 script publishes in topological order (leaves first, the `kindling` binary
 last): `kindling-types` → `kindling-store` → `kindling-provider` →
-`kindling-service` → `kindling-client` → `kindling-server` → `eddacraft-kindling`.
+`kindling-service` → `kindling-server` → `kindling-client` → `eddacraft-kindling`.
+`kindling-client` carries a versioned dev-dependency on `kindling-server`, so the
+server must already be on crates.io when the client publishes — this is why the
+server precedes the client (the order encoded in `scripts/publish.sh`).
 
 ```bash
 # Dry run (cargo publish --dry-run for every crate)
