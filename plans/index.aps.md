@@ -30,26 +30,28 @@ kindling is functional (596 tests passing, 10 packages building) and the TypeScr
 
 ## Modules
 
-| Module                                                                | Purpose                                                          | Status      | Dependencies       |
-| --------------------------------------------------------------------- | ---------------------------------------------------------------- | ----------- | ------------------ |
-| [01-npm-publish](./modules/01-npm-publish.aps.md)                     | Package metadata, READMEs, publish scripts, CI                   | Done        | —                  |
-| [02-rust-hook-binary](./modules/02-rust-hook-binary.aps.md)           | Rust binary for Claude Code hook invocations                     | Superseded  | by 05              |
-| [03-rust-cli](./modules/03-rust-cli.aps.md)                           | Full Rust CLI replacing Commander.js                             | Superseded  | by 05              |
-| [04-intent-capture-events](./modules/04-intent-capture-events.aps.md) | kindling-native intent event primitive + export                  | Done        | —                  |
-| [04-schema-contract](./modules/04-schema-contract.aps.md)             | Cross-language SQLite schema contract for Rust+TS                | Done        | —                  |
-| [05-rust-port](./modules/05-rust-port.aps.md)                         | Rust-canonical kindling + thin TS client over local daemon (UDS) | In Progress | 04-schema-contract |
+| Module                                                                                  | Purpose                                                                                                                | Status      | Dependencies       |
+| --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ----------- | ------------------ |
+| [01-npm-publish](./modules/01-npm-publish.aps.md)                                       | Package metadata, READMEs, publish scripts, CI                                                                         | Done        | —                  |
+| [02-rust-hook-binary](./modules/02-rust-hook-binary.aps.md)                             | Rust binary for Claude Code hook invocations                                                                           | Superseded  | by 05              |
+| [03-rust-cli](./modules/03-rust-cli.aps.md)                                             | Full Rust CLI replacing Commander.js                                                                                   | Superseded  | by 05              |
+| [04-intent-capture-events](./modules/04-intent-capture-events.aps.md)                   | kindling-native intent event primitive + export                                                                        | Done        | —                  |
+| [04-schema-contract](./modules/04-schema-contract.aps.md)                               | Cross-language SQLite schema contract for Rust+TS                                                                      | Done        | —                  |
+| [05-rust-port](./modules/05-rust-port.aps.md)                                           | Rust-canonical kindling + thin TS client over local daemon (UDS)                                                       | In Progress | 04-schema-contract |
+| [06-downstream-integration-surface](./modules/06-downstream-integration-surface.aps.md) | Harden the daemon/client contract anvil consumes (publish, dedup, query, handshake, observability, redaction evidence) | In Progress | 05-rust-port       |
 
 See `plans/specs/2026-05-03-rust-canonical-thin-client-design.md` for the current design (daemon, transport, distribution, TS deprecation strategy). The earlier dual-maintain spec at `plans/specs/2026-04-15-rust-port-design.md` is superseded but retained for historical context.
 
 ## Schedule
 
-| Phase   | Modules                  | Target                                                                           |
-| ------- | ------------------------ | -------------------------------------------------------------------------------- |
-| Now     | 05-rust-port (Phase 1)   | Foundation crates: workspace, types, store, filter                               |
-| Next    | 05-rust-port (Phase 2)   | Service + daemon + hook + Rust client; anvil unblocks                            |
-| Then    | 05-rust-port (Phase 3)   | CLI + umbrella binary + cross-platform builds + cargo/brew/curl distribution     |
-| Then    | 05-rust-port (Phase 4)   | Thin TS client SDK on npm; deprecate TS implementation packages and anvil bridge |
-| Backlog | 04-intent-capture-events | Ship intent capture primitive + export (independent of the Rust port)            |
+| Phase   | Modules                           | Target                                                                                                  |
+| ------- | --------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Now     | 05-rust-port (Phase 1)            | Foundation crates: workspace, types, store, filter                                                      |
+| Next    | 05-rust-port (Phase 2)            | Service + daemon + hook + Rust client; anvil unblocks                                                   |
+| Then    | 05-rust-port (Phase 3)            | CLI + umbrella binary + cross-platform builds + cargo/brew/curl distribution                            |
+| Then    | 05-rust-port (Phase 4)            | Thin TS client SDK on npm; deprecate TS implementation packages and anvil bridge                        |
+| Next    | 06-downstream-integration-surface | Publish 0.2.0 (unblocks anvil), then dedup / query API / handshake / observability / redaction evidence |
+| Backlog | 04-intent-capture-events          | Ship intent capture primitive + export (independent of the Rust port)                                   |
 
 ## Risks
 
@@ -75,4 +77,5 @@ See `plans/specs/2026-05-03-rust-canonical-thin-client-design.md` for the curren
 - **D-002:** ~~Phase the Rust work (hooks first, CLI second)~~ — _superseded by D-003_
 - **D-003:** ~~Dual-maintain Rust + TypeScript with Rust-canonical types~~ — _superseded by D-005_
 - **D-004:** Supersede modules 02 and 03 with module 05 — _decided 2026-04-15_ — The hybrid phasing no longer models the work correctly. 02 and 03 remain in the repo for historical reference but are marked Superseded in this index.
+- **D-006:** Triage anvil's integration wishlist (2026-06-22) into module 06 rather than scattering it across 05 — _decided 2026-06-22_ — anvil's downstream KDS module sent 10 asks; auditing them against the tree showed several already shipped (client+spool published at 0.1.0, `/v1/health` handshake, export `bundleVersion` + `--dry-run`) and one mis-framed (no `kindling-spool` crate exists — the spool is `kindling-client::spool`). The genuine new work (publish 0.2.0, daemon dedup, structured query API, capability handshake + kind registry, spool/cold-start observability, redaction evidence, fixtures) is grouped as module 06 so the contract anvil consumes evolves as one coherent surface. KINTEG-001 (publish) is user-gated and gates anvil's consumption of the rest.
 - **D-005:** Rust-canonical kindling with thin TS HTTP client over local daemon — _decided 2026-05-03_ — Rust becomes the only implementation. Non-Rust consumers reach kindling via `kindling serve` (long-running per-user daemon) over a Unix domain socket. `@eddacraft/kindling` is repurposed as a thin HTTP client with an npm postinstall that downloads the platform binary. All other TS implementation packages are deprecated and removed after the cutover. Driven by: sole-operator project means no external migration coordination, every realistic TS consumer can hit a localhost daemon, dual-maintain pays a real tax for a use case nobody asked for. See `plans/specs/2026-05-03-rust-canonical-thin-client-design.md`.
