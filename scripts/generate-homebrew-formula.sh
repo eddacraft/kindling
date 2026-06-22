@@ -9,8 +9,8 @@
 #   KINDLING_VERSION=v0.2.0 ./scripts/generate-homebrew-formula.sh
 #
 # Environment:
-#   KINDLING_TAP_DIR  path to a local clone of github.com/eddacraft/homebrew-tap
-#                     (default: sibling ../homebrew-tap if it exists)
+#   KINDLING_TAP_DIR  local clone of github.com/eddacraft/homebrew-tap (the shared
+#                     tap that already ships anvil; default: sibling ../homebrew-tap)
 #
 # Requires: curl, sed
 
