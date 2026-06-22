@@ -23,6 +23,16 @@ class Kindling < Formula
       sha256 "REPLACE_WITH_SHA256_X86_64_APPLE_DARWIN"
     end
   end
+  if OS.linux?
+    if Hardware::CPU.arm?
+      url "https://github.com/eddacraft/kindling/releases/download/v#{version}/kindling-#{version}-aarch64-unknown-linux-gnu.tar.gz"
+      sha256 "REPLACE_WITH_SHA256_AARCH64_UNKNOWN_LINUX_GNU"
+    end
+    if Hardware::CPU.intel?
+      url "https://github.com/eddacraft/kindling/releases/download/v#{version}/kindling-#{version}-x86_64-unknown-linux-gnu.tar.gz"
+      sha256 "REPLACE_WITH_SHA256_X86_64_UNKNOWN_LINUX_GNU"
+    end
+  end
 
   def install
     bin.install "kindling"

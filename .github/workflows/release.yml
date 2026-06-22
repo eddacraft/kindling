@@ -84,8 +84,9 @@ jobs:
           fail_on_unmatched_files: true
 
   # ---- Homebrew tap PR (eddacraft/homebrew-tap) ---------------------------
-  # Opens a PR in the shared tap (same repo that ships anvil) once release
-  # assets and .sha256 sidecars are attached. Requires HOMEBREW_TAP_TOKEN: a
+  # Opens a PR in the shared tap (same repo that ships anvil) once macOS and
+  # Linux glibc release assets and .sha256 sidecars are attached. Requires
+  # HOMEBREW_TAP_TOKEN: a
   # PAT or fine-grained token with contents:write on eddacraft/homebrew-tap.
   homebrew-tap-pr:
     name: open homebrew-tap PR

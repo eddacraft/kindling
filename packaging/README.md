@@ -14,7 +14,7 @@ the same archives into the npm platform packages.
 | crates.io              | `scripts/publish.sh` (order), vendored `crates/*/schema/`                                                        | `cargo install eddacraft-kindling`                                                      |
 | `curl \| sh` installer | [`install.sh`](../install.sh) (repo root)                                                                        | `curl -fsSL https://raw.githubusercontent.com/eddacraft/kindling/main/install.sh \| sh` |
 | npm (self-contained)   | `packages/kindling/scripts/build-platform-packages.mjs`                                                          | `npm install @eddacraft/kindling` (bundles the matching prebuilt binary)                |
-| Homebrew (macOS)       | `packaging/homebrew/kindling.rb` → [homebrew-tap](https://github.com/eddacraft/homebrew-tap) (shared with anvil) | `brew install eddacraft/tap/kindling`                                                   |
+| Homebrew (macOS/Linux) | `packaging/homebrew/kindling.rb` → [homebrew-tap](https://github.com/eddacraft/homebrew-tap) (shared with anvil) | `brew install eddacraft/tap/kindling`                                                   |
 
 > The CLI binary publishes to crates.io as **`eddacraft-kindling`** because the
 > bare `kindling` name is taken; the installed command is still `kindling`.

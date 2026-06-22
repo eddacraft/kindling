@@ -14,8 +14,8 @@ brew install eddacraft/tap/kindling
 ## Automated updates (CI)
 
 On every published kindling release, [`.github/workflows/release.yml`](../../.github/workflows/release.yml)
-runs a `homebrew-tap-pr` job **after** macOS tarballs and `.sha256` sidecars are
-attached to the GitHub Release. It:
+runs a `homebrew-tap-pr` job **after** release tarballs and `.sha256` sidecars are
+attached to the GitHub Release (macOS and Linux glibc). It:
 
 1. Runs `./scripts/generate-homebrew-formula.sh <tag>`
 2. Copies `packaging/homebrew/kindling.rb` into the tap checkout
@@ -51,11 +51,14 @@ gh pr create --repo eddacraft/homebrew-tap
 
 ## What the formula installs
 
-Prebuilt macOS binaries from [kindling releases](https://github.com/eddacraft/kindling/releases):
+Prebuilt binaries from [kindling releases](https://github.com/eddacraft/kindling/releases):
 
-| Architecture          | Archive                                          |
-| --------------------- | ------------------------------------------------ |
-| Apple Silicon (arm64) | `kindling-<version>-aarch64-apple-darwin.tar.gz` |
-| Intel (x86_64)        | `kindling-<version>-x86_64-apple-darwin.tar.gz`  |
+| Platform | Architecture          | Archive                                               |
+| -------- | --------------------- | ----------------------------------------------------- |
+| macOS    | Apple Silicon (arm64) | `kindling-<version>-aarch64-apple-darwin.tar.gz`      |
+| macOS    | Intel (x86_64)        | `kindling-<version>-x86_64-apple-darwin.tar.gz`       |
+| Linux    | arm64 (glibc)         | `kindling-<version>-aarch64-unknown-linux-gnu.tar.gz` |
+| Linux    | x86_64 (glibc)        | `kindling-<version>-x86_64-unknown-linux-gnu.tar.gz`  |
 
-Linux users should use the [install script](../../install.sh).
+Same layout as [anvil in the tap](https://github.com/eddacraft/homebrew-tap/blob/main/Formula/anvil.rb).
+Alpine/musl hosts should use the [install script](../../install.sh) (`*-linux-musl` tarballs).

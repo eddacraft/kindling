@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # generate-homebrew-formula.sh: update packaging/homebrew/kindling.rb with
-# release version and macOS tarball SHA256 checksums from GitHub.
+# release version and macOS/Linux tarball SHA256 checksums from GitHub.
 #
 # Usage:
 #   ./scripts/generate-homebrew-formula.sh              # latest release
@@ -79,11 +79,21 @@ fetch_sha256() {
   printf '%s\n' "$line" | awk '{print $1}'
 }
 
-SHA_AARCH64="$(fetch_sha256 "aarch64-apple-darwin")"
-SHA_X86_64="$(fetch_sha256 "x86_64-apple-darwin")"
+# macOS + Linux (glibc) targets; matches anvil's homebrew-tap layout.
+declare -A TARGETS=(
+  [SHA_AARCH64_APPLE_DARWIN]="aarch64-apple-darwin"
+  [SHA_X86_64_APPLE_DARWIN]="x86_64-apple-darwin"
+  [SHA_AARCH64_UNKNOWN_LINUX_GNU]="aarch64-unknown-linux-gnu"
+  [SHA_X86_64_UNKNOWN_LINUX_GNU]="x86_64-unknown-linux-gnu"
+)
 
-info "aarch64-apple-darwin: ${SHA_AARCH64}"
-info "x86_64-apple-darwin:  ${SHA_X86_64}"
+for var in SHA_AARCH64_APPLE_DARWIN SHA_X86_64_APPLE_DARWIN \
+           SHA_AARCH64_UNKNOWN_LINUX_GNU SHA_X86_64_UNKNOWN_LINUX_GNU; do
+  target="${TARGETS[$var]}"
+  value="$(fetch_sha256 "$target")"
+  printf -v "$var" '%s' "$value"
+  info "${target}: ${value}"
+done
 
 TMP="$(mktemp)"
 trap 'rm -f "$TMP"' EXIT
@@ -94,10 +104,14 @@ cp "$FORMULA" "$TMP"
 sed -i "s/^  version \".*\"/  version \"${VERSION}\"/" "$TMP"
 
 # Replace SHA256 placeholders (or existing checksums on re-run).
-sed -i "s/REPLACE_WITH_SHA256_AARCH64_APPLE_DARWIN/${SHA_AARCH64}/" "$TMP"
-sed -i "s/REPLACE_WITH_SHA256_X86_64_APPLE_DARWIN/${SHA_X86_64}/" "$TMP"
-sed -i "/aarch64-apple-darwin\.tar\.gz\"$/,+1 s/sha256 \"[a-f0-9]*\"/sha256 \"${SHA_AARCH64}\"/" "$TMP"
-sed -i "/x86_64-apple-darwin\.tar\.gz\"$/,+1 s/sha256 \"[a-f0-9]*\"/sha256 \"${SHA_X86_64}\"/" "$TMP"
+sed -i "s/REPLACE_WITH_SHA256_AARCH64_APPLE_DARWIN/${SHA_AARCH64_APPLE_DARWIN}/" "$TMP"
+sed -i "s/REPLACE_WITH_SHA256_X86_64_APPLE_DARWIN/${SHA_X86_64_APPLE_DARWIN}/" "$TMP"
+sed -i "s/REPLACE_WITH_SHA256_AARCH64_UNKNOWN_LINUX_GNU/${SHA_AARCH64_UNKNOWN_LINUX_GNU}/" "$TMP"
+sed -i "s/REPLACE_WITH_SHA256_X86_64_UNKNOWN_LINUX_GNU/${SHA_X86_64_UNKNOWN_LINUX_GNU}/" "$TMP"
+sed -i "/aarch64-apple-darwin\.tar\.gz\"$/,+1 s/sha256 \"[a-f0-9]*\"/sha256 \"${SHA_AARCH64_APPLE_DARWIN}\"/" "$TMP"
+sed -i "/x86_64-apple-darwin\.tar\.gz\"$/,+1 s/sha256 \"[a-f0-9]*\"/sha256 \"${SHA_X86_64_APPLE_DARWIN}\"/" "$TMP"
+sed -i "/aarch64-unknown-linux-gnu\.tar\.gz\"$/,+1 s/sha256 \"[a-f0-9]*\"/sha256 \"${SHA_AARCH64_UNKNOWN_LINUX_GNU}\"/" "$TMP"
+sed -i "/x86_64-unknown-linux-gnu\.tar\.gz\"$/,+1 s/sha256 \"[a-f0-9]*\"/sha256 \"${SHA_X86_64_UNKNOWN_LINUX_GNU}\"/" "$TMP"
 
 mv "$TMP" "$FORMULA"
 trap - EXIT

@@ -63,7 +63,7 @@ Plugin: [plugins/kindling-claude-code](./plugins/kindling-claude-code)
 | --------------------------- | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | **Installer (recommended)** | `curl -fsSL https://raw.githubusercontent.com/eddacraft/kindling/main/install.sh \| sh` | Prebuilt binary; Linux, macOS, Windows                                                 |
 | **Cargo**                   | `cargo install eddacraft-kindling`                                                      | Crate name is `eddacraft-kindling`; the binary is `kindling`                           |
-| **Homebrew (macOS)**        | `brew install eddacraft/tap/kindling`                                                   | Same tap as anvil: [eddacraft/homebrew-tap](https://github.com/eddacraft/homebrew-tap) |
+| **Homebrew (macOS/Linux)**  | `brew install eddacraft/tap/kindling`                                                   | Same tap as anvil: [eddacraft/homebrew-tap](https://github.com/eddacraft/homebrew-tap) |
 | **npm**                     | `npm install @eddacraft/kindling`                                                       | Thin client; bundles a matching prebuilt binary                                        |
 
 ```bash
