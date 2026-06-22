@@ -220,12 +220,12 @@ Supersedes `02-rust-hook-binary` and `03-rust-cli`. Replaces the dual-maintain p
 - **Status:** Merged — `feat/rust-port-thin-client`, PR #77 (`6462fde`+`a413dad`). `packages/kindling` rewritten as a thin HTTP-over-UDS client (Node `http`, no native deps, `0.2.0`); `kindling` class mirrors the old service; auto-spawns daemon on first call (real `serve --socket --kindling-home` flags); uses generated types from PORT-016. 5 vitest tests vs a locally-built daemon; daemon-integration tests `describe.skipIf(!existsSync(target/debug/kindling))` with a dedicated `thin-client` rust.yml job that builds the binary then runs them. The npm postinstall binary DOWNLOAD is PORT-018 (needs a real release) — here the binary is resolved via PATH / `KINDLING_BIN`.
 - **Dependencies:** PORT-013, PORT-016
 
-#### PORT-018: npm postinstall binary download
+#### PORT-018: npm self-contained binary delivery
 
 - **Intent:** `pnpm add @eddacraft/kindling` puts the platform binary in place automatically
-- **Expected Outcome:** Postinstall script detects platform, downloads the matching `kindling` binary from the GitHub Release matching the package version, places it in `node_modules/@eddacraft/kindling/bin/`; if the binary is already on PATH, postinstall is a no-op; honours `npm_config_proxy` and standard env vars; offline / failed-download case warns and defers (client throws on first call with a clear error pointing at install docs)
-- **Validation:** Fresh `pnpm add` in a clean project on Linux/macOS/Windows installs binary and exposes a working client; offline test confirms warn-and-defer behaviour with a clear error message on first call
-- **Status:** Draft
+- **Expected Outcome:** Per-platform `@eddacraft/kindling-<os>-<arch>[-musl]` packages (one prebuilt `kindling` binary each, with `os`/`cpu`/`libc` fields) declared as `optionalDependencies`; the package manager installs ONLY the matching one — no postinstall, works under `--ignore-scripts`. The client resolves the binary via `require.resolve`, falling back to `$KINDLING_BIN` → a bundled `bin/kindling` → `kindling` on `PATH`. Supersedes the original postinstall-download framing (see D-007).
+- **Validation:** Fresh `pnpm add` in a clean project on Linux/macOS/Windows installs the matching binary and exposes a working client; `--ignore-scripts` install still yields a working binary; `pnpm install --frozen-lockfile` stays green.
+- **Status:** In Progress — `feat/npm-platform-binaries`, PR #104 (rebased onto current main). esbuild/swc-style optionalDependencies model instead of a postinstall download; a reusable `_cross-build.yml` is shared by `release.yml` (Release assets) and `publish.yml` (npm platform packages from the same archives). optionalDependencies are **injected at publish time, not committed**, so the lockfile stays installable before the platform packages exist on the registry. Windows is x64-only (matches the release matrix). End-to-end publish validation needs a real release (user-gated).
 - **Dependencies:** PORT-014, PORT-017
 
 #### PORT-019: Adapter packages cutover
