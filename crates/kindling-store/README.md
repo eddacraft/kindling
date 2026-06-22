@@ -10,7 +10,7 @@ Most applications should use [`kindling-client`](https://crates.io/crates/kindli
 
 ```toml
 [dependencies]
-kindling-store = "0.1"
+kindling-store = "0.2"
 ```
 
 ## When to use this crate

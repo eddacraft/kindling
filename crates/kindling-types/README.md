@@ -10,7 +10,7 @@ Most Rust integrations should depend on [`kindling-client`](https://crates.io/cr
 
 ```toml
 [dependencies]
-kindling-types = "0.1"
+kindling-types = "0.2"
 ```
 
 ## When to use this crate
