@@ -2,7 +2,7 @@
 
 | Field          | Value                                                                                                            |
 | -------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Status         | Ready                                                                                                            |
+| Status         | Committed                                                                                                        |
 | Owner          | @aneki                                                                                                           |
 | Created        | 2026-06-22                                                                                                       |
 | Execution plan | [../execution/2026-06-22-conversion-surface-delivery.md](../execution/2026-06-22-conversion-surface-delivery.md) |
@@ -24,21 +24,21 @@ Public visitors and non-Anvil users need a clear path to try, understand, and ad
 
 ## Work items
 
-| ID  | Title                              | Wave | Status | Branch (suggested)                 |
-| --- | ---------------------------------- | ---- | ------ | ---------------------------------- |
-| C0  | Merge conversion surface + release | 0    | Ready  | `feat/conversion-surface`          |
-| C12 | Post-release verification          | 0    | Draft  | —                                  |
-| C1  | install.sh demo prompt             | 1    | Draft  | `feat/install-demo-prompt`         |
-| C2  | VSIX + Cursor/Windsurf docs        | 1    | Draft  | `feat/vscode-vsix-and-cursor-docs` |
-| C3  | Workspace auto-detect (search)     | 1    | Draft  | `feat/cli-repo-autodetect`         |
-| C4  | kindling stats                     | 1    | Draft  | `feat/cli-stats`                   |
-| C5  | kindling wrap                      | 2    | Draft  | `feat/cli-wrap`                    |
-| C6  | kindling tui                       | 2    | Draft  | `feat/cli-tui`                     |
-| C7  | Search filters                     | 2    | Draft  | `feat/cli-search-filters`          |
-| C8  | VS Code wrap/tasks docs            | 2    | Draft  | `docs/vscode-wrap-tasks`           |
-| C9  | why-kindling one-pager             | 3    | Draft  | `docs/why-kindling-and-sync`       |
-| C10 | External docs sync script          | 3    | Draft  | `docs/why-kindling-and-sync`       |
-| C11 | Composite GitHub Action            | 4    | Draft  | `feat/kindling-action`             |
+| ID  | Title                              | Wave | Status    | Branch (suggested)                 |
+| --- | ---------------------------------- | ---- | --------- | ---------------------------------- |
+| C0  | Merge conversion surface + release | 0    | Committed | `feat/conversion-surface`          |
+| C12 | Post-release verification          | 0    | Draft     | —                                  |
+| C1  | install.sh demo prompt             | 1    | Draft     | `feat/install-demo-prompt`         |
+| C2  | VSIX + Cursor/Windsurf docs        | 1    | Draft     | `feat/vscode-vsix-and-cursor-docs` |
+| C3  | Workspace auto-detect (search)     | 1    | Draft     | `feat/cli-repo-autodetect`         |
+| C4  | kindling stats                     | 1    | Draft     | `feat/cli-stats`                   |
+| C5  | kindling wrap                      | 2    | Draft     | `feat/cli-wrap`                    |
+| C6  | kindling tui                       | 2    | Draft     | `feat/cli-tui`                     |
+| C7  | Search filters                     | 2    | Draft     | `feat/cli-search-filters`          |
+| C8  | VS Code wrap/tasks docs            | 2    | Draft     | `docs/vscode-wrap-tasks`           |
+| C9  | why-kindling one-pager             | 3    | Draft     | `docs/why-kindling-and-sync`       |
+| C10 | External docs sync script          | 3    | Draft     | `docs/why-kindling-and-sync`       |
+| C11 | Composite GitHub Action            | 4    | Draft     | `feat/kindling-action`             |
 
 ## Dependencies
 
