@@ -1,0 +1,29 @@
+# Inferred by aps migrate — review and adjust if needed
+# .aps/config.yml — written by installer, read by updater
+
+# Project contract (INSTALL-014 / D-035): toolchain pin + runtime path
+# defaults the global 'aps' binary discovers by walking up from cwd.
+cli_version: '0.3.0'
+plans_dir: plans/
+docs_dir: docs/
+tooling_root: .aps/
+
+aps:
+  version: '0.3.0'
+  config_schema: 1
+  installed: '2026-06-22'
+  updated: '2026-06-22'
+
+project:
+  type: simple
+  monorepo_tool: ~
+  profile: solo
+
+tools:
+  - name: claude-code
+    skill: .claude/skills/aps-planning
+    hooks: full
+    agents:
+      - aps-planner
+      - aps-librarian
+      - aps-conductor
