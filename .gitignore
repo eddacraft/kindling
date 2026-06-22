@@ -175,3 +175,6 @@ crates/**/tests/fixtures/*.db-shm
 # Generated per-platform binary packages (materialized at publish time by
 # packages/kindling/scripts/build-platform-packages.mjs)
 packages/kindling/platforms/
+
+# APS session baseline (ephemeral)
+.claude/.aps-session-baseline

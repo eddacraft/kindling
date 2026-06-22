@@ -10,7 +10,7 @@ This is the recommended Rust SDK for most integrations. It is a thin async clien
 
 ```toml
 [dependencies]
-kindling-client = "0.1"
+kindling-client = "0.2"
 ```
 
 ## Example

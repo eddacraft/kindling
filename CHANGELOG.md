@@ -5,14 +5,13 @@ All notable changes to the kindling project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-> **Heads-up on the road to 1.0.0.** kindling is being re-implemented in Rust
-> as the canonical engine, with `@eddacraft/kindling` repurposed as a thin
-> HTTP-over-UDS client for the Rust `kindling` binary (installed separately via
-> `cargo install eddacraft-kindling` or the install script). The
-> existing TypeScript implementation packages (`-core`, `-store-sqlite`,
-> `-store-sqljs`, `-provider-local`, `-server`, `-cli`) are deprecated and
-> will be removed at 1.0.0. The 0.1.x line continues to receive maintenance
-> until the Rust cutover lands. See
+> **Heads-up.** kindling is now Rust-canonical: the engine is a Cargo workspace
+> in `crates/`, and the npm `@eddacraft/kindling` package is a thin
+> HTTP-over-UDS client that bundles the Rust `kindling` binary via per-platform
+> `optionalDependencies` (or use `cargo install eddacraft-kindling` / the install
+> script). As of 0.2.0 the retired TypeScript implementation packages have been
+> removed from the repo; their last `0.1.x` npm versions remain published and
+> are marked deprecated on the registry. See
 > `plans/specs/2026-05-03-rust-canonical-thin-client-design.md`.
 
 ## [Unreleased]
@@ -76,12 +75,26 @@ to carry the opt-in `spool` durable-emit feature — `kindling-client`'s
   to the thin client / `kindling` binary (PORT-015, PORT-019); the npm adapters
   now depend on `@eddacraft/kindling` rather than the TS core.
 - **Branding:** lowercase `kindling`, `eddacraft`, and `anvil` in prose.
+- **npm packages versioned to 0.2.0** in lockstep — the thin `@eddacraft/kindling`
+  client and the `opencode` / `pocketflow` adapters (the only remaining npm
+  packages), bumped from the published `0.1.2`.
+
+### Removed
+
+- **Retired the TypeScript implementation packages** — `-core`, `-store-sqlite`,
+  `-store-sqljs`, `-provider-local`, `-server`, `-cli`, and
+  `-adapter-claude-code` — and removed their source from the workspace (PORT-020).
+  The Rust daemon + the thin `@eddacraft/kindling` client own this surface;
+  Claude Code support is now the `kindling` binary's built-in hooks. `packages/`
+  contains only `@eddacraft/kindling` and the `opencode` / `pocketflow` adapters,
+  and `pnpm install` no longer pulls `better-sqlite3` (native), `sql.js`, or
+  `fastify`.
 
 ### Deprecated
 
-- The TypeScript implementation packages (`-core`, `-store-sqlite`,
-  `-store-sqljs`, `-provider-local`, `-server`, `-cli`) are deprecated (PORT-020)
-  and will be removed at 1.0.0.
+- The retired packages above keep their last-published `0.1.x` npm versions
+  (still installable) and are marked **deprecated** on the registry, pointing
+  consumers to `@eddacraft/kindling` or the `kindling` binary.
 
 ### Security
 
