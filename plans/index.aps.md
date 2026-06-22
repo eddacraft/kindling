@@ -5,7 +5,7 @@
 | Status  | In Progress |
 | Owner   | @aneki      |
 | Created | 2026-03-14  |
-| Updated | 2026-06-18  |
+| Updated | 2026-06-22  |
 
 ## Problem
 
@@ -39,6 +39,7 @@ kindling is functional (596 tests passing, 10 packages building) and the TypeScr
 | [05-rust-port](./modules/05-rust-port.aps.md)                                           | Rust-canonical kindling + thin TS client over local daemon (UDS)                                                       | In Progress | 04-schema-contract |
 | [06-downstream-integration-surface](./modules/06-downstream-integration-surface.aps.md) | Harden the daemon/client contract anvil consumes (publish, dedup, query, handshake, observability, redaction evidence) | In Progress | 05-rust-port       |
 | [07-intent-capture-events](./modules/07-intent-capture-events.aps.md)                   | kindling-native intent event primitive + export (independent of the Rust port)                                         | Done        | —                  |
+| [08-conversion-surface](./modules/08-conversion-surface.aps.md)                         | Public first impressions: merge built work, release ops, CLI depth, adapter/docs distribution                          | Ready       | 05-rust-port       |
 
 See `plans/specs/2026-05-03-rust-canonical-thin-client-design.md` for the current design (daemon, transport, distribution, TS deprecation strategy). The earlier dual-maintain spec at `plans/specs/2026-04-15-rust-port-design.md` is superseded but retained for historical context.
 
