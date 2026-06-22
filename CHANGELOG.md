@@ -17,13 +17,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-22
+
 The Rust cutover. kindling is now Rust-canonical: the engine ships as a Cargo
 workspace (`crates/`) publishing to crates.io, and the npm `@eddacraft/kindling`
 package is a thin client over the Rust binary. The Rust workspace is versioned
-independently and lands its first crates.io publish at `0.1.0`.
+independently; `0.1.0` was the first crates.io publish and `0.2.0` is the first
+to carry the opt-in `spool` durable-emit feature — `kindling-client`'s
+`SpooledClient` — which unblocks daemon-backed downstream consumers (anvil).
 
 ### Added
 
+- **`SpooledClient` durable-emit layer** for `kindling-client`, behind the
+  opt-in `spool` feature
+  (`kindling-client = { version = "0.2.0", features = ["spool"] }`). Wraps the
+  client so an `append_observation` that cannot reach the daemon buffers the
+  observation to a local append-only NDJSON spool and replays it — in append
+  order, idempotent on a stable observation id assigned before spooling — on the
+  next successful append or an explicit `flush()`. The daemon's SQLite store
+  stays the sole source of truth; the spool is a transient write buffer, never a
+  parallel one. Delivery is **at-least-once** in 0.2.0; daemon-side dedup for
+  exactly-once is a tracked follow-up (KINTEG-002). New to crates.io — the
+  published `0.1.0` `kindling-client` shipped no `spool` feature.
 - **Rust engine** published to crates.io: `eddacraft-kindling` (the `kindling`
   CLI binary + Claude Code hooks), `kindling-client` (daemon-backed SDK, the
   default for integrations), `kindling-service` (embedded, in-process),

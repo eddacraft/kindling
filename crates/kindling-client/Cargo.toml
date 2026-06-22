@@ -27,6 +27,11 @@ uuid = { version = "1", features = ["v4"], optional = true }
 [features]
 spool = ["dep:uuid", "tokio/sync"]
 
+# Build docs.rs with every feature so the opt-in `spool` module (SpooledClient)
+# appears in the published docs — it is the headline of the 0.2.0 release.
+[package.metadata.docs.rs]
+all-features = true
+
 [dev-dependencies]
 kindling-server = { path = "../kindling-server", version = "0.2.0" }
 kindling-store = { path = "../kindling-store", version = "0.2.0" }
