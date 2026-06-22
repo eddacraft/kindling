@@ -86,14 +86,14 @@ For Rust applications, prefer the daemon-backed client:
 
 ```toml
 [dependencies]
-kindling-client = "0.1"
+kindling-client = "0.2"
 ```
 
 Or use the in-process service when you explicitly want embedded, single-process access:
 
 ```toml
 [dependencies]
-kindling-service = "0.1"
+kindling-service = "0.2"
 ```
 
 Full setup guide: [docs.eddacraft.ai/kindling/quickstart/install](https://docs.eddacraft.ai/kindling/quickstart/install)

@@ -10,7 +10,7 @@ Most users should access retrieval through [`kindling-client`](https://crates.io
 
 ```toml
 [dependencies]
-kindling-provider = "0.1"
+kindling-provider = "0.2"
 ```
 
 ## When to use this crate
