@@ -401,3 +401,35 @@ fn init_claude_code_is_stubbed() {
     assert_eq!(v["claudeCode"]["configured"], json!(false));
     assert!(v["claudeCode"]["message"].is_string());
 }
+
+#[test]
+fn demo_loads_sample_memory_and_search_finds_jwt() {
+    let env = CliEnv::new();
+    let out = env.run_db(&["demo", "--reset", "--json"]);
+    assert_success(&out);
+    let v = json_stdout(&out);
+    assert!(v["success"].as_bool().unwrap_or(false));
+    assert!(v["imported"]["observations"].as_u64().unwrap_or(0) >= 5);
+
+    let search = env.run_db(&["search", "JWT", "--json"]);
+    assert_success(&search);
+    let hits = json_stdout(&search);
+    assert!(
+        hits["candidates"].as_array().map(|a| !a.is_empty()).unwrap_or(false)
+            || hits["pins"].as_array().map(|a| !a.is_empty()).unwrap_or(false)
+    );
+}
+
+#[test]
+fn browse_writes_html_without_opening_browser() {
+    let env = CliEnv::new();
+    assert_success(&env.run_db(&["demo", "--reset"]));
+
+    let html_path = env.path("browse.html");
+    let path = html_path.to_string_lossy();
+    let out = env.run_db(&["browse", "--no-open", "--output", &path]);
+    assert_success(&out);
+    let html = read(&html_path);
+    assert!(html.contains("kindling memory"));
+    assert!(html.contains("obs-demo-4"));
+}

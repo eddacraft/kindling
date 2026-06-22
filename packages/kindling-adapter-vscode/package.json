@@ -1,0 +1,88 @@
+{
+  "name": "@eddacraft/kindling-adapter-vscode",
+  "version": "0.2.0",
+  "description": "VS Code, Cursor, and Windsurf extension for kindling - capture file saves and editor activity into local memory",
+  "type": "module",
+  "main": "./dist/extension.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "kindling",
+    "vscode",
+    "cursor",
+    "windsurf",
+    "adapter",
+    "session",
+    "ai",
+    "coding",
+    "memory",
+    "extension"
+  ],
+  "author": "eddacraft <hello@eddacraft.ai>",
+  "publisher": "eddacraft",
+  "displayName": "Kindling",
+  "homepage": "https://github.com/eddacraft/kindling/tree/main/packages/kindling-adapter-vscode#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/eddacraft/kindling.git",
+    "directory": "packages/kindling-adapter-vscode"
+  },
+  "bugs": {
+    "url": "https://github.com/eddacraft/kindling/issues"
+  },
+  "license": "Apache-2.0",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "kindling.search",
+        "title": "Kindling: Search Memory"
+      },
+      {
+        "command": "kindling.logSelection",
+        "title": "Kindling: Log Selection"
+      },
+      {
+        "command": "kindling.status",
+        "title": "Kindling: Status"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint src",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "pnpm run build"
+  },
+  "dependencies": {
+    "@eddacraft/kindling": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0",
+    "vitest": "^3.2.6"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

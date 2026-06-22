@@ -20,9 +20,9 @@ pub mod hook;
 mod output;
 
 pub use cli::{
-    CapsuleCloseArgs, CapsuleCommand, CapsuleOpenArgs, Cli, Command, CommonOpts, ExportArgs,
-    ForgetArgs, ImportArgs, InitArgs, ListArgs, LogArgs, PinArgs, SearchArgs, ServeArgs,
-    StatusArgs, UnpinArgs,
+    BrowseArgs, CapsuleCloseArgs, CapsuleCommand, CapsuleOpenArgs, Cli, Command, CommonOpts,
+    DemoArgs, ExportArgs, ForgetArgs, ImportArgs, InitArgs, ListArgs, LogArgs, PinArgs,
+    SearchArgs, ServeArgs, StatusArgs, UnpinArgs,
 };
 
 use std::path::PathBuf;
@@ -146,6 +146,8 @@ fn json_flag(command: &Command) -> bool {
         Command::Export(a) => a.common.json,
         Command::Import(a) => a.common.json,
         Command::Serve(_) => false,
+        Command::Demo(a) => a.common.json,
+        Command::Browse(a) => a.common.json,
     }
 }
 
@@ -169,6 +171,8 @@ fn dispatch(cli: Cli) -> CliResult {
         Command::Export(args) => commands::export::run_export(args, via_daemon),
         Command::Import(args) => commands::export::run_import(args, via_daemon),
         Command::Serve(args) => commands::serve::run(args),
+        Command::Demo(args) => commands::demo::run(args),
+        Command::Browse(args) => commands::browse::run(args),
     }
 }
 

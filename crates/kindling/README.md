@@ -17,9 +17,10 @@ an unrelated project; the command you run is still `kindling`.)
 ## Quick start
 
 ```bash
-kindling init
-kindling log "JWT tokens expire after 15 minutes, not 1 hour"
+kindling demo
 kindling search "JWT"
+kindling browse
+kindling log "JWT tokens expire after 15 minutes, not 1 hour"
 kindling status
 ```
 
