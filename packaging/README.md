@@ -119,14 +119,13 @@ already ships **anvil** (`brew install eddacraft/tap/anvil`). kindling joins the
 same tap: publish [`packaging/homebrew/kindling.rb`](./homebrew/kindling.rb) as
 `Formula/kindling.rb`.
 
-**Per-release maintainer steps:**
+**Per-release (automated):** `release.yml` opens a PR in `eddacraft/homebrew-tap`
+after assets upload. Requires the `HOMEBREW_TAP_TOKEN` secret on this repo (see
+[`packaging/homebrew-tap/README.md`](./homebrew-tap/README.md)). Merge that PR to
+publish the formula.
 
-1. Run `./scripts/generate-homebrew-formula.sh vX.Y.Z` (requires darwin tarballs
-   and `.sha256` sidecars on the GitHub Release).
-2. Copy or sync to the tap: `KINDLING_TAP_DIR=../homebrew-tap ./scripts/generate-homebrew-formula.sh vX.Y.Z --sync-tap`
-3. Commit and push `Formula/kindling.rb` in `eddacraft/homebrew-tap`.
-
-See [`packaging/homebrew-tap/README.md`](./homebrew-tap/README.md) for details.
+**Manual fallback:** `./scripts/generate-homebrew-formula.sh vX.Y.Z --sync-tap`
+then push or PR to `eddacraft/homebrew-tap`.
 
 ## Maintainer checklist (per release)
 
@@ -135,5 +134,4 @@ See [`packaging/homebrew-tap/README.md`](./homebrew-tap/README.md) for details.
       publishes the npm thin client + the 7 `@eddacraft/kindling-<platform>`
       binary packages from the same archives.
 - [ ] `cargo login` + `scripts/publish.sh` → crates.io (`cargo install eddacraft-kindling`).
-- [ ] `./scripts/generate-homebrew-formula.sh vX.Y.Z --sync-tap` and push
-      `Formula/kindling.rb` to [eddacraft/homebrew-tap](https://github.com/eddacraft/homebrew-tap).
+- [ ] Merge the automated `homebrew-tap` PR (or run `./scripts/generate-homebrew-formula.sh vX.Y.Z --sync-tap` manually).
