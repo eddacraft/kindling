@@ -9,12 +9,12 @@ targets, packaged as `kindling-<version>-<target>.tar.gz` + `.sha256`);
 **GitHub Release**, and [`publish.yml`](../.github/workflows/publish.yml) feeds
 the same archives into the npm platform packages.
 
-| Channel                | Artefact in this repo                                     | What the user runs                                                                      |
-| ---------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| crates.io              | `scripts/publish.sh` (order), vendored `crates/*/schema/` | `cargo install eddacraft-kindling`                                                      |
-| `curl \| sh` installer | [`install.sh`](../install.sh) (repo root)                 | `curl -fsSL https://raw.githubusercontent.com/eddacraft/kindling/main/install.sh \| sh` |
-| npm (self-contained)   | `packages/kindling/scripts/build-platform-packages.mjs`   | `npm install @eddacraft/kindling` (bundles the matching prebuilt binary)                |
-| Homebrew (planned)     | `packaging/homebrew/kindling.rb`                          | `brew install eddacraft/tap/kindling` _(once the tap is published)_                     |
+| Channel                | Artefact in this repo                                                                        | What the user runs                                                                      |
+| ---------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| crates.io              | `scripts/publish.sh` (order), vendored `crates/*/schema/`                                    | `cargo install eddacraft-kindling`                                                      |
+| `curl \| sh` installer | [`install.sh`](../install.sh) (repo root)                                                    | `curl -fsSL https://raw.githubusercontent.com/eddacraft/kindling/main/install.sh \| sh` |
+| npm (self-contained)   | `packages/kindling/scripts/build-platform-packages.mjs`                                      | `npm install @eddacraft/kindling` (bundles the matching prebuilt binary)                |
+| Homebrew (macOS)       | `packaging/homebrew/kindling.rb` → [homebrew-tap](https://github.com/eddacraft/homebrew-tap) | `brew install eddacraft/tap/kindling` _(after `Formula/kindling.rb` is in the tap)_     |
 
 > The CLI binary publishes to crates.io as **`eddacraft-kindling`** because the
 > bare `kindling` name is taken; the installed command is still `kindling`.
@@ -112,21 +112,21 @@ packages under `packages/kindling/platforms/` (git-ignored), and `npm publish`es
 each (with provenance) **before** the workspace packages so the optional deps
 resolve on the registry. The platform packages are not pnpm workspace members.
 
-## 4. Homebrew (`eddacraft/tap`) — planned, not yet published
+## 4. Homebrew (`eddacraft/tap`)
 
-[`packaging/homebrew/kindling.rb`](./homebrew/kindling.rb) is a macOS-only formula
-with a per-arch `url` + `sha256`. The `eddacraft/homebrew-tap` repository does
-not exist yet, so `brew install eddacraft/tap/kindling` is not available until
-the steps below are done.
+The tap is published at [github.com/eddacraft/homebrew-tap](https://github.com/eddacraft/homebrew-tap)
+and currently ships **anvil**. The kindling formula template is
+[`packaging/homebrew/kindling.rb`](./homebrew/kindling.rb); publish it as
+`Formula/kindling.rb` in the tap so `brew install eddacraft/tap/kindling` works.
 
-**Credential-gated maintainer steps:**
+**Per-release maintainer steps:**
 
-1. Create the tap repo `github.com/eddacraft/homebrew-tap`.
-2. Copy `kindling.rb` to `Formula/kindling.rb` there.
-3. Per release: bump `version` and replace the two
-   `REPLACE_WITH_SHA256_*` placeholders with the SHA256 values from the
-   `*-apple-darwin.tar.gz.sha256` sidecars on the GitHub Release. (A release
-   workflow could template and push this automatically.)
+1. Run `./scripts/generate-homebrew-formula.sh vX.Y.Z` (requires darwin tarballs
+   and `.sha256` sidecars on the GitHub Release).
+2. Copy or sync to the tap: `KINDLING_TAP_DIR=../homebrew-tap ./scripts/generate-homebrew-formula.sh vX.Y.Z --sync-tap`
+3. Commit and push `Formula/kindling.rb` in `eddacraft/homebrew-tap`.
+
+See [`packaging/homebrew-tap/README.md`](./homebrew-tap/README.md) for details.
 
 ## Maintainer checklist (per release)
 
@@ -135,5 +135,5 @@ the steps below are done.
       publishes the npm thin client + the 7 `@eddacraft/kindling-<platform>`
       binary packages from the same archives.
 - [ ] `cargo login` + `scripts/publish.sh` → crates.io (`cargo install eddacraft-kindling`).
-- [ ] Update `packaging/homebrew/kindling.rb` (`version` + darwin SHA256s), push to
-      `eddacraft/homebrew-tap` (create the tap repo first; not done yet).
+- [ ] `./scripts/generate-homebrew-formula.sh vX.Y.Z --sync-tap` and push
+      `Formula/kindling.rb` to [eddacraft/homebrew-tap](https://github.com/eddacraft/homebrew-tap).

@@ -1,80 +1,59 @@
 # eddacraft/homebrew-tap
 
-Homebrew tap for installing the kindling CLI on macOS.
+Homebrew tap for EddaCraft tools: [github.com/eddacraft/homebrew-tap](https://github.com/eddacraft/homebrew-tap)
 
-The formula template lives in this repo at
-[`packaging/homebrew/kindling.rb`](../homebrew/kindling.rb). The tap repository
-is separate so users can run `brew install eddacraft/tap/kindling` without
-cloning the main kindling source tree.
+The tap is live. Today it ships **anvil** (`Formula/anvil.rb`). The **kindling**
+formula template lives in this repo at [`packaging/homebrew/kindling.rb`](../homebrew/kindling.rb)
+and should be published to the tap as `Formula/kindling.rb` so users can run:
 
-## Create the tap repository
+```bash
+brew install eddacraft/tap/kindling
+```
 
-1. Create a new GitHub repository named `homebrew-tap` under the `eddacraft`
-   organisation:
+## Add or update the kindling formula
 
-   ```
-   https://github.com/eddacraft/homebrew-tap
-   ```
+### 1. Generate checksums from a GitHub Release
 
-2. Initialise the standard Homebrew layout:
+The release must include macOS tarballs and `.sha256` sidecars (produced by
+[`release.yml`](../../.github/workflows/release.yml)):
 
-   ```bash
-   git clone git@github.com:eddacraft/homebrew-tap.git
-   cd homebrew-tap
-   mkdir -p Formula
-   ```
+```bash
+./scripts/generate-homebrew-formula.sh vX.Y.Z
+```
 
-3. Copy the formula from the kindling repo:
+This updates `packaging/homebrew/kindling.rb` with the bare version and both
+darwin SHA256 values.
 
-   ```bash
-   cp /path/to/kindling/packaging/homebrew/kindling.rb Formula/kindling.rb
-   git add Formula/kindling.rb
-   git commit -m "Add kindling formula"
-   git push origin main
-   ```
+To copy straight into a local tap clone:
 
-4. Verify installation:
+```bash
+KINDLING_TAP_DIR=../homebrew-tap ./scripts/generate-homebrew-formula.sh vX.Y.Z --sync-tap
+```
 
-   ```bash
-   brew install eddacraft/tap/kindling
-   kindling --version
-   ```
+`KINDLING_TAP_DIR` defaults to a sibling directory named `homebrew-tap` if it
+exists.
 
-## Per-release maintenance
+### 2. Push to the tap repository
 
-After each GitHub Release that publishes macOS tarballs:
+```bash
+cd ../homebrew-tap   # or your clone of github.com/eddacraft/homebrew-tap
+git add Formula/kindling.rb
+git commit -m "kindling vX.Y.Z"
+git push origin main
+```
 
-1. From the kindling repo, update the formula with release checksums:
+### 3. Smoke test
 
-   ```bash
-   ./scripts/generate-homebrew-formula.sh vX.Y.Z
-   ```
-
-   This fetches the `.sha256` sidecars from the GitHub Release and updates
-   `version` plus both `REPLACE_WITH_SHA256_*` placeholders in
-   `packaging/homebrew/kindling.rb`.
-
-2. Copy the updated formula to the tap:
-
-   ```bash
-   cp packaging/homebrew/kindling.rb /path/to/homebrew-tap/Formula/kindling.rb
-   cd /path/to/homebrew-tap
-   git add Formula/kindling.rb
-   git commit -m "kindling vX.Y.Z"
-   git push origin main
-   ```
-
-3. Smoke test:
-
-   ```bash
-   brew update
-   brew upgrade kindling
-   kindling --version
-   ```
+```bash
+brew update
+brew install eddacraft/tap/kindling
+kindling --version
+kindling demo
+```
 
 ## What the formula installs
 
-The formula downloads prebuilt macOS binaries from GitHub Releases:
+Prebuilt macOS binaries from [kindling GitHub Releases](https://github.com/eddacraft/kindling/releases):
 
 | Architecture          | Archive                                          |
 | --------------------- | ------------------------------------------------ |
@@ -82,18 +61,15 @@ The formula downloads prebuilt macOS binaries from GitHub Releases:
 | Intel (x86_64)        | `kindling-<version>-x86_64-apple-darwin.tar.gz`  |
 
 Linux users should use the [install script](../../install.sh) or download release
-tarballs directly. See [packaging/README.md](../README.md) for the full
-distribution matrix.
+tarballs directly.
 
 ## Automation (optional)
 
-A release workflow can call `scripts/generate-homebrew-formula.sh`, commit to
-`eddacraft/homebrew-tap`, and push automatically. Until that is wired up,
-maintainers update the tap manually using the steps above.
+A release workflow can call `generate-homebrew-formula.sh --sync-tap` and push to
+`eddacraft/homebrew-tap` automatically. Until that is wired up, update the tap
+manually on each release.
 
-## User-facing install instructions
-
-Add to docs and README once the tap is live:
+## User-facing install
 
 ```bash
 brew install eddacraft/tap/kindling

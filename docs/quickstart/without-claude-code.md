@@ -23,7 +23,7 @@ Other install options:
 
 - **Cargo:** `cargo install eddacraft-kindling`
 - **npm (thin client + bundled binary):** `npm install @eddacraft/kindling`
-- **Homebrew (macOS, planned):** see [packaging/homebrew-tap/README.md](../../packaging/homebrew-tap/README.md)
+- **Homebrew (macOS):** `brew install eddacraft/tap/kindling` via [eddacraft/homebrew-tap](https://github.com/eddacraft/homebrew-tap) (see [packaging/homebrew-tap/README.md](../../packaging/homebrew-tap/README.md) if the formula is not yet in the tap)
 
 Full install guide: [docs.eddacraft.ai/kindling/quickstart/install](https://docs.eddacraft.ai/kindling/quickstart/install)
 

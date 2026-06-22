@@ -1,10 +1,10 @@
 # Homebrew formula for kindling.
 #
-# This formula belongs in the `eddacraft/tap` tap repository
-# (github.com/eddacraft/homebrew-tap). Copy it to `Formula/kindling.rb` there.
+# Publish to the live tap: github.com/eddacraft/homebrew-tap → Formula/kindling.rb
 #
-# Install once the tap exists:
 #   brew install eddacraft/tap/kindling
+#
+# Generate version + checksums: ./scripts/generate-homebrew-formula.sh vX.Y.Z
 #
 # Per-release maintenance: bump `version` and replace the four
 # REPLACE_WITH_SHA256_* placeholders with the SHA256 of each macOS release

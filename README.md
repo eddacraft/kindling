@@ -59,12 +59,12 @@ Plugin: [plugins/kindling-claude-code](./plugins/kindling-claude-code)
 
 ## Install
 
-| Channel                     | Command                                                                                 | Notes                                                            |
-| --------------------------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| **Installer (recommended)** | `curl -fsSL https://raw.githubusercontent.com/eddacraft/kindling/main/install.sh \| sh` | Prebuilt binary; Linux, macOS, Windows                           |
-| **Cargo**                   | `cargo install eddacraft-kindling`                                                      | Crate name is `eddacraft-kindling`; the binary is `kindling`     |
-| **Homebrew (macOS)**        | `brew install eddacraft/tap/kindling`                                                   | See [packaging/homebrew-tap](./packaging/homebrew-tap/README.md) |
-| **npm**                     | `npm install @eddacraft/kindling`                                                       | Thin client; bundles a matching prebuilt binary                  |
+| Channel                     | Command                                                                                 | Notes                                                                    |
+| --------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| **Installer (recommended)** | `curl -fsSL https://raw.githubusercontent.com/eddacraft/kindling/main/install.sh \| sh` | Prebuilt binary; Linux, macOS, Windows                                   |
+| **Cargo**                   | `cargo install eddacraft-kindling`                                                      | Crate name is `eddacraft-kindling`; the binary is `kindling`             |
+| **Homebrew (macOS)**        | `brew install eddacraft/tap/kindling`                                                   | Tap: [eddacraft/homebrew-tap](https://github.com/eddacraft/homebrew-tap) |
+| **npm**                     | `npm install @eddacraft/kindling`                                                       | Thin client; bundles a matching prebuilt binary                          |
 
 ```bash
 kindling init          # create the local database
