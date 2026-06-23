@@ -4,15 +4,16 @@
 | ------ | ------ | ----------- |
 | KINTEG | @aneki | In Progress |
 
-**Last reviewed:** 2026-06-24
+**Last reviewed:** 2026-06-24 (KINTEG-001 Done, KINTEG-004 Done)
 
 ## Purpose
 
 Harden the contract kindling exposes to downstream consumers — chiefly **anvil**,
-whose KDS (kindling daemon source) module is blocked waiting on a published
-client and a stable daemon contract. This module turns anvil's integration
-wishlist (received 2026-06-22) into a vetted, deduplicated work plan, grounded
-against what kindling already ships.
+whose KDS (kindling daemon source) module can now depend on `kindling-client`
+0.2.0 (with `spool`) on crates.io; remaining work is integration proof
+(PORT-011), the runtime facade (KINTEG-008), and contract hardening below. This
+module turns anvil's integration wishlist (received 2026-06-22) into a vetted,
+deduplicated work plan, grounded against what kindling already ships.
 
 kindling stays **mechanism, not policy**: this module exposes capabilities
 (query, handshake, observability, redaction evidence) without encoding anvil's
@@ -41,13 +42,14 @@ Verified against the tree on 2026-06-22:
   _before_ spool so replay is idempotent on id. There is **no separate
   `kindling-spool` crate** — anvil's "publish kindling-spool" ask is really
   "publish the client, whose spool module ships with it."
-- **`eddacraft-kindling` and `kindling-client` are published at 0.1.0** on
-  crates.io. The workspace is locally bumped to **0.2.0** (unpublished). The
-  spool module post-dates 0.1.0, so anvil needs 0.2.0.
-- **Schema/version handshake is half-built.** `GET /v1/health` already returns
-  `{ version, schemaVersion, projects }` (`kindling-server/src/handlers.rs:55`)
-  and `Client::health()` checks the daemon's `schemaVersion` against a
-  compile-time expected version, failing loud on drift.
+- **All seven workspace crates are published at 0.2.0** on crates.io (KINTEG-001,
+  completed 2026-06-24). `kindling-client` ships the opt-in `spool` feature
+  (`SpooledClient`); there is no standalone `kindling-spool` crate.
+- **Capability handshake is shipped (KINTEG-004).** `GET /v1/health` and
+  `kindling status --json` return the full capability block (`version`,
+  `schemaVersion`, `supportedKinds`, `storagePath`, `kindRegistry`); the TS thin
+  client `health()` consumes the same shape. `Client::health()` still checks
+  `schemaVersion` against a compile-time expected version, failing loud on drift.
 - **Import/export is mostly done.** `kindling export` / `kindling import` exist
   with a `bundleVersion`/`version` "1.0" literal and a working `--dry-run`
   validation path (`kindling/src/commands/export.rs`).
@@ -115,22 +117,17 @@ Verified against the tree on 2026-06-22:
   `spool` module present. README/CHANGELOG note that the spool ships inside the
   client (no standalone `kindling-spool` crate).
 - **Validation:** `cargo publish --dry-run -p kindling-client` clean; post-publish
-  `cargo add kindling-client@0.2.0` resolves in a scratch crate.
-- **Status:** Release prepped (PR) — **publish is user-gated** (crates.io is a
-  credential-gated maintainer action, per the runbook).
-- **Notes:** Correct anvil's "publish kindling-spool" framing in the release
-  note: the durable-emit layer is `kindling-client::spool`, **opt-in behind the
-  `spool` feature** (`features = ["spool"]`) — not on by default. Verified
-  against the crates.io sparse index that the published `0.1.0` `kindling-client`
-  has `features: {}` (no spool at all), so 0.2.0 is the _first_ crate carrying
-  `SpooledClient` — this is exactly anvil's blocker. Prep done on this branch:
-  workspace already at 0.2.0 (all 7 crates lockstep, intra-deps pinned `0.2.0`);
-  CHANGELOG `[0.2.0]` section leads with the spool feature; `docs.rs` metadata
-  added to `kindling-client` (`all-features = true`) so `SpooledClient` appears
-  in published docs; fixed a runbook bug that listed the publish order as
-  client-before-server (client's versioned dev-dep on server requires the
-  reverse). Remaining user step: `scripts/publish.sh` after
-  `printf '%s' "$TOKEN" | cargo login` (or `CARGO_REGISTRY_TOKEN`).
+  `cargo add kindling-client@0.2.0 --features spool` resolves in a scratch crate.
+- **Status:** Done — published 2026-06-24 via `scripts/publish.sh` after
+  `cargo login`. All seven workspace crates at 0.2.0 on crates.io; registry
+  verification: `cargo add kindling-client@=0.2.0 --features spool` resolves from
+  `registry+https://github.com/rust-lang/crates.io-index`; `docs.rs/kindling-client/0.2.0`
+  documents `SpooledClient`.
+- **Notes:** The durable-emit layer is `kindling-client::spool`, **opt-in behind the
+  `spool` feature** (`features = ["spool"]`) — not on by default. 0.2.0 is the
+  first crates.io release carrying `SpooledClient` (0.1.0 had `features: {}`).
+  Prep landed in PR #118; publish-readiness tests in
+  `crates/kindling/tests/publish_readiness.rs`.
 
 ### KINTEG-002: Daemon-side observation dedup (exactly-once-ish replay)
 
@@ -181,12 +178,11 @@ Verified against the tree on 2026-06-22:
   registry test asserting every `ObservationKind` variant is present with its
   required fields.
 - **Dependencies:** —
-- **Status:** In Progress
-- **Notes:** Half-built today — `/v1/health` already returns version + schema +
-  projects. Additive work: `supportedKinds`, `storagePath`, and folding the
-  daemon/schema/version block into `kindling status --json` (currently
-  in-process DB stats only). Folds anvil wishlist #4 + #8 into one contract
-  surface so they can't disagree.
+- **Status:** Done — PR #117 (`feat/kinteg-004-capability-handshake`, merged
+  2026-06-23). Shared `kindling-types::build_capability` feeds `/v1/health`,
+  `kindling status --json`, Rust `Client::health()`, and the TS thin client;
+  kind registry derived from `ObservationKind::ALL` with ts-rs bindings.
+- **Notes:** Unblocks KINTEG-003 and KINTEG-007 (both depend on the kind vocabulary).
 
 ### KINTEG-005: Durable-emit observability + cold-start diagnostics
 

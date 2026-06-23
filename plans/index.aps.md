@@ -1,11 +1,11 @@
 # kindling — Plan Index
 
-| Field   | Value       |
-| ------- | ----------- |
-| Status  | In Progress |
-| Owner   | @aneki      |
-| Created | 2026-03-14  |
-| Updated | 2026-06-24  |
+| Field   | Value                                           |
+| ------- | ----------------------------------------------- |
+| Status  | In Progress                                     |
+| Owner   | @aneki                                          |
+| Created | 2026-03-14                                      |
+| Updated | 2026-06-24 (KINTEG-001, KINTEG-004 marked Done) |
 
 ## Problem
 
@@ -14,7 +14,7 @@ kindling is functional (596 tests passing, 10 packages building) and the TypeScr
 ## Success Criteria
 
 - [x] All packages published to npm under `@eddacraft` scope
-- [ ] Single statically-linked `kindling` binary distributed via cargo, brew, curl|sh, and npm postinstall
+- [x] Single statically-linked `kindling` binary distributed via cargo (`cargo install eddacraft-kindling` @ 0.2.0 on crates.io); brew, curl|sh, and npm registry validation remain user-gated
 - [ ] `kindling serve` daemon: auto-spawn on first call, idle shutdown after 30 min default, UDS transport (TCP fallback on Windows)
 - [ ] All 7 Claude Code hook types complete in <10ms warm, <100ms cold
 - [ ] anvil emits observations directly via `kindling-client` or `kindling-service` — no TS bridge
@@ -45,14 +45,15 @@ See `plans/specs/2026-05-03-rust-canonical-thin-client-design.md` for the curren
 
 ## Schedule
 
-| Phase | Modules                           | Target                                                                                                                        |
-| ----- | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| Now   | 05-rust-port (Phase 1)            | Foundation crates: workspace, types, store, filter                                                                            |
-| Next  | 05-rust-port (Phase 2)            | Service + daemon + hook + Rust client; anvil unblocks                                                                         |
-| Then  | 05-rust-port (Phase 3)            | CLI + umbrella binary + cross-platform builds + cargo/brew/curl distribution                                                  |
-| Then  | 05-rust-port (Phase 4)            | Thin TS client SDK on npm; deprecate TS implementation packages and anvil bridge                                              |
-| Next  | 06-downstream-integration-surface | Publish 0.2.0 (unblocks anvil), dedup, then `kindling-runtime` facade; query / handshake / observability / redaction evidence |
-| Done  | 07-intent-capture-events          | Intent capture primitive + export shipped (independent of the Rust port; KINTENT-001..006 merged)                             |
+| Phase | Modules                                   | Target                                                                                                                                    |
+| ----- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Now   | 05-rust-port (Phase 1)                    | Foundation crates: workspace, types, store, filter                                                                                        |
+| Next  | 05-rust-port (Phase 2)                    | Service + daemon + hook + Rust client; anvil unblocks                                                                                     |
+| Then  | 05-rust-port (Phase 3)                    | CLI + umbrella binary + cross-platform builds + cargo/brew/curl distribution                                                              |
+| Then  | 05-rust-port (Phase 4)                    | Thin TS client SDK on npm; deprecate TS implementation packages and anvil bridge                                                          |
+| Now   | 06-downstream-integration-surface         | PORT-011 (anvil integration), KINTEG-008 (`kindling-runtime` facade), KINTEG-002 dedup; then query / observability / redaction / fixtures |
+| Done  | 06-downstream-integration-surface (slice) | KINTEG-001 (crates.io 0.2.0 + spool), KINTEG-004 (capability handshake + kind registry)                                                   |
+| Done  | 07-intent-capture-events                  | Intent capture primitive + export shipped (independent of the Rust port; KINTENT-001..006 merged)                                         |
 
 ## Risks
 
