@@ -4,7 +4,7 @@
 | ------ | ------ | ----------- |
 | KINTEG | @aneki | In Progress |
 
-**Last reviewed:** 2026-06-23
+**Last reviewed:** 2026-06-24
 
 ## Purpose
 
@@ -24,6 +24,12 @@ returned a refined pass-on list that maps 1:1 onto KINTEG-001…007. Two
 adjustments landed: the "publish kindling-spool" framing was corrected to
 "publish `kindling-client` 0.2.0 with stable `SpooledClient`", and import/export
 was de-scoped to docs-only-if-missing (see KINTEG-007). No new asks surfaced.
+
+**Architecture follow-up (2026-06-24).** Integration review for anvil-primary
+consumption identified friction: seven crates, PATH-dependent auto-spawn, and
+spool behind a manual feature flag. KINTEG-008 adds a `kindling-runtime` facade
+so anvil ships one binary with an in-process daemon — without abandoning the
+shared UDS contract. See `plans/specs/2026-06-24-kindling-runtime-design.md`.
 
 ## Context: what already exists (do not rebuild)
 
@@ -63,6 +69,7 @@ Verified against the tree on 2026-06-22:
 - Durable-emit observability (spool status) + cold-start diagnostics
 - Redaction evidence (counts + classes, never values) in append responses
 - Import/export compatibility guarantee + public adapter test fixtures
+- `kindling-runtime` facade for bundled daemon + spooled client (anvil-first)
 
 ## Out of Scope
 
@@ -88,6 +95,7 @@ Verified against the tree on 2026-06-22:
 - Spool status API + `~/.kindling/` cold-start failure log
 - Redaction-evidence fields on append responses
 - Published hook-payload fixtures for adapter authors
+- `kindling-runtime` on crates.io — one-dep integration with embedded daemon
 
 ## Ready Checklist
 
@@ -235,3 +243,49 @@ Verified against the tree on 2026-06-22:
   missing." Fixtures are the primary deliverable: promote/derive from the internal
   `crates/kindling/tests/fixtures/capture-cases.json` into a published, versioned
   fixture set (npm `@eddacraft/kindling` and/or a `fixtures/` dir).
+
+### KINTEG-008: `kindling-runtime` — anvil-first integration facade
+
+- **Intent:** Give anvil (and other Rust downstreams) a **single Cargo dependency**
+  that bundles daemon startup, client wiring, and durable emit — without
+  requiring the `kindling` CLI on `PATH` or manual `Spawner::custom` glue.
+- **Expected Outcome:** New workspace crate `kindling-runtime` published to
+  crates.io. Default features (`client`, `spool`, `embedded-daemon`) expose
+  `Runtime::start(config) -> Runtime` with:
+  - **Attach-or-start** on the configured UDS socket (reuse an existing daemon
+    when present; otherwise start `kindling_server::serve` in-process on a tokio
+    task via `Spawner::custom`, matching the pattern in
+    `crates/kindling-client/tests/client.rs::cold_spawn_starts_daemon`).
+  - **`spooled_client()`** as the primary emit surface (spool enabled by default
+    at the runtime layer; bare `kindling-client` keeps spool opt-in for compat).
+  - **`client()`** for callers that want the thin client without spool.
+  - Re-exported `kindling-types` domain types so consumers need not depend on
+    types separately.
+  - Optional `external-spawn` feature: fall back to `Command::new("kindling")`
+    when the host already ships the CLI (current default behaviour).
+- **Expected Outcome (docs):** README with anvil-oriented quickstart:
+  `kindling-runtime = { version = "0.3", features = ["embedded-daemon"] }` and a
+  minimal `Runtime::start` → `spooled_client().append_observation` example.
+  Design spec at `plans/specs/2026-06-24-kindling-runtime-design.md`.
+- **Validation:**
+  - `cargo test -p kindling-runtime` — cold embedded start, attach to
+    pre-running daemon (spawner not called), spooled append round-trip into store.
+  - `cargo clippy -p kindling-runtime --all-features -- -D warnings` clean.
+  - `cargo package --list -p kindling-runtime` includes `Cargo.toml`, `README.md`.
+  - Post-publish: `cargo add kindling-runtime` resolves in a scratch crate; anvil
+    KDS can drop direct `kindling-client` + `kindling-server` deps.
+- **Dependencies:** KINTEG-001 (published `kindling-client` 0.2.0 + spool);
+  KINTEG-002 recommended before promoting spool as runtime default (dedup closes
+  the at-least-once gap). PORT-011 (anvil integration proof) should land with
+  raw client first to document baseline pain, then migrate to runtime.
+- **Status:** Proposed
+- **Notes:**
+  - **Not** a merge of the seven crates — composes `kindling-client` +
+    `kindling-server`; CLI/npm adapters unchanged.
+  - `scripts/publish.sh` order: insert `kindling-runtime` after `kindling-server`,
+    before `kindling-client` (runtime depends on both).
+  - v1 is daemon-mode only. A follow-up `embedded-service` feature (direct
+    `KindlingService`, zero IPC) is explicitly deferred unless anvil proves a
+    shared-socket-free hot path.
+  - KINTEG-003/004 capability and query methods should eventually hang off
+    `Runtime` (thin delegates), not duplicate wire shapes.
