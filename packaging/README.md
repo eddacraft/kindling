@@ -34,7 +34,8 @@ Publishing readiness (done in-repo by PORT-014):
 
 **Credential-gated maintainer steps:**
 
-1. `cargo login <crates.io-token>` (or export `CARGO_REGISTRY_TOKEN`).
+1. `printf '%s' "$TOKEN" | cargo login` (token from stdin; or export
+   `CARGO_REGISTRY_TOKEN`).
 2. Run [`scripts/publish.sh`](../scripts/publish.sh) — it publishes in
    dependency order: `kindling-types → kindling-store → kindling-provider →
 kindling-service → kindling-server → kindling-client → eddacraft-kindling`
@@ -133,5 +134,6 @@ then push or PR to `eddacraft/homebrew-tap`.
       attaches all target archives + `.sha256` sidecars, and `publish.yml`
       publishes the npm thin client + the 7 `@eddacraft/kindling-<platform>`
       binary packages from the same archives.
-- [ ] `cargo login` + `scripts/publish.sh` → crates.io (`cargo install eddacraft-kindling`).
+- [ ] `printf '%s' "$TOKEN" | cargo login` + `scripts/publish.sh` → crates.io
+      (`cargo install eddacraft-kindling`).
 - [ ] Merge the automated `homebrew-tap` PR (or run `./scripts/generate-homebrew-formula.sh vX.Y.Z --sync-tap` manually).

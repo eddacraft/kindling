@@ -129,7 +129,8 @@ Verified against the tree on 2026-06-22:
   added to `kindling-client` (`all-features = true`) so `SpooledClient` appears
   in published docs; fixed a runbook bug that listed the publish order as
   client-before-server (client's versioned dev-dep on server requires the
-  reverse). Remaining user step: `scripts/publish.sh` after `cargo login`.
+  reverse). Remaining user step: `scripts/publish.sh` after
+  `printf '%s' "$TOKEN" | cargo login` (or `CARGO_REGISTRY_TOKEN`).
 
 ### KINTEG-002: Daemon-side observation dedup (exactly-once-ish replay)
 

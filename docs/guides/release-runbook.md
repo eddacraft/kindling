@@ -165,8 +165,9 @@ The Rust crates are published to crates.io by the maintainer with
 
 Prerequisites:
 
-- A crates.io account and API token: `cargo login <token>` (or set
-  `CARGO_REGISTRY_TOKEN`).
+- A crates.io account and API token: `printf '%s' "$TOKEN" | cargo login` (token
+  is read from stdin; `cargo login <token>` is deprecated), or set
+  `CARGO_REGISTRY_TOKEN`.
 - A clean, committed tree on the release commit/tag.
 - `scripts/sync-vendored-schema.sh` already run (CI enforces no drift).
 
