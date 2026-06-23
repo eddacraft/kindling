@@ -27,7 +27,27 @@ Example:
 **Impact:** Will need retry logic or batching for bulk operations.
 -->
 
-_(No issues yet)_
+### ISS-001: Plugin test glob required on Node 26
+
+| Field      | Value                  |
+| ---------- | ---------------------- |
+| Status     | Resolved               |
+| Severity   | Low                    |
+| Discovered | release-prep preflight |
+| Module     | 08-conversion-surface  |
+
+**Context:** `node --test test/` fails on Node 26 (`MODULE_NOT_FOUND`); the glob `test/*.test.js` works and preserves skip-when-no-binary behaviour.
+
+### ISS-002: Workspace project count exceeds pre-release estimate
+
+| Field      | Value                  |
+| ---------- | ---------------------- |
+| Status     | Open                   |
+| Severity   | Low                    |
+| Discovered | release-prep preflight |
+| Module     | 08-conversion-surface  |
+
+**Context:** After merging conversion surface, `pnpm install` reports 7 workspace projects (4 packages + vscode adapter + plugin + `examples/adapter-minimal`), not the 5 estimated in the release plan. All install cleanly with `--frozen-lockfile`.
 
 ---
 

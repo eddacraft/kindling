@@ -16,6 +16,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Conversion surface** merged to main: `kindling demo`, `kindling browse`, `@eddacraft/kindling-adapter-vscode`, onboarding docs (`docs/quickstart/`, `docs/integrations.md`, adapter cookbook), Homebrew formula updates (macOS + Linux glibc), and automated homebrew-tap PR on release.
+
+### Removed
+
+- Retired TypeScript implementation package directories (`kindling-core`, `kindling-store-sqlite`, `kindling-store-sqljs`, `kindling-provider-local`, `kindling-server`, `kindling-cli`, `kindling-adapter-claude-code`) and stale `tsconfig.base.json` path entries.
+
+### Fixed
+
+- Claude Code plugin test script: `node --test test/*.test.js` (Node 26 no longer accepts a bare `test/` directory path).
+
 ## [0.2.0] - 2026-06-22
 
 The Rust cutover. kindling is now Rust-canonical: the engine ships as a Cargo

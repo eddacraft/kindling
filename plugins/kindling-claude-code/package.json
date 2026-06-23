@@ -10,6 +10,6 @@
     "directory": "plugins/kindling-claude-code"
   },
   "scripts": {
-    "test": "node --test test/"
+    "test": "node --test test/*.test.js"
   }
 }
