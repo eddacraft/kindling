@@ -3,12 +3,14 @@
 //! The service option structs (`OpenCapsuleOptions`, `CloseCapsuleOptions`,
 //! …) are deliberately NOT `Deserialize`, so this crate owns the wire-facing
 //! request shapes and converts them into the service options. All bodies are
-//! camelCase JSON. Response bodies serialize the domain types the service
-//! returns (already camelCase) — no response DTOs are needed.
+//! camelCase JSON. Most response bodies serialize the domain types the service
+//! returns (already camelCase) directly; the one exception is
+//! [`AppendObservationResponse`], which flattens the stored observation and
+//! adds the `deduplicated` marker.
 
-use kindling_service::{CloseCapsuleOptions, CreatePinOptions, OpenCapsuleOptions};
-use kindling_types::{CapsuleType, Id, ObservationInput, PinTargetType, ScopeIds};
-use serde::Deserialize;
+use kindling_service::{AppendOutcome, CloseCapsuleOptions, CreatePinOptions, OpenCapsuleOptions};
+use kindling_types::{CapsuleType, Id, Observation, ObservationInput, PinTargetType, ScopeIds};
+use serde::{Deserialize, Serialize};
 
 /// `POST /v1/capsules` body — open a capsule.
 #[derive(Debug, Deserialize)]
@@ -92,6 +94,32 @@ pub struct AppendObservationRequest {
     pub capsule_id: Option<Id>,
     #[serde(default)]
     pub validate: Option<bool>,
+}
+
+/// `POST /v1/observations` response — the stored observation plus a dedup
+/// marker.
+///
+/// The observation fields are flattened so existing clients that read
+/// `id`/`content`/… off the top level keep working; the new top-level
+/// `deduplicated` flag is `true` when the write collided with an already-stored
+/// id (the returned observation is then the pre-existing stored row, unchanged)
+/// and `false` when a new row was written. This makes spool replay observably
+/// exactly-once-ish on id.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppendObservationResponse {
+    #[serde(flatten)]
+    pub observation: Observation,
+    pub deduplicated: bool,
+}
+
+impl From<AppendOutcome> for AppendObservationResponse {
+    fn from(outcome: AppendOutcome) -> Self {
+        Self {
+            observation: outcome.observation,
+            deduplicated: outcome.deduplicated,
+        }
+    }
 }
 
 /// `POST /v1/pins` body — create a pin.
