@@ -200,10 +200,10 @@ Verified against the tree on 2026-06-22:
 - **Dependencies:** —
 - **Status:** Complete (2026-06-24)
 - **Notes:** Shipped `SpoolStatus` + `spool_status()` on `SpooledClient`,
-  passive `spool_status_from_path()` for CLI inspection, `kindling spool status
-  --spool-path --json`, and spawn-failure logging to `~/.kindling/spawn.log`
-  (configurable via `ClientConfig::spawn_log_path`). Live last-flush/error/replay
-  counters are per-client instance only; passive CLI reports pending count + path.
+  passive `spool_status_from_path()` (reads `{spool}.status.json` sidecar) for CLI
+  inspection, `kindling spool status --spool-path --json`, and spawn-failure logging
+  to `~/.kindling/spawn.log` (configurable via `ClientConfig::spawn_log_path`).
+  Flush/error/replay metadata persists in the sidecar, not inside NDJSON lines.
 
 ### KINTEG-006: Redaction evidence in append responses
 

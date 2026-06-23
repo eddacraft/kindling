@@ -66,18 +66,19 @@ pub struct SpoolStatus {
     pub pending_count: usize,
     /// Path to the NDJSON spool file this status describes.
     pub spool_path: PathBuf,
-    /// Epoch milliseconds of the last successful flush (in-memory per client).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Epoch milliseconds of the last successful flush.
+    #[serde(default)]
     pub last_flush_time_ms: Option<i64>,
-    /// Last connectivity or flush error observed by this client instance.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Last connectivity or flush error observed for this spool file.
+    #[serde(default)]
     pub last_error: Option<String>,
     /// Cumulative replay attempts (each flush try per spooled entry).
     pub replay_attempts: u64,
 }
 
-/// In-memory counters recorded by a single [`SpooledClient`] instance.
-#[derive(Debug, Default)]
+/// Flush/error/replay counters for a spool file (in-memory + sidecar).
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct SpoolRuntime {
     last_flush_time_ms: Option<i64>,
     last_error: Option<String>,
@@ -183,11 +184,12 @@ pub struct SpooledClient {
 impl SpooledClient {
     /// Build a durable-emit client over `client`, buffering to `spool_path`.
     pub fn new(client: Client, spool_path: PathBuf) -> Self {
+        let runtime = read_runtime_sidecar(&spool_path).unwrap_or_default();
         Self {
             client,
             spool_path,
             file_lock: Mutex::new(()),
-            runtime: Mutex::new(SpoolRuntime::default()),
+            runtime: Mutex::new(runtime),
         }
     }
 
@@ -245,7 +247,7 @@ impl SpooledClient {
         {
             Ok(observation) => Ok(AppendOutcome::Delivered(Box::new(observation))),
             Err(err) if is_connectivity_error(&err) => {
-                self.record_connectivity_error(&err).await;
+                self.record_connectivity_error(&err).await?;
                 let entry = SpoolEntry {
                     input,
                     capsule_id,
@@ -284,7 +286,7 @@ impl SpooledClient {
         let mut propagate: Option<ClientError> = None;
 
         for (idx, entry) in entries.iter().enumerate() {
-            self.bump_replay_attempts().await;
+            self.bump_replay_attempts().await?;
             match self
                 .client
                 .append_observation(
@@ -296,7 +298,7 @@ impl SpooledClient {
             {
                 Ok(_) => replayed += 1,
                 Err(err) if is_connectivity_error(&err) => {
-                    self.record_connectivity_error(&err).await;
+                    self.record_connectivity_error(&err).await?;
                     break;
                 }
                 Err(err) => {
@@ -318,7 +320,7 @@ impl SpooledClient {
         }
 
         if replayed > 0 {
-            self.record_successful_flush().await;
+            self.record_successful_flush().await?;
         }
 
         Ok(FlushReport {
@@ -327,20 +329,23 @@ impl SpooledClient {
         })
     }
 
-    async fn bump_replay_attempts(&self) {
+    async fn bump_replay_attempts(&self) -> Result<(), SpoolError> {
         let mut rt = self.runtime.lock().await;
         rt.replay_attempts = rt.replay_attempts.saturating_add(1);
+        write_runtime_sidecar(&self.spool_path, &rt)
     }
 
-    async fn record_connectivity_error(&self, err: &ClientError) {
+    async fn record_connectivity_error(&self, err: &ClientError) -> Result<(), SpoolError> {
         let mut rt = self.runtime.lock().await;
         rt.last_error = Some(err.to_string());
+        write_runtime_sidecar(&self.spool_path, &rt)
     }
 
-    async fn record_successful_flush(&self) {
+    async fn record_successful_flush(&self) -> Result<(), SpoolError> {
         let mut rt = self.runtime.lock().await;
         rt.last_flush_time_ms = Some(now_ms());
         rt.last_error = None;
+        write_runtime_sidecar(&self.spool_path, &rt)
     }
 
     /// Count of pending (un-replayed) spool entries.
@@ -360,19 +365,18 @@ impl SpooledClient {
         })
     }
 
-    /// Passive status from an on-disk spool file (pending count + path only).
-    ///
-    /// Historical flush/error/replay fields are not persisted across processes.
+    /// Passive status from an on-disk spool file and its `.status.json` sidecar.
     pub fn spool_status_from_path(
         spool_path: impl Into<PathBuf>,
     ) -> Result<SpoolStatus, SpoolError> {
         let spool_path = spool_path.into();
+        let runtime = read_runtime_sidecar(&spool_path)?;
         Ok(SpoolStatus {
             pending_count: read_spool(&spool_path)?.len(),
             spool_path,
-            last_flush_time_ms: None,
-            last_error: None,
-            replay_attempts: 0,
+            last_flush_time_ms: runtime.last_flush_time_ms,
+            last_error: runtime.last_error,
+            replay_attempts: runtime.replay_attempts,
         })
     }
 
@@ -392,6 +396,40 @@ impl SpooledClient {
         file.flush()?;
         Ok(())
     }
+}
+
+/// Sidecar path for flush/error/replay metadata: `{spool_path}.status.json`.
+fn status_sidecar_path(spool_path: &Path) -> PathBuf {
+    let name = format!(
+        "{}.status.json",
+        spool_path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "spool".to_string())
+    );
+    match spool_path.parent() {
+        Some(dir) => dir.join(name),
+        None => PathBuf::from(name),
+    }
+}
+
+fn read_runtime_sidecar(spool_path: &Path) -> Result<SpoolRuntime, SpoolError> {
+    let path = status_sidecar_path(spool_path);
+    let contents = match std::fs::read_to_string(&path) {
+        Ok(c) => c,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(SpoolRuntime::default()),
+        Err(e) => return Err(SpoolError::Io(e)),
+    };
+    Ok(serde_json::from_str(&contents)?)
+}
+
+fn write_runtime_sidecar(spool_path: &Path, runtime: &SpoolRuntime) -> Result<(), SpoolError> {
+    let path = status_sidecar_path(spool_path);
+    let line = serde_json::to_string(runtime)?;
+    let tmp = temp_sibling(&path);
+    std::fs::write(&tmp, format!("{line}\n"))?;
+    std::fs::rename(&tmp, &path)?;
+    Ok(())
 }
 
 fn now_ms() -> i64 {
