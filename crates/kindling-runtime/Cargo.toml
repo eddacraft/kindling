@@ -1,0 +1,45 @@
+[package]
+name = "kindling-runtime"
+description = "Anvil-first integration facade for kindling: one dependency bundling daemon startup, client wiring, and durable emit."
+homepage.workspace = true
+documentation = "https://docs.rs/kindling-runtime"
+readme = "README.md"
+keywords = ["memory", "ai", "context", "daemon", "agent"]
+categories = ["development-tools", "api-bindings"]
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+kindling-types = { path = "../kindling-types", version = "0.2.0" }
+kindling-client = { path = "../kindling-client", version = "0.2.0", optional = true }
+kindling-server = { path = "../kindling-server", version = "0.2.0", optional = true }
+tokio = { version = "1", features = ["rt", "macros", "net", "time", "sync"] }
+thiserror = "2"
+
+[features]
+default = ["client", "spool", "embedded-daemon"]
+# HTTP client surface (the daemon-backed Rust SDK).
+client = ["dep:kindling-client"]
+# Promote SpooledClient (durable emit) as the primary append path.
+spool = ["client", "kindling-client/spool"]
+# In-process `kindling-server` started on a tokio task — no `kindling` on PATH.
+embedded-daemon = ["client", "dep:kindling-server"]
+# Fall back to spawning the real `kindling` binary on PATH (Spawner::Command).
+external-spawn = ["client"]
+
+# Build docs.rs with every feature so the spool + embedded surfaces appear in
+# the published docs.
+[package.metadata.docs.rs]
+all-features = true
+
+[dev-dependencies]
+kindling-store = { path = "../kindling-store", version = "0.2.0" }
+tempfile = "3"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time"] }
+
+[lints]
+workspace = true

@@ -622,6 +622,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "kindling-runtime"
+version = "0.2.0"
+dependencies = [
+ "kindling-client",
+ "kindling-server",
+ "kindling-store",
+ "kindling-types",
+ "tempfile",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "kindling-server"
 version = "0.2.0"
 dependencies = [
