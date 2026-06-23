@@ -54,6 +54,10 @@ pub(crate) struct AppendObservationBody {
 pub(crate) struct AppendObservationResponseBody {
     #[serde(flatten)]
     pub observation: Observation,
+    /// Defaults to `false` for rolling-upgrade safety: an older
+    /// (pre-KINTEG-002) daemon does not emit this field, and an absent marker
+    /// semantically means "a fresh write" (not a duplicate).
+    #[serde(default)]
     pub deduplicated: bool,
 }
 
