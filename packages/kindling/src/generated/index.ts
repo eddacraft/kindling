@@ -3,10 +3,12 @@
 // crates/kindling-types/bindings (the ts-rs output).
 
 export type * from './CandidateResult.js';
+export type * from './Capability.js';
 export type * from './Capsule.js';
 export type * from './CapsuleInput.js';
 export type * from './CapsuleStatus.js';
 export type * from './CapsuleType.js';
+export type * from './KindRegistryEntry.js';
 export type * from './Observation.js';
 export type * from './ObservationInput.js';
 export type * from './ObservationKind.js';

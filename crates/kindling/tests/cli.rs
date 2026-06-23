@@ -22,6 +22,33 @@ fn log_then_status_counts_observation() {
     assert_eq!(v["counts"]["capsules"], json!(0));
     // Activity timestamp present after a log.
     assert!(v["activity"]["latestTimestamp"].is_number());
+    assert_status_capability_block(&v);
+}
+
+#[test]
+fn status_json_capability_block_is_consistent_across_runs() {
+    let env = CliEnv::new();
+    let _ = env.run_db(&["log", "consistency probe", "--kind", "message"]);
+
+    let first = json_stdout(&env.run_db(&["status", "--json"]));
+    let second = json_stdout(&env.run_db(&["status", "--json"]));
+    assert_status_capability_block(&first);
+    assert_status_capability_block(&second);
+    assert_eq!(first["supportedKinds"], second["supportedKinds"]);
+    assert_eq!(first["kindRegistry"], second["kindRegistry"]);
+    assert_eq!(first["schemaVersion"], second["schemaVersion"]);
+    assert_eq!(first["version"], second["version"]);
+}
+
+fn assert_status_capability_block(v: &serde_json::Value) {
+    assert!(v["version"].is_string());
+    assert!(v["schemaVersion"].is_number());
+    let kinds = v["supportedKinds"].as_array().expect("supportedKinds");
+    assert_eq!(kinds.len(), 9);
+    let storage = v["storagePath"].as_str().expect("storagePath");
+    assert!(!storage.is_empty());
+    let registry = v["kindRegistry"].as_array().expect("kindRegistry");
+    assert_eq!(registry.len(), 9);
 }
 
 #[test]

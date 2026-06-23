@@ -1,8 +1,10 @@
-//! `status` — database statistics. In-process only (no daemon endpoint).
+//! `status` — database statistics plus capability handshake. In-process only.
 //!
-//! Ports `packages/kindling-cli/src/commands/status.ts`. The `--json` shape
-//! matches field-for-field: `{ database, counts, activity }`.
+//! The `--json` shape augments the prior `{ database, counts, activity }` layout
+//! with the capability block (`version`, `schemaVersion`, `supportedKinds`,
+//! `storagePath`, `kindRegistry`).
 
+use kindling_types::build_capability;
 use serde::Serialize;
 
 use crate::cli::StatusArgs;
@@ -11,6 +13,8 @@ use crate::{open_service, CliResult};
 
 #[derive(Serialize)]
 struct StatusOutput {
+    #[serde(flatten)]
+    capability: kindling_types::Capability,
     database: DatabaseSection,
     counts: CountsSection,
     activity: ActivitySection,
@@ -53,7 +57,14 @@ pub fn run(args: StatusArgs) -> CliResult {
 
     let latest_date = stats.latest_ts.map(iso8601_utc);
 
+    let capability = build_capability(
+        env!("CARGO_PKG_VERSION"),
+        kindling_store::schema_version().version as u32,
+        db_path.to_string_lossy(),
+    );
+
     let output = StatusOutput {
+        capability,
         database: DatabaseSection {
             path: db_path.to_string_lossy().into_owned(),
             size: size.clone(),

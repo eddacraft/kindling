@@ -15,7 +15,9 @@ use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::Json;
 use kindling_service::AppendObservationOptions;
-use kindling_types::{Capsule, Observation, Pin, RetrieveOptions, RetrieveResult};
+use kindling_types::{
+    build_capability, Capsule, Observation, Pin, RetrieveOptions, RetrieveResult,
+};
 use serde_json::{json, Value};
 
 use crate::dto::{
@@ -50,15 +52,20 @@ fn project_root(headers: &HeaderMap) -> Result<String, ApiError> {
     }
 }
 
-/// `GET /v1/health` — version, schema version, and touched project ids.
+/// `GET /v1/health` — capability handshake plus touched project ids.
 /// Requires no project header.
 pub async fn health(State(state): State<AppState>) -> Json<Value> {
     let schema = kindling_store::schema_version();
-    Json(json!({
-        "version": env!("CARGO_PKG_VERSION"),
-        "schemaVersion": schema.version,
-        "projects": state.known_project_ids(),
-    }))
+    let capability = build_capability(
+        env!("CARGO_PKG_VERSION"),
+        schema.version as u32,
+        state.kindling_home().display().to_string(),
+    );
+    let mut body = serde_json::to_value(capability).expect("capability serializes");
+    if let Some(obj) = body.as_object_mut() {
+        obj.insert("projects".to_string(), json!(state.known_project_ids()));
+    }
+    Json(body)
 }
 
 /// `POST /v1/capsules` — open a capsule.
