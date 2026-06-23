@@ -58,6 +58,15 @@
 //! answer. So if a daemon (the CLI, a Claude Code hook, or another runtime) is
 //! already listening on the same socket, the runtime **attaches** to it and the
 //! embedded spawner is not invoked.
+//!
+//! This "attach, don't spawn" guarantee holds for the **sequential** case: a
+//! daemon that is already bound when [`start`](Runtime::start) runs is attached
+//! to. It is *not* a cross-process lock. If two cold-starts race on the same
+//! socket (neither daemon bound yet), both embedded spawners can briefly fire;
+//! the second `serve` then fails to bind the already-taken socket and its task
+//! exits cleanly, leaving exactly one daemon. For v1 anvil (a single binary
+//! owning its socket) this window does not arise, so the runtime deliberately
+//! ships no socket lock — see the design spec's "socket lock file" note.
 
 #![forbid(unsafe_code)]
 
@@ -140,9 +149,12 @@ impl RuntimeConfig {
     }
 
     /// Build an embedded-daemon config rooted at the default home for
-    /// `project_root` (the common anvil case). Panics on a missing home only via
-    /// [`from_default_home`](Self::from_default_home)'s error — prefer that for
-    /// fallible construction.
+    /// `project_root` (the common anvil case).
+    ///
+    /// Infallible: if no home directory can be determined it **silently falls
+    /// back** to `.kindling` in the current working directory. Prefer
+    /// [`from_default_home`](Self::from_default_home) when you want a missing
+    /// home to surface as an error instead of a cwd-relative fallback.
     pub fn embedded(project_root: impl Into<String>) -> Self {
         let kindling_home = default_kindling_home().unwrap_or_else(|| PathBuf::from(".kindling"));
         Self {
@@ -224,6 +236,11 @@ fn default_kindling_home() -> Option<PathBuf> {
 ///
 /// Owns the embedded server task handle (when [`SpawnStrategy::Embedded`]), so
 /// [`shutdown`](Self::shutdown) can stop it.
+///
+/// Dropping a `Runtime` **without** calling [`shutdown`](Self::shutdown) does
+/// not stop an embedded daemon: the `serve` task was spawned onto the tokio
+/// runtime and keeps running until the runtime itself shuts down (or the daemon
+/// idles out). Call [`shutdown`](Self::shutdown) for deterministic teardown.
 #[cfg(feature = "client")]
 #[derive(Debug)]
 pub struct Runtime {
@@ -324,6 +341,11 @@ impl Runtime {
     pub async fn shutdown(self) -> Result<(), RuntimeError> {
         #[cfg(feature = "embedded-daemon")]
         {
+            // `.lock().ok()` swallows a poisoned mutex: the only code that holds
+            // this lock is the spawner closure storing the JoinHandle, which
+            // never panics while holding it, so poisoning cannot occur in
+            // practice. If it somehow did, treating it as "no handle to abort"
+            // is the benign outcome (the daemon idles out on its own).
             let handle = self.server_handle.lock().ok().and_then(|mut g| g.take());
             if let Some(handle) = handle {
                 handle.abort();
