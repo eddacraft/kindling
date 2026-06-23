@@ -1,28 +1,51 @@
-# Module 08 — Conversion Surface
+# Conversion Surface
 
-| Field          | Value                                                                                                            |
-| -------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Status         | Ready                                                                                                            |
-| Owner          | @aneki                                                                                                           |
-| Created        | 2026-06-22                                                                                                       |
-| Execution plan | [../execution/2026-06-22-conversion-surface-delivery.md](../execution/2026-06-22-conversion-surface-delivery.md) |
+| ID   | Owner  | Status |
+| ---- | ------ | ------ |
+| CONV | @aneki | Ready  |
 
-## Problem
+**Last reviewed:** 2026-06-23
+
+## Purpose
 
 Public visitors and non-Anvil users need a clear path to try, understand, and adopt kindling without Claude Code or anvil. Much of the surface is built on `feat/conversion-surface` but not merged; remaining gaps are CLI depth, distribution polish, and docs sync.
 
-## Success criteria
+Execution plan: [../execution/2026-06-22-conversion-surface-delivery.md](../execution/2026-06-22-conversion-surface-delivery.md).
 
-- [ ] `feat/conversion-surface` merged and released
-- [ ] Homebrew (macOS + Linux glibc) live via automated tap PR
-- [ ] npm publishes `@eddacraft/kindling-adapter-vscode`; VSIX on GitHub Release
-- [ ] Asciinema demo embedded in README
-- [ ] `install.sh` offers demo; `stats`, `wrap`, `tui`, search filters shipped
-- [ ] Cursor/Windsurf quickstart documented
-- [ ] `docs/why-kindling.md` + external docs sync
-- [ ] Composite GitHub Action v1
+## In Scope
 
-## Work items
+- Merge `feat/conversion-surface` (demo, browse, VS Code adapter, homebrew updates, onboarding docs)
+- Homebrew (macOS + Linux glibc) via automated tap PR
+- npm publish of `@eddacraft/kindling-adapter-vscode`; VSIX on GitHub Release
+- Asciinema demo embedded in README
+- Follow-up CLI depth (`stats`, `wrap`, `tui`, search filters) and docs sync (C1–C11)
+
+## Out of Scope
+
+- anvil integration or KINTEG downstream contract work
+- musl targets in Homebrew (use `install.sh`)
+- Semantic/embedding retrieval or cloud-hosted kindling
+
+## Interfaces
+
+**Depends on:**
+
+- `05-rust-port` (daemon, thin client, distribution) — conversion surface ships on top of the Rust cutover
+
+**Exposes:**
+
+- `kindling demo`, `kindling browse` CLI commands
+- `@eddacraft/kindling-adapter-vscode` npm package
+- Public onboarding docs (`docs/quickstart/`, `docs/integrations.md`, adapter cookbook)
+
+## Ready Checklist
+
+- [x] Purpose and scope are clear
+- [x] Dependencies identified
+- [x] Execution plan written
+- [x] At least one task defined
+
+## Work Items
 
 | ID  | Title                              | Wave | Status | Branch (suggested)                 |
 | --- | ---------------------------------- | ---- | ------ | ---------------------------------- |
