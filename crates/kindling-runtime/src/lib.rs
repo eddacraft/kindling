@@ -100,6 +100,7 @@ use std::time::Duration;
 /// configured socket — the variant only decides what happens when a spawn is
 /// actually required.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum SpawnStrategy {
     /// Start an in-process [`kindling-server`](kindling_server) on a tokio task
     /// (requires the `embedded-daemon` feature). The blessed anvil path: one
@@ -116,7 +117,12 @@ pub enum SpawnStrategy {
 }
 
 /// Configuration for a [`Runtime`].
+///
+/// `#[non_exhaustive]`: build via [`RuntimeConfig::embedded`],
+/// [`RuntimeConfig::with_home`], or [`RuntimeConfig::from_default_home`] (then
+/// mutate fields), so new fields can be added without a breaking change.
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct RuntimeConfig {
     /// Root of the per-project databases and the daemon's socket/pid/port files
     /// (`~/.kindling` by default). Using the default layout shares the DB with
@@ -200,6 +206,7 @@ impl RuntimeConfig {
 
 /// Errors from [`Runtime`] operations.
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum RuntimeError {
     /// Invalid or unresolvable configuration (e.g. no home directory).
     #[error("runtime config error: {0}")]
