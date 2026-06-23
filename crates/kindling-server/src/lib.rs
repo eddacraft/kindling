@@ -9,7 +9,7 @@
 //! # v1 HTTP API
 //!
 //! ```text
-//! GET    /v1/health                  → 200 { version, schemaVersion, projects: [...] }
+//! GET    /v1/health                  → 200 { version, schemaVersion, supportedKinds, storagePath, kindRegistry, projects: [...] }
 //! POST   /v1/capsules                → 201 Capsule
 //! GET    /v1/capsules/open?sessionId → 200 Capsule | null
 //! PATCH  /v1/capsules/:id/close      → 200 Capsule

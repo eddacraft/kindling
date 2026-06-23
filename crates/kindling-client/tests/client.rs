@@ -220,6 +220,20 @@ async fn health_reports_schema_version() {
     for entry in &health.kind_registry {
         assert!(!entry.required_fields.is_empty());
     }
+
+    // Emit the captured response shape for launch-verification evidence.
+    let captured = serde_json::json!({
+        "version": health.version,
+        "schemaVersion": health.schema_version,
+        "supportedKinds": health.supported_kinds,
+        "storagePath": health.storage_path,
+        "kindRegistry": health.kind_registry,
+        "projects": health.projects,
+    });
+    eprintln!(
+        "HEALTH_CAPABILITY_RESPONSE={}",
+        serde_json::to_string_pretty(&captured).expect("serialize health")
+    );
 }
 
 /// 2b. A wrong expected schema version yields SchemaMismatch.
