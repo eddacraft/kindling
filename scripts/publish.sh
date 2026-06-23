@@ -19,8 +19,8 @@
 #                          name on crates.io is owned by an unrelated project.)
 #
 # Prerequisites (CREDENTIAL-GATED — the maintainer must do these):
-#   * A crates.io account + API token: `cargo login <token>`
-#     (or set CARGO_REGISTRY_TOKEN in the environment).
+#   * A crates.io account + API token: pipe to stdin, e.g.
+#     `printf '%s' "$TOKEN" | cargo login` (or set CARGO_REGISTRY_TOKEN).
 #   * A clean, committed tree on the release commit/tag.
 #   * `scripts/sync-vendored-schema.sh` already run (CI enforces no drift).
 #
