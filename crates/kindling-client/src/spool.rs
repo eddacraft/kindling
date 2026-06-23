@@ -19,13 +19,17 @@
 //!
 //! # Delivery semantics
 //!
-//! v1 is **at-least-once**. Before trying or spooling, `append_observation`
-//! assigns a stable [`uuid::Uuid`] v4 to the observation when the caller left
-//! `input.id` as `None`, so a spooled entry and any later replay carry the
-//! *same* id. A crash after the daemon commits but before the spool is rewritten
-//! can therefore replay an already-stored observation. Making this
-//! **exactly-once** requires the daemon to ignore (dedup) a write whose id
-//! already exists — a noted follow-up, not yet implemented.
+//! Delivery is **exactly-once-ish on id**. Before trying or spooling,
+//! `append_observation` assigns a stable [`uuid::Uuid`] v4 to the observation
+//! when the caller left `input.id` as `None`, so a spooled entry and any later
+//! replay carry the *same* id. A crash after the daemon commits but before the
+//! spool is rewritten can therefore replay an already-stored observation — but
+//! the daemon now **deduplicates** on id: a write whose id already exists is
+//! ignored (the stored row is returned untouched, never overwritten or
+//! re-masked), surfaced via [`AppendResult::deduplicated`](crate::AppendResult).
+//! So a replay is an observable no-op rather than a duplicate row. ("-ish"
+//! because the dedup key is the observation id; two genuinely distinct writes
+//! that reuse an id would still collapse to one.)
 //!
 //! # Which failures spool vs propagate
 //!
@@ -54,8 +58,8 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
-use crate::{Client, ClientError};
-use kindling_types::{Id, Observation, ObservationInput};
+use crate::{AppendResult, Client, ClientError};
+use kindling_types::{Id, ObservationInput};
 
 /// Configuration for a [`SpooledClient`].
 ///
@@ -98,11 +102,14 @@ pub struct SpoolEntry {
 /// Outcome of [`SpooledClient::append_observation`].
 #[derive(Debug)]
 pub enum AppendOutcome {
-    /// Written straight to the daemon; carries the stored [`Observation`].
+    /// Reached the daemon; carries the [`AppendResult`] (stored observation +
+    /// the daemon's `deduplicated` marker). `deduplicated` is `true` when this
+    /// id was already stored (e.g. a replay of an entry the daemon had already
+    /// committed before a crash) — the stored row is returned unchanged.
     ///
-    /// The `Observation` is boxed so the enum stays small (the `Spooled`
-    /// variant carries no data).
-    Delivered(Box<Observation>),
+    /// The result is boxed so the enum stays small (the `Spooled` variant
+    /// carries no data).
+    Delivered(Box<AppendResult>),
     /// Daemon unreachable — the request was buffered to the spool.
     Spooled,
 }
@@ -213,7 +220,7 @@ impl SpooledClient {
             .append_observation(input.clone(), capsule_id.clone(), validate)
             .await
         {
-            Ok(observation) => Ok(AppendOutcome::Delivered(Box::new(observation))),
+            Ok(result) => Ok(AppendOutcome::Delivered(Box::new(result))),
             Err(err) if is_connectivity_error(&err) => {
                 let entry = SpoolEntry {
                     input,

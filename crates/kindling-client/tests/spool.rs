@@ -71,7 +71,10 @@ async fn delivered_when_daemon_up() {
         .expect("append should not error when daemon is up");
 
     match outcome {
-        AppendOutcome::Delivered(obs) => assert_eq!(obs.content, "delivered needle one"),
+        AppendOutcome::Delivered(result) => {
+            assert_eq!(result.observation.content, "delivered needle one");
+            assert!(!result.deduplicated, "first delivery is not a dedup");
+        }
         AppendOutcome::Spooled => panic!("expected Delivered, got Spooled"),
     }
 
@@ -89,6 +92,83 @@ async fn delivered_when_daemon_up() {
             .any(|c| matches!(&c.entity,
                 kindling_types::RetrievedEntity::Observation(o) if o.content == "delivered needle one")),
         "delivered observation must be retrievable: {res:#?}"
+    );
+}
+
+/// Daemon-side dedup: appending the same observation id twice is exactly-once.
+/// The first append writes (deduplicated=false); the second, carrying DIFFERENT
+/// content, is ignored by the daemon — it returns the original stored row with
+/// deduplicated=true, and retrieval still surfaces exactly one row.
+#[tokio::test]
+async fn replay_of_delivered_id_is_a_noop() {
+    let daemon = TestDaemon::start().await;
+    let (_dir, spool_path) = spool_tempdir();
+    let spooled = SpooledClient::new(daemon.client(PROJECT), spool_path);
+
+    // Fixed id so the two appends collide.
+    let mut first = message_input("idempotent replay needle");
+    first.id = Some("replay-fixed-id".to_string());
+
+    let first_outcome = spooled
+        .append_observation(first, None, None)
+        .await
+        .expect("first append");
+    match first_outcome {
+        AppendOutcome::Delivered(result) => {
+            assert!(!result.deduplicated, "first delivery is a fresh write");
+            assert_eq!(result.observation.id, "replay-fixed-id");
+            assert_eq!(result.observation.content, "idempotent replay needle");
+        }
+        AppendOutcome::Spooled => panic!("daemon is up; expected Delivered"),
+    }
+
+    // Replay the SAME id with different content (simulating a post-crash spool
+    // replay of an already-committed entry).
+    let mut replay = message_input("DIFFERENT body that must be ignored");
+    replay.id = Some("replay-fixed-id".to_string());
+
+    let replay_outcome = spooled
+        .append_observation(replay, None, None)
+        .await
+        .expect("replay append");
+    match replay_outcome {
+        AppendOutcome::Delivered(result) => {
+            assert!(result.deduplicated, "replay of a stored id must dedup");
+            assert_eq!(
+                result.observation.content, "idempotent replay needle",
+                "dedup returns the original stored row, not the replayed body"
+            );
+        }
+        AppendOutcome::Spooled => panic!("daemon is up; expected Delivered"),
+    }
+
+    // Retrieval surfaces exactly ONE matching observation (no duplicate row,
+    // and the ignored replay body never landed).
+    let res = spooled
+        .client()
+        .retrieve(retrieve_opts("idempotent"))
+        .await
+        .expect("retrieve");
+    let matches: Vec<&str> = res
+        .candidates
+        .iter()
+        .filter_map(|c| match &c.entity {
+            kindling_types::RetrievedEntity::Observation(o) if o.id == "replay-fixed-id" => {
+                Some(o.content.as_str())
+            }
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        matches,
+        vec!["idempotent replay needle"],
+        "exactly one row for the id, carrying the original content: {res:#?}"
+    );
+    assert!(
+        !res.candidates.iter().any(|c| matches!(&c.entity,
+            kindling_types::RetrievedEntity::Observation(o)
+                if o.content == "DIFFERENT body that must be ignored")),
+        "the ignored replay body must never have been stored"
     );
 }
 
