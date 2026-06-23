@@ -71,6 +71,14 @@ describe.skipIf(!HAS_BINARY)('Kindling thin client — warm round-trip', () => {
     const health = await client.health();
     expect(typeof health.version).toBe('string');
     expect(typeof health.schemaVersion).toBe('number');
+    expect(health.supportedKinds).toHaveLength(9);
+    expect(health.supportedKinds[0]).toBe('tool_call');
+    expect(health.supportedKinds[8]).toBe('node_error');
+    expect(health.storagePath.length).toBeGreaterThan(0);
+    expect(health.kindRegistry).toHaveLength(9);
+    for (const entry of health.kindRegistry) {
+      expect(entry.requiredFields.length).toBeGreaterThan(0);
+    }
 
     // openCapsule
     const capsule = await client.openCapsule({

@@ -12,8 +12,10 @@ import { resolveConfig, type KindlingOptions, type ResolvedConfig } from './conf
 import { ApiError, SchemaMismatchError } from './errors.js';
 import { request, type OutgoingRequest } from './transport.js';
 
+import type { Capability } from './generated/Capability.js';
 import type { Capsule } from './generated/Capsule.js';
 import type { CapsuleType } from './generated/CapsuleType.js';
+import type { KindRegistryEntry } from './generated/KindRegistryEntry.js';
 import type { Observation } from './generated/Observation.js';
 import type { ObservationInput } from './generated/ObservationInput.js';
 import type { Pin } from './generated/Pin.js';
@@ -23,14 +25,10 @@ import type { RetrieveResult } from './generated/RetrieveResult.js';
 import type { ScopeIds } from './generated/ScopeIds.js';
 
 /** Result of `GET /v1/health`. */
-export interface Health {
-  /** Daemon package version. */
-  version: string;
-  /** Schema version the daemon's store reports. */
-  schemaVersion: number;
+export type Health = Capability & {
   /** Project ids the daemon has touched this session. */
   projects: string[];
-}
+};
 
 /** Arguments to {@link Kindling.openCapsule}. */
 export interface OpenCapsuleArgs {
@@ -66,6 +64,9 @@ export interface PinArgs {
 interface HealthBody {
   version: string;
   schemaVersion: number;
+  supportedKinds: string[];
+  storagePath: string;
+  kindRegistry: KindRegistryEntry[];
   projects?: string[];
 }
 
@@ -93,7 +94,7 @@ export class Kindling {
   }
 
   /**
-   * `GET /v1/health` — version, schema version, and touched project ids.
+   * `GET /v1/health` — capability handshake plus touched project ids.
    *
    * Verifies the daemon's `schemaVersion` matches the configured expected
    * version; throws {@link SchemaMismatchError} on mismatch (fail loud).
@@ -107,6 +108,9 @@ export class Kindling {
     return {
       version: body.version,
       schemaVersion: body.schemaVersion,
+      supportedKinds: body.supportedKinds,
+      storagePath: body.storagePath,
+      kindRegistry: body.kindRegistry,
       projects: body.projects ?? [],
     };
   }
