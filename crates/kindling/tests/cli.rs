@@ -439,3 +439,47 @@ fn browse_writes_html_without_opening_browser() {
     assert!(html.contains("kindling memory"));
     assert!(html.contains("obs-demo-4"));
 }
+
+#[test]
+fn browse_escapes_script_breakout_in_embedded_json() {
+    let env = CliEnv::new();
+    let payload = "note </script><script>alert(1)</script> end";
+    assert_success(&env.run_db(&["log", payload, "--json"]));
+
+    let html_path = env.path("browse.html");
+    let path = html_path.to_string_lossy();
+    assert_success(&env.run_db(&["browse", "--no-open", "--output", &path]));
+    let html = read(&html_path);
+
+    let script_start = html
+        .find("const bundle = ")
+        .expect("bundle assignment in HTML");
+    let script_end = script_start
+        + html[script_start..]
+            .find("</script>")
+            .expect("bundle script close tag");
+    let script_body = &html[script_start..script_end];
+    assert!(
+        !script_body.contains("</script>"),
+        "bundle script block must not contain unescaped </script>: {script_body}"
+    );
+
+    let json_start = script_start + "const bundle = ".len();
+    let rest = &html[json_start..script_end];
+    let json_end = rest
+        .find(";\n")
+        .or_else(|| rest.find(';'))
+        .expect("bundle assignment terminator");
+    let bundle: serde_json::Value =
+        serde_json::from_str(&rest[..json_end]).expect("bundle must be valid JSON");
+    let dataset = bundle.get("dataset").unwrap_or(&bundle);
+    let observations = dataset["observations"]
+        .as_array()
+        .expect("observations array in bundle");
+    assert!(
+        observations
+            .iter()
+            .any(|o| o["content"].as_str() == Some(payload)),
+        "payload must round-trip in embedded JSON: {bundle:#}"
+    );
+}
