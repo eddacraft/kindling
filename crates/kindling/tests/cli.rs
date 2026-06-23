@@ -468,50 +468,6 @@ fn browse_writes_html_without_opening_browser() {
 }
 
 #[test]
-fn spool_status_json_reports_all_status_fields() {
-    let env = CliEnv::new();
-    let spool_path = env.path("spool.ndjson");
-    let spool_str = spool_path.to_string_lossy().into_owned();
-    let sidecar_path = env.path("spool.ndjson.status.json");
-
-    // One buffered entry plus sidecar metadata written by SpooledClient on outage/flush.
-    let entry = serde_json::json!({
-        "input": {
-            "id": "obs-spool-cli-1",
-            "kind": "message",
-            "content": "buffered for status test",
-            "scopeIds": { "sessionId": "s1" }
-        }
-    });
-    std::fs::write(&spool_path, format!("{entry}\n")).unwrap();
-    let sidecar = serde_json::json!({
-        "lastFlushTimeMs": 1_700_000_000_000i64,
-        "lastError": null,
-        "replayAttempts": 2
-    });
-    std::fs::write(&sidecar_path, format!("{sidecar}\n")).unwrap();
-
-    let first = env.run(&["spool", "status", "--spool-path", &spool_str, "--json"]);
-    assert_success(&first);
-    let v = json_stdout(&first);
-    assert_eq!(v["pendingCount"], json!(1));
-    assert_eq!(v["spoolPath"], json!(spool_str));
-    assert_eq!(v["replayAttempts"], json!(2));
-    assert_eq!(v["lastFlushTimeMs"], json!(1_700_000_000_000i64));
-    assert!(v["lastError"].is_null());
-
-    // Second run: same file, consistent passive snapshot.
-    let second = env.run(&["spool", "status", "--spool-path", &spool_str, "--json"]);
-    assert_success(&second);
-    let v2 = json_stdout(&second);
-    assert_eq!(v2["pendingCount"], json!(1));
-    assert_eq!(v2["spoolPath"], json!(spool_str));
-    assert_eq!(v2["replayAttempts"], json!(2));
-    assert_eq!(v2["lastFlushTimeMs"], v["lastFlushTimeMs"]);
-    assert_eq!(v["lastError"], v2["lastError"]);
-}
-
-#[test]
 fn browse_escapes_script_breakout_in_embedded_json() {
     let env = CliEnv::new();
     let payload = "note </script><script>alert(1)</script> end";

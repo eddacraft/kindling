@@ -203,7 +203,7 @@ Verified against the tree on 2026-06-22:
   passive `spool_status_from_path()` (reads `{spool}.status.json` sidecar) for CLI
   inspection, `kindling spool status --spool-path --json`, and spawn-failure logging
   to `~/.kindling/spawn.log` (configurable via `ClientConfig::spawn_log_path`).
-  Flush/error/replay metadata persists in the sidecar, not inside NDJSON lines.
+  Flush/error/replay metadata is best-effort in the sidecar (never blocks spool/flush).
 
 ### KINTEG-006: Redaction evidence in append responses
 
