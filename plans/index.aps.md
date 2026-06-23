@@ -45,14 +45,14 @@ See `plans/specs/2026-05-03-rust-canonical-thin-client-design.md` for the curren
 
 ## Schedule
 
-| Phase | Modules                           | Target                                                                                                  |
-| ----- | --------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| Now   | 05-rust-port (Phase 1)            | Foundation crates: workspace, types, store, filter                                                      |
-| Next  | 05-rust-port (Phase 2)            | Service + daemon + hook + Rust client; anvil unblocks                                                   |
-| Then  | 05-rust-port (Phase 3)            | CLI + umbrella binary + cross-platform builds + cargo/brew/curl distribution                            |
-| Then  | 05-rust-port (Phase 4)            | Thin TS client SDK on npm; deprecate TS implementation packages and anvil bridge                        |
-| Next  | 06-downstream-integration-surface | Publish 0.2.0 (unblocks anvil), then dedup / query API / handshake / observability / redaction evidence |
-| Done  | 07-intent-capture-events          | Intent capture primitive + export shipped (independent of the Rust port; KINTENT-001..006 merged)       |
+| Phase | Modules                           | Target                                                                                                                        |
+| ----- | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Now   | 05-rust-port (Phase 1)            | Foundation crates: workspace, types, store, filter                                                                            |
+| Next  | 05-rust-port (Phase 2)            | Service + daemon + hook + Rust client; anvil unblocks                                                                         |
+| Then  | 05-rust-port (Phase 3)            | CLI + umbrella binary + cross-platform builds + cargo/brew/curl distribution                                                  |
+| Then  | 05-rust-port (Phase 4)            | Thin TS client SDK on npm; deprecate TS implementation packages and anvil bridge                                              |
+| Next  | 06-downstream-integration-surface | Publish 0.2.0 (unblocks anvil), dedup, then `kindling-runtime` facade; query / handshake / observability / redaction evidence |
+| Done  | 07-intent-capture-events          | Intent capture primitive + export shipped (independent of the Rust port; KINTENT-001..006 merged)                             |
 
 ## Risks
 
@@ -79,6 +79,7 @@ See `plans/specs/2026-05-03-rust-canonical-thin-client-design.md` for the curren
 - **D-003:** ~~Dual-maintain Rust + TypeScript with Rust-canonical types~~ — _superseded by D-005_
 - **D-004:** Supersede modules 02 and 03 with module 05 — _decided 2026-04-15_ — The hybrid phasing no longer models the work correctly. 02 and 03 remain in the repo for historical reference but are marked Superseded in this index.
 - **D-006:** Triage anvil's integration wishlist (2026-06-22) into module 06 rather than scattering it across 05 — _decided 2026-06-22_ — anvil's downstream KDS module sent 10 asks; auditing them against the tree showed several already shipped (client+spool published at 0.1.0, `/v1/health` handshake, export `bundleVersion` + `--dry-run`) and one mis-framed (no `kindling-spool` crate exists — the spool is `kindling-client::spool`). The genuine new work (publish 0.2.0, daemon dedup, structured query API, capability handshake + kind registry, spool/cold-start observability, redaction evidence, fixtures) is grouped as module 06 so the contract anvil consumes evolves as one coherent surface. KINTEG-001 (publish) is user-gated and gates anvil's consumption of the rest.
+- **D-008:** Add `kindling-runtime` as the anvil-first integration facade — _decided 2026-06-24_ — anvil is the primary Rust consumer; requiring a separate `kindling` binary on PATH plus manual `kindling-client` + `spool` + `kindling-server` wiring is the wrong default. A new facade crate composes in-process daemon spawn (pattern already proven in client tests), attach-or-start on the standard socket, and spool-on-by-default at the runtime layer. Does not replace the daemon model or merge the seven crates; CLI/npm adapters stay on the thin client. Tracked as KINTEG-008. See `plans/specs/2026-06-24-kindling-runtime-design.md`.
 - **D-005:** Rust-canonical kindling with thin TS HTTP client over local daemon — _decided 2026-05-03_ — Rust becomes the only implementation. Non-Rust consumers reach kindling via `kindling serve` (long-running per-user daemon) over a Unix domain socket. `@eddacraft/kindling` is repurposed as a thin HTTP client with an npm postinstall that downloads the platform binary. All other TS implementation packages are deprecated and removed after the cutover. Driven by: sole-operator project means no external migration coordination, every realistic TS consumer can hit a localhost daemon, dual-maintain pays a real tax for a use case nobody asked for. See `plans/specs/2026-05-03-rust-canonical-thin-client-design.md`.
 - **D-007:** npm ships the binary via per-platform `optionalDependencies`, not a postinstall download — _decided 2026-06-22_ — PR #104 (PORT-018). The esbuild/swc model (one `@eddacraft/kindling-<os>-<arch>[-musl]` package per host; the package manager auto-installs only the matching one) avoids postinstall network entirely, works under `--ignore-scripts`, and is lockfile-deterministic. The specifiers are injected at publish time rather than committed, so `pnpm install --frozen-lockfile` stays green before the platform packages exist on the registry. Supersedes the "npm postinstall that downloads the platform binary" mechanism noted in D-005; D-005's Rust-canonical direction is unchanged.
 
