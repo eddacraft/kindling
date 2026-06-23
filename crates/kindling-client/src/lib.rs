@@ -14,7 +14,7 @@
 //! # v1 wire contract
 //!
 //! ```text
-//! GET    /v1/health                  → 200 { version, schemaVersion, projects: [...] }
+//! GET    /v1/health                  → 200 { version, schemaVersion, supportedKinds, storagePath, kindRegistry, projects: [...] }
 //! POST   /v1/capsules                → 201 Capsule
 //! GET    /v1/capsules/open?sessionId → 200 Capsule | null
 //! PATCH  /v1/capsules/:id/close      → 200 Capsule
@@ -79,7 +79,8 @@ use serde::Deserialize;
 /// the API sends or returns as `kindling_client::<Type>`. `kindling-types`
 /// stays an internal transitive dependency you never have to name.
 pub use kindling_types::{
-    CandidateResult, Capsule, CapsuleStatus, CapsuleType, Id, Observation, ObservationInput,
+    build_capability, kind_registry, supported_kind_names, CandidateResult, Capability, Capsule,
+    CapsuleStatus, CapsuleType, Id, KindRegistryEntry, Observation, ObservationInput,
     ObservationKind, Pin, PinResult, PinTargetType, ProviderSearchOptions, ProviderSearchResult,
     RetrieveOptions, RetrieveProvenance, RetrieveResult, RetrievedEntity, ScopeIds, Summary,
     Timestamp,
@@ -100,6 +101,12 @@ pub struct Health {
     pub version: String,
     /// Schema version the daemon's store reports.
     pub schema_version: u32,
+    /// Snake-case observation kinds the daemon supports.
+    pub supported_kinds: Vec<String>,
+    /// Daemon kindling home root (global storage path).
+    pub storage_path: String,
+    /// Machine-readable kind registry (kinds + required fields).
+    pub kind_registry: Vec<KindRegistryEntry>,
     /// Project ids the daemon has touched this session.
     pub projects: Vec<String>,
 }
@@ -110,6 +117,9 @@ pub struct Health {
 struct HealthBody {
     version: String,
     schema_version: u32,
+    supported_kinds: Vec<String>,
+    storage_path: String,
+    kind_registry: Vec<KindRegistryEntry>,
     #[serde(default)]
     projects: Vec<String>,
 }
@@ -185,6 +195,9 @@ impl Client {
         Ok(Health {
             version: body.version,
             schema_version: body.schema_version,
+            supported_kinds: body.supported_kinds,
+            storage_path: body.storage_path,
+            kind_registry: body.kind_registry,
             projects: body.projects,
         })
     }

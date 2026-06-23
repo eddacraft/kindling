@@ -22,6 +22,8 @@ fn export_all_types_to_bindings_dir() {
     // creating the directory if needed.
     let dir = bindings_dir();
     let exports: Vec<Result<(), ts_rs::ExportError>> = vec![
+        Capability::export_all_to(&dir),
+        KindRegistryEntry::export_all_to(&dir),
         ScopeIds::export_all_to(&dir),
         ValidationError::export_all_to(&dir),
         Observation::export_all_to(&dir),
@@ -49,6 +51,8 @@ fn export_all_types_to_bindings_dir() {
 
     // Spot-check that the directory now contains the expected files.
     for f in [
+        "Capability.ts",
+        "KindRegistryEntry.ts",
         "Observation.ts",
         "Capsule.ts",
         "Summary.ts",

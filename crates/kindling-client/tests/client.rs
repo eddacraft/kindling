@@ -203,7 +203,7 @@ async fn forget_redacts_observation() {
     }
 }
 
-/// 2a. health() returns the daemon's schema version.
+/// 2a. health() returns the daemon's schema version and capability block.
 #[tokio::test]
 async fn health_reports_schema_version() {
     let daemon = TestDaemon::start().await;
@@ -212,6 +212,14 @@ async fn health_reports_schema_version() {
     let health = client.health().await.expect("health");
     assert_eq!(health.schema_version, schema_version_u32());
     assert!(!health.version.is_empty());
+    assert_eq!(health.supported_kinds.len(), 9);
+    assert_eq!(health.supported_kinds[0], "tool_call");
+    assert_eq!(health.supported_kinds[8], "node_error");
+    assert!(!health.storage_path.is_empty());
+    assert_eq!(health.kind_registry.len(), 9);
+    for entry in &health.kind_registry {
+        assert!(!entry.required_fields.is_empty());
+    }
 }
 
 /// 2b. A wrong expected schema version yields SchemaMismatch.

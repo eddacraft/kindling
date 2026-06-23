@@ -247,6 +247,7 @@ async fn health_reports_version_and_schema() {
         body["schemaVersion"],
         kindling_store::schema_version().version
     );
+    assert_capability_block(&body);
     assert_eq!(body["projects"].as_array().unwrap().len(), 0);
 
     // Touch a project.
@@ -763,4 +764,33 @@ async fn get_open_capsule_round_trip() {
         .send("GET", "/v1/capsules/open?sessionId=sess-1", None, None)
         .await;
     assert_eq!(resp.status, StatusCode::BAD_REQUEST, "no project → 400");
+}
+
+fn assert_capability_block(body: &serde_json::Value) {
+    let kinds = body["supportedKinds"].as_array().expect("supportedKinds");
+    assert_eq!(kinds.len(), 9);
+    let expected: Vec<serde_json::Value> = [
+        "tool_call",
+        "command",
+        "file_diff",
+        "error",
+        "message",
+        "node_start",
+        "node_end",
+        "node_output",
+        "node_error",
+    ]
+    .into_iter()
+    .map(serde_json::Value::from)
+    .collect();
+    assert_eq!(kinds, &expected);
+    let storage = body["storagePath"].as_str().expect("storagePath");
+    assert!(!storage.is_empty(), "storagePath must be non-empty");
+    let registry = body["kindRegistry"].as_array().expect("kindRegistry");
+    assert_eq!(registry.len(), 9);
+    for entry in registry {
+        assert!(entry["kind"].is_string());
+        let fields = entry["requiredFields"].as_array().expect("requiredFields");
+        assert!(!fields.is_empty());
+    }
 }
