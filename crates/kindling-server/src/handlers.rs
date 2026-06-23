@@ -15,14 +15,13 @@ use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::Json;
 use kindling_service::AppendObservationOptions;
-use kindling_types::{
-    build_capability, Capsule, Observation, Pin, RetrieveOptions, RetrieveResult,
-};
+use kindling_types::{build_capability, Capsule, Pin, RetrieveOptions, RetrieveResult};
 use serde_json::{json, Value};
 
 use crate::dto::{
-    AppendObservationRequest, CloseCapsuleRequest, CreatePinRequest, OpenCapsuleQuery,
-    OpenCapsuleRequest, PreCompactContextRequest, SessionStartContextRequest, DEFAULT_MAX_RESULTS,
+    AppendObservationRequest, AppendObservationResponse, CloseCapsuleRequest, CreatePinRequest,
+    OpenCapsuleQuery, OpenCapsuleRequest, PreCompactContextRequest, SessionStartContextRequest,
+    DEFAULT_MAX_RESULTS,
 };
 use crate::error::ApiError;
 use crate::inject::{format_pre_compact, format_session_start, local_offset_seconds};
@@ -138,22 +137,27 @@ pub async fn get_open_capsule(
 }
 
 /// `POST /v1/observations` — append an observation.
+///
+/// The response flattens the stored observation and adds a top-level
+/// `deduplicated` flag (see [`AppendObservationResponse`]). A duplicate id is
+/// not an error: the daemon ignores the incoming write and returns the
+/// pre-existing stored row with `deduplicated: true`, still as `201 Created`.
 pub async fn append_observation(
     State(state): State<AppState>,
     headers: HeaderMap,
     Json(req): Json<AppendObservationRequest>,
-) -> Result<(StatusCode, Json<Observation>), ApiError> {
+) -> Result<(StatusCode, Json<AppendObservationResponse>), ApiError> {
     let root = project_root(&headers)?;
     let options = AppendObservationOptions {
         capsule_id: req.capsule_id,
         validate: req.validate.unwrap_or(true),
     };
     let svc = state.service_for(&root)?;
-    let observation = {
+    let outcome = {
         let guard = svc.lock().expect("service mutex poisoned");
         guard.append_observation(req.input, options)?
     };
-    Ok((StatusCode::CREATED, Json(observation)))
+    Ok((StatusCode::CREATED, Json(outcome.into())))
 }
 
 /// `POST /v1/retrieve` — ranked retrieval.
