@@ -68,10 +68,17 @@ impl SqliteKindlingStore {
 
     // ===== WRITE PATH =====
 
-    /// Insert an observation. FTS sync happens automatically via triggers.
-    pub fn insert_observation(&self, observation: &Observation) -> StoreResult<()> {
-        self.conn.execute(
-            "INSERT INTO observations (
+    /// Insert an observation if its id is not already present. FTS sync happens
+    /// automatically via triggers.
+    ///
+    /// Uses `INSERT OR IGNORE` (id-conflict → no-op), making replay idempotent:
+    /// an observation whose id already exists is left untouched, so a spool
+    /// replay after a crash cannot store a duplicate or overwrite the stored
+    /// row. Returns `true` when a NEW row was written and `false` when the id
+    /// already existed and the insert was ignored.
+    pub fn insert_observation(&self, observation: &Observation) -> StoreResult<bool> {
+        let changes = self.conn.execute(
+            "INSERT OR IGNORE INTO observations (
                id, kind, content, provenance, ts, scope_ids, redacted,
                session_id, repo_id, agent_id, user_id
              ) VALUES (
@@ -92,7 +99,7 @@ impl SqliteKindlingStore {
                 ":user_id": observation.scope_ids.user_id,
             },
         )?;
-        Ok(())
+        Ok(changes > 0)
     }
 
     /// Create a new capsule.
@@ -166,6 +173,11 @@ impl SqliteKindlingStore {
 
     /// Attach an observation to a capsule, appending at the next `seq` to
     /// keep deterministic ordering.
+    ///
+    /// Idempotent on `(capsule_id, observation_id)`: re-attaching the same
+    /// observation to the same capsule is a no-op (`INSERT OR IGNORE` against
+    /// the composite primary key), so replaying a deduplicated observation
+    /// cannot error or create a duplicate link / a gap in `seq`.
     pub fn attach_observation_to_capsule(
         &self,
         capsule_id: &str,
@@ -177,7 +189,7 @@ impl SqliteKindlingStore {
             |row| row.get(0),
         )?;
         self.conn.execute(
-            "INSERT INTO capsule_observations (capsule_id, observation_id, seq)
+            "INSERT OR IGNORE INTO capsule_observations (capsule_id, observation_id, seq)
              VALUES (?1, ?2, ?3)",
             (capsule_id, observation_id, next_seq),
         )?;
