@@ -12,7 +12,7 @@ aps:
   version: '0.3.0'
   config_schema: 1
   installed: '2026-06-22'
-  updated: '2026-06-22'
+  updated: '2026-06-24'
 
 project:
   type: simple
