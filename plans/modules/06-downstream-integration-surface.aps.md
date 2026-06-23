@@ -4,7 +4,8 @@
 | ------ | ------ | ----------- |
 | KINTEG | @aneki | In Progress |
 
-**Last reviewed:** 2026-06-24 (KINTEG-001/004 Done; PORT-011 In Progress in anvil)
+**Last reviewed:** 2026-06-24 (KINTEG-001/004 Done; KINTEG-002 PR #121 + KINTEG-008
+PR #122 In Progress awaiting merge; PORT-011 In Progress in anvil)
 
 ## Purpose
 
@@ -141,12 +142,16 @@ Verified against the tree on 2026-06-22:
 - **Validation:** Store-level test: appending the same id twice yields one row;
   client-level test: a replay of an already-delivered spool entry is a no-op.
 - **Dependencies:** —
-- **Status:** Proposed
+- **Status:** In Progress — PR #121 (`feat/kinteg-002-daemon-dedup`), gates green,
+  council review clean (no CRITICAL/MAJOR), awaiting review/merge.
 - **Notes:** Stable ids already exist (assigned in `SpooledClient` before spool).
-  Decide the contract: silent idempotent success vs. a `deduplicated: true`
-  marker on the response (the latter pairs well with KINTEG-006 observability).
-  Mind the redaction interaction — a dedup'd write must not re-run masking in a
-  way that changes the stored row.
+  Contract decided: a **`deduplicated: bool`** marker (not silent) — `AppendOutcome`
+  in `kindling-service`, `AppendResult` in `kindling-client`, top-level
+  `deduplicated` on the `POST /v1/observations` response. Store `insert_observation`
+  → `INSERT OR IGNORE` returning written?; on a duplicate the service returns the
+  **existing stored row** (no re-mask, no mutation); `attach_observation_to_capsule`
+  also made idempotent. Redaction interaction covered (forget-then-replay returns
+  the redacted row). Pairs with KINTEG-006 observability.
 
 ### KINTEG-003: Structured read/query API over the daemon
 
@@ -276,7 +281,12 @@ Verified against the tree on 2026-06-22:
   KINTEG-002 recommended before promoting spool as runtime default (dedup closes
   the at-least-once gap). PORT-011 (anvil integration proof) should land with
   raw client first to document baseline pain, then migrate to runtime.
-- **Status:** Proposed
+- **Status:** In Progress — PR #122 (`feat/kinteg-008-runtime-facade`), stacked on
+  #121 (retarget to `main` once #121 merges). Gates green, council review clean after
+  remediation (TOCTOU doc, spool offline→drain test, `#[non_exhaustive]`), awaiting
+  review/merge. New crate `kindling-runtime` (v0.2.0) with `Runtime::start` /
+  `spooled_client()` / attach-or-start; `publish.sh` updated (runtime after client);
+  `publish_readiness` now asserts 8 crates.
 - **Notes:**
   - **Not** a merge of the seven crates — composes `kindling-client` +
     `kindling-server`; CLI/npm adapters unchanged.
