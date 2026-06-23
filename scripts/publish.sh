@@ -13,6 +13,9 @@
 #   kindling-client      -> types   (spool is an opt-in feature). NOTE: a
 #                          versioned dev-dependency on kindling-server forces
 #                          server to publish FIRST, even though it's not a prod dep.
+#   kindling-runtime     -> types, client, server   (the anvil-first integration
+#                          facade; bundles embedded daemon + durable spooled emit.
+#                          Publishes AFTER client + server since it depends on both.)
 #   eddacraft-kindling   -> types, store, service, client, server   (the binary,
 #                          installs as `kindling`; cli + hook folded in. Published
 #                          under `eddacraft-` because the bare `kindling` crate
@@ -49,6 +52,7 @@ kindling-provider
 kindling-service
 kindling-server
 kindling-client
+kindling-runtime
 eddacraft-kindling
 "
 
