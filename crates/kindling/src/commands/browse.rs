@@ -71,7 +71,14 @@ fn open_in_browser(path: &Path) -> Result<(), CliError> {
     }
 }
 
+/// Break `</script>` sequences so the HTML parser cannot close the bundle
+/// `<script>` block early when observation content contains that literal.
+fn escape_json_for_script_tag(json: &str) -> String {
+    json.replace("</", "<\\/")
+}
+
 fn render_html(data_json: &str) -> String {
+    let safe_json = escape_json_for_script_tag(data_json);
     // Embed dataset JSON once; the page is fully offline.
     format!(
         r#"<!DOCTYPE html>
@@ -273,6 +280,19 @@ fn render_html(data_json: &str) -> String {
   </script>
 </body>
 </html>"#,
-        data_json = data_json
+        data_json = safe_json
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::escape_json_for_script_tag;
+
+    #[test]
+    fn escape_json_for_script_tag_breaks_script_close_token() {
+        let raw = r#"{"content":"</script><script>alert(1)</script>"}"#;
+        let escaped = escape_json_for_script_tag(raw);
+        assert!(!escaped.contains("</script>"));
+        assert!(escaped.contains(r#"<\/script>"#));
+    }
 }
