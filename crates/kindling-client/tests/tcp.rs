@@ -58,6 +58,7 @@ fn tcp_transport_round_trip() {
         // once it binds (rather than failing on the real-binary spawn path).
         spawn: Spawner::custom(|| Ok(())),
         transport: Transport::Tcp,
+        spawn_log_path: None,
     });
 
     runtime.block_on(async {

@@ -22,7 +22,7 @@ mod output;
 pub use cli::{
     BrowseArgs, CapsuleCloseArgs, CapsuleCommand, CapsuleOpenArgs, Cli, Command, CommonOpts,
     DemoArgs, ExportArgs, ForgetArgs, ImportArgs, InitArgs, ListArgs, LogArgs, PinArgs, SearchArgs,
-    ServeArgs, StatusArgs, UnpinArgs,
+    ServeArgs, SpoolCommand, SpoolStatusArgs, StatusArgs, UnpinArgs,
 };
 
 use std::path::PathBuf;
@@ -41,6 +41,9 @@ pub enum CliError {
 
     #[error(transparent)]
     Client(#[from] kindling_client::ClientError),
+
+    #[error(transparent)]
+    Spool(#[from] kindling_client::SpoolError),
 
     #[error(transparent)]
     Server(#[from] kindling_server::ServerError),
@@ -148,6 +151,7 @@ fn json_flag(command: &Command) -> bool {
         Command::Serve(_) => false,
         Command::Demo(a) => a.common.json,
         Command::Browse(a) => a.common.json,
+        Command::Spool(SpoolCommand::Status(a)) => a.json,
     }
 }
 
@@ -173,6 +177,7 @@ fn dispatch(cli: Cli) -> CliResult {
         Command::Serve(args) => commands::serve::run(args),
         Command::Demo(args) => commands::demo::run(args),
         Command::Browse(args) => commands::browse::run(args),
+        Command::Spool(SpoolCommand::Status(args)) => commands::spool::run_status(args),
     }
 }
 

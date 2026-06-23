@@ -52,6 +52,7 @@ impl TestDaemon {
             poll_interval: Duration::from_millis(10),
             spawn: Spawner::custom(|| panic!("spawner must not be called when daemon is running")),
             transport: Transport::Uds,
+            spawn_log_path: None,
         };
         kindling_client::Client::with_config(cfg)
     }
@@ -68,6 +69,7 @@ impl TestDaemon {
             poll_interval: Duration::from_millis(10),
             spawn: Spawner::custom(|| panic!("spawner must not be called when daemon is running")),
             transport: Transport::Uds,
+            spawn_log_path: None,
         };
         kindling_client::Client::with_config(cfg)
     }

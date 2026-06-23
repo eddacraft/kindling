@@ -24,7 +24,7 @@ use tokio::net::TcpStream;
 #[cfg(unix)]
 use tokio::net::UnixStream;
 
-use crate::config::{ClientConfig, Spawner, Transport};
+use crate::config::{append_spawn_log, ClientConfig, Spawner, Transport};
 use crate::error::ClientError;
 
 /// A decoded HTTP response: status plus raw body bytes.
@@ -57,6 +57,7 @@ pub(crate) async fn request(
                 &cfg.spawn,
                 cfg.connect_timeout,
                 cfg.poll_interval,
+                cfg.effective_spawn_log_path().as_deref(),
             )
             .await?;
             send_http(stream, req).await
@@ -67,6 +68,7 @@ pub(crate) async fn request(
                 &cfg.spawn,
                 cfg.connect_timeout,
                 cfg.poll_interval,
+                cfg.effective_spawn_log_path().as_deref(),
             )
             .await?;
             send_http(stream, req).await
@@ -138,6 +140,7 @@ async fn ensure_connected(
     spawner: &Spawner,
     connect_timeout: Duration,
     poll_interval: Duration,
+    spawn_log_path: Option<&Path>,
 ) -> Result<UnixStream, ClientError> {
     // Fast path: daemon already up.
     match UnixStream::connect(socket_path).await {
@@ -153,9 +156,9 @@ async fn ensure_connected(
 
     // Spawn exactly once, then poll within the budget.
     if let Err(e) = spawner.spawn() {
-        return Err(ClientError::Unavailable(format!(
-            "failed to spawn kindling daemon: {e}"
-        )));
+        let msg = format!("failed to spawn kindling daemon: {e}");
+        log_spawn_failure(spawn_log_path, &msg);
+        return Err(ClientError::Unavailable(msg));
     }
 
     let deadline = Instant::now() + connect_timeout;
@@ -164,18 +167,19 @@ async fn ensure_connected(
             Ok(stream) => return Ok(stream),
             Err(e) if is_absent(&e) => e.to_string(),
             Err(e) => {
-                return Err(ClientError::Unavailable(format!(
-                    "connecting to {} after spawn: {e}",
-                    socket_path.display()
-                )));
+                let msg = format!("connecting to {} after spawn: {e}", socket_path.display());
+                log_spawn_failure(spawn_log_path, &msg);
+                return Err(ClientError::Unavailable(msg));
             }
         };
         if Instant::now() >= deadline {
-            return Err(ClientError::Unavailable(format!(
+            let msg = format!(
                 "daemon socket {} did not become reachable within {:?} after spawn ({last_err})",
                 socket_path.display(),
                 connect_timeout
-            )));
+            );
+            log_spawn_failure(spawn_log_path, &msg);
+            return Err(ClientError::Unavailable(msg));
         }
         tokio::time::sleep(poll_interval).await;
     }
@@ -199,6 +203,7 @@ async fn ensure_connected_tcp(
     spawner: &Spawner,
     connect_timeout: Duration,
     poll_interval: Duration,
+    spawn_log_path: Option<&Path>,
 ) -> Result<TcpStream, ClientError> {
     // Fast path: port file present and daemon already up.
     if let Some(port) = read_port(port_path) {
@@ -215,9 +220,9 @@ async fn ensure_connected_tcp(
 
     // Spawn exactly once, then poll within the budget.
     if let Err(e) = spawner.spawn() {
-        return Err(ClientError::Unavailable(format!(
-            "failed to spawn kindling daemon: {e}"
-        )));
+        let msg = format!("failed to spawn kindling daemon: {e}");
+        log_spawn_failure(spawn_log_path, &msg);
+        return Err(ClientError::Unavailable(msg));
     }
 
     let deadline = Instant::now() + connect_timeout;
@@ -227,21 +232,29 @@ async fn ensure_connected_tcp(
                 Ok(stream) => return Ok(stream),
                 Err(e) if is_absent(&e) => format!("connecting to 127.0.0.1:{port}: {e}"),
                 Err(e) => {
-                    return Err(ClientError::Unavailable(format!(
-                        "connecting to 127.0.0.1:{port} after spawn: {e}"
-                    )));
+                    let msg = format!("connecting to 127.0.0.1:{port} after spawn: {e}");
+                    log_spawn_failure(spawn_log_path, &msg);
+                    return Err(ClientError::Unavailable(msg));
                 }
             },
             None => format!("port file {} not yet present", port_path.display()),
         };
         if Instant::now() >= deadline {
-            return Err(ClientError::Unavailable(format!(
+            let msg = format!(
                 "daemon TCP port (via {}) did not become reachable within {:?} after spawn ({last_err})",
                 port_path.display(),
                 connect_timeout
-            )));
+            );
+            log_spawn_failure(spawn_log_path, &msg);
+            return Err(ClientError::Unavailable(msg));
         }
         tokio::time::sleep(poll_interval).await;
+    }
+}
+
+fn log_spawn_failure(spawn_log_path: Option<&Path>, detail: &str) {
+    if let Some(path) = spawn_log_path {
+        append_spawn_log(path, detail);
     }
 }
 

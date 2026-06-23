@@ -58,6 +58,7 @@ pub fn live_client(socket_path: PathBuf, project_root: &str) -> Client {
         poll_interval: Duration::from_millis(10),
         spawn: Spawner::custom(|| panic!("spawner must not be called when daemon is running")),
         transport: Transport::default(),
+        spawn_log_path: None,
     };
     Client::with_config(cfg)
 }
@@ -80,6 +81,7 @@ pub fn down_client(socket_path: PathBuf, project_root: &str) -> Client {
             ))
         }),
         transport: Transport::default(),
+        spawn_log_path: None,
     };
     Client::with_config(cfg)
 }

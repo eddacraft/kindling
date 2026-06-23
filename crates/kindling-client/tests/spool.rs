@@ -334,6 +334,39 @@ async fn pending_count_reflects_spool_size() {
     }
 }
 
+/// Spool status surfaces pending count, path, flush time, errors, and replay attempts.
+#[tokio::test]
+async fn spool_status_after_outage_and_flush() {
+    let dir = tempfile::tempdir().unwrap();
+    let socket = dir.path().join("nope.sock");
+    let (_spool_dir, spool_path) = spool_tempdir();
+
+    let down = SpooledClient::new(down_client(socket, PROJECT), spool_path.clone());
+    down.append_observation(message_input("status probe"), None, None)
+        .await
+        .unwrap();
+
+    let while_down = down.spool_status().await.expect("status while down");
+    assert_eq!(while_down.pending_count, 1);
+    assert_eq!(while_down.spool_path, spool_path);
+    assert!(while_down.last_error.is_some());
+    assert_eq!(while_down.replay_attempts, 0);
+    assert!(while_down.last_flush_time_ms.is_none());
+
+    drop(down);
+
+    let daemon = TestDaemon::start().await;
+    let spooled = SpooledClient::new(daemon.client(PROJECT), spool_path.clone());
+    spooled.flush().await.expect("flush after outage");
+
+    let after_flush = spooled.spool_status().await.expect("status after flush");
+    assert_eq!(after_flush.pending_count, 0);
+    assert_eq!(after_flush.spool_path, spool_path);
+    assert!(after_flush.last_flush_time_ms.is_some());
+    assert!(after_flush.last_error.is_none());
+    assert!(after_flush.replay_attempts >= 1);
+}
+
 /// Flush stops at the first connectivity failure, keeping the remainder.
 #[tokio::test]
 async fn flush_keeps_remainder_when_down() {
