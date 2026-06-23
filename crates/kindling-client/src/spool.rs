@@ -184,7 +184,7 @@ pub struct SpooledClient {
 impl SpooledClient {
     /// Build a durable-emit client over `client`, buffering to `spool_path`.
     pub fn new(client: Client, spool_path: PathBuf) -> Self {
-        let runtime = read_runtime_sidecar(&spool_path).unwrap_or_default();
+        let runtime = load_runtime_sidecar(&spool_path);
         Self {
             client,
             spool_path,
@@ -247,7 +247,7 @@ impl SpooledClient {
         {
             Ok(observation) => Ok(AppendOutcome::Delivered(Box::new(observation))),
             Err(err) if is_connectivity_error(&err) => {
-                self.record_connectivity_error(&err).await?;
+                self.record_connectivity_error(&err).await;
                 let entry = SpoolEntry {
                     input,
                     capsule_id,
@@ -286,7 +286,7 @@ impl SpooledClient {
         let mut propagate: Option<ClientError> = None;
 
         for (idx, entry) in entries.iter().enumerate() {
-            self.bump_replay_attempts().await?;
+            self.bump_replay_attempts().await;
             match self
                 .client
                 .append_observation(
@@ -298,7 +298,7 @@ impl SpooledClient {
             {
                 Ok(_) => replayed += 1,
                 Err(err) if is_connectivity_error(&err) => {
-                    self.record_connectivity_error(&err).await?;
+                    self.record_connectivity_error(&err).await;
                     break;
                 }
                 Err(err) => {
@@ -320,7 +320,7 @@ impl SpooledClient {
         }
 
         if replayed > 0 {
-            self.record_successful_flush().await?;
+            self.record_successful_flush().await;
         }
 
         Ok(FlushReport {
@@ -329,23 +329,23 @@ impl SpooledClient {
         })
     }
 
-    async fn bump_replay_attempts(&self) -> Result<(), SpoolError> {
+    async fn bump_replay_attempts(&self) {
         let mut rt = self.runtime.lock().await;
         rt.replay_attempts = rt.replay_attempts.saturating_add(1);
-        write_runtime_sidecar(&self.spool_path, &rt)
+        persist_runtime_sidecar(&self.spool_path, &rt);
     }
 
-    async fn record_connectivity_error(&self, err: &ClientError) -> Result<(), SpoolError> {
+    async fn record_connectivity_error(&self, err: &ClientError) {
         let mut rt = self.runtime.lock().await;
         rt.last_error = Some(err.to_string());
-        write_runtime_sidecar(&self.spool_path, &rt)
+        persist_runtime_sidecar(&self.spool_path, &rt);
     }
 
-    async fn record_successful_flush(&self) -> Result<(), SpoolError> {
+    async fn record_successful_flush(&self) {
         let mut rt = self.runtime.lock().await;
         rt.last_flush_time_ms = Some(now_ms());
         rt.last_error = None;
-        write_runtime_sidecar(&self.spool_path, &rt)
+        persist_runtime_sidecar(&self.spool_path, &rt);
     }
 
     /// Count of pending (un-replayed) spool entries.
@@ -365,14 +365,16 @@ impl SpooledClient {
         })
     }
 
-    /// Passive status from an on-disk spool file and its `.status.json` sidecar.
+    /// Passive status from an on-disk spool file and its optional `.status.json`
+    /// sidecar (best-effort: a corrupt sidecar is ignored).
     pub fn spool_status_from_path(
         spool_path: impl Into<PathBuf>,
     ) -> Result<SpoolStatus, SpoolError> {
         let spool_path = spool_path.into();
-        let runtime = read_runtime_sidecar(&spool_path)?;
+        let pending_count = read_spool(&spool_path)?.len();
+        let runtime = load_runtime_sidecar(&spool_path);
         Ok(SpoolStatus {
-            pending_count: read_spool(&spool_path)?.len(),
+            pending_count,
             spool_path,
             last_flush_time_ms: runtime.last_flush_time_ms,
             last_error: runtime.last_error,
@@ -413,23 +415,27 @@ fn status_sidecar_path(spool_path: &Path) -> PathBuf {
     }
 }
 
-fn read_runtime_sidecar(spool_path: &Path) -> Result<SpoolRuntime, SpoolError> {
+/// Load sidecar metadata. Best-effort: any I/O or parse failure yields defaults.
+fn load_runtime_sidecar(spool_path: &Path) -> SpoolRuntime {
     let path = status_sidecar_path(spool_path);
     let contents = match std::fs::read_to_string(&path) {
         Ok(c) => c,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(SpoolRuntime::default()),
-        Err(e) => return Err(SpoolError::Io(e)),
+        Err(_) => return SpoolRuntime::default(),
     };
-    Ok(serde_json::from_str(&contents)?)
+    serde_json::from_str(&contents).unwrap_or_default()
 }
 
-fn write_runtime_sidecar(spool_path: &Path, runtime: &SpoolRuntime) -> Result<(), SpoolError> {
-    let path = status_sidecar_path(spool_path);
-    let line = serde_json::to_string(runtime)?;
-    let tmp = temp_sibling(&path);
-    std::fs::write(&tmp, format!("{line}\n"))?;
-    std::fs::rename(&tmp, &path)?;
-    Ok(())
+/// Persist sidecar metadata. Best-effort: errors are ignored so observability
+/// never masks spool delivery or flush progress.
+fn persist_runtime_sidecar(spool_path: &Path, runtime: &SpoolRuntime) {
+    let _ = (|| -> Result<(), SpoolError> {
+        let path = status_sidecar_path(spool_path);
+        let line = serde_json::to_string(runtime)?;
+        let tmp = temp_sibling(&path);
+        std::fs::write(&tmp, format!("{line}\n"))?;
+        std::fs::rename(&tmp, &path)?;
+        Ok(())
+    })();
 }
 
 fn now_ms() -> i64 {

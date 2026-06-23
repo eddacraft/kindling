@@ -377,6 +377,49 @@ async fn spool_status_after_outage_and_flush() {
     assert!(passive.replay_attempts >= 1);
 }
 
+/// Spooling succeeds even when the status sidecar cannot be written.
+#[tokio::test]
+async fn spool_append_succeeds_when_sidecar_unwritable() {
+    let dir = tempfile::tempdir().unwrap();
+    let socket = dir.path().join("nope.sock");
+    let spool_path = dir.path().join("spool.ndjson");
+    // Block sidecar writes by occupying the target path with a directory.
+    std::fs::create_dir(dir.path().join("spool.ndjson.status.json")).unwrap();
+
+    let spooled = SpooledClient::new(down_client(socket, PROJECT), spool_path.clone());
+    let outcome = spooled
+        .append_observation(message_input("sidecar blocked"), None, None)
+        .await
+        .expect("spool must succeed even when sidecar write fails");
+    assert!(matches!(outcome, AppendOutcome::Spooled));
+    assert_eq!(spooled.pending_count().unwrap(), 1);
+}
+
+/// Passive status always reports pending count; corrupt sidecar is ignored.
+#[test]
+fn spool_status_from_path_tolerates_corrupt_sidecar() {
+    let dir = tempfile::tempdir().unwrap();
+    let spool_path = dir.path().join("spool.ndjson");
+    let entry = serde_json::json!({
+        "input": message_input("corrupt sidecar probe"),
+    });
+    std::fs::write(
+        &spool_path,
+        format!("{}\n", serde_json::to_string(&entry).unwrap()),
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("spool.ndjson.status.json"),
+        "not valid json {{{",
+    )
+    .unwrap();
+
+    let status = SpooledClient::spool_status_from_path(&spool_path).expect("status");
+    assert_eq!(status.pending_count, 1);
+    assert_eq!(status.replay_attempts, 0);
+    assert!(status.last_flush_time_ms.is_none());
+}
+
 /// Flush stops at the first connectivity failure, keeping the remainder.
 #[tokio::test]
 async fn flush_keeps_remainder_when_down() {
