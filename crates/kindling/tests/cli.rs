@@ -468,6 +468,39 @@ fn browse_writes_html_without_opening_browser() {
 }
 
 #[test]
+fn spool_status_json_reports_pending_count_and_path() {
+    let env = CliEnv::new();
+    let spool_path = env.path("spool.ndjson");
+    let spool_str = spool_path.to_string_lossy().into_owned();
+
+    // One valid NDJSON spool entry (passive inspection; no daemon needed).
+    let entry = serde_json::json!({
+        "input": {
+            "id": "obs-spool-cli-1",
+            "kind": "message",
+            "content": "buffered for status test",
+            "scopeIds": { "sessionId": "s1" }
+        }
+    });
+    std::fs::write(&spool_path, format!("{entry}\n")).unwrap();
+
+    let first = env.run(&["spool", "status", "--spool-path", &spool_str, "--json"]);
+    assert_success(&first);
+    let v = json_stdout(&first);
+    assert_eq!(v["pendingCount"], json!(1));
+    assert_eq!(v["spoolPath"], json!(spool_str));
+    assert_eq!(v["replayAttempts"], json!(0));
+
+    // Second run: same file, consistent passive snapshot.
+    let second = env.run(&["spool", "status", "--spool-path", &spool_str, "--json"]);
+    assert_success(&second);
+    let v2 = json_stdout(&second);
+    assert_eq!(v2["pendingCount"], json!(1));
+    assert_eq!(v2["spoolPath"], json!(spool_str));
+    assert_eq!(v["pendingCount"], v2["pendingCount"]);
+}
+
+#[test]
 fn browse_escapes_script_breakout_in_embedded_json() {
     let env = CliEnv::new();
     let payload = "note </script><script>alert(1)</script> end";

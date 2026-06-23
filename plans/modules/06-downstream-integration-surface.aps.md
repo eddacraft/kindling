@@ -198,11 +198,12 @@ Verified against the tree on 2026-06-22:
   flush; spawn-failure test asserting a log line is written on a simulated
   spawn failure.
 - **Dependencies:** —
-- **Status:** Proposed
-- **Notes:** `SpooledClient` already tracks enough to derive most fields;
-  last-flush-time / last-error / replay-attempts need to be recorded on the
-  struct. Cold-start logging closes the spec's "log cold-start failures to
-  ~/.kindling/" open follow-up (see index Risks: orphaned/stale daemon).
+- **Status:** Complete (2026-06-24)
+- **Notes:** Shipped `SpoolStatus` + `spool_status()` on `SpooledClient`,
+  passive `spool_status_from_path()` for CLI inspection, `kindling spool status
+  --spool-path --json`, and spawn-failure logging to `~/.kindling/spawn.log`
+  (configurable via `ClientConfig::spawn_log_path`). Live last-flush/error/replay
+  counters are per-client instance only; passive CLI reports pending count + path.
 
 ### KINTEG-006: Redaction evidence in append responses
 

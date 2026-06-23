@@ -82,6 +82,9 @@ const SOCKET_FILE: &str = "kindling.sock";
 /// Default file name of the daemon TCP port file under the kindling home.
 const PORT_FILE: &str = "kindling.port";
 
+/// Diagnostic log for auto-spawn / cold-start failures under the kindling home.
+const SPAWN_LOG_FILE: &str = "spawn.log";
+
 /// Which transport the client uses to reach the daemon.
 ///
 /// Mirrors `kindling_server::Transport` (each crate keeps its own copy so the
@@ -196,6 +199,10 @@ pub struct ClientConfig {
     /// Transport to reach the daemon. Defaults to [`Transport::default`] (UDS
     /// on Unix, TCP on Windows).
     pub transport: Transport,
+    /// Override for the spawn-failure diagnostic log path. When `None`,
+    /// [`effective_spawn_log_path`](Self::effective_spawn_log_path) uses
+    /// `~/.kindling/spawn.log`.
+    pub spawn_log_path: Option<PathBuf>,
 }
 
 impl ClientConfig {
@@ -228,7 +235,13 @@ impl ClientConfig {
             poll_interval: Duration::from_millis(10),
             spawn: Spawner::default(),
             transport: Transport::default(),
+            spawn_log_path: None,
         })
+    }
+
+    /// Path for spawn-failure diagnostics (`~/.kindling/spawn.log` by default).
+    pub fn effective_spawn_log_path(&self) -> Option<PathBuf> {
+        self.spawn_log_path.clone().or_else(default_spawn_log_path)
     }
 }
 
@@ -238,10 +251,7 @@ impl ClientConfig {
 /// locally so the client need not depend on `kindling-store` (which pulls
 /// rusqlite and would defeat the crate's thinness goal).
 pub fn default_socket_path() -> Option<PathBuf> {
-    let home = std::env::var_os("HOME")
-        .filter(|v| !v.is_empty())
-        .or_else(|| std::env::var_os("USERPROFILE").filter(|v| !v.is_empty()))?;
-    Some(PathBuf::from(home).join(".kindling").join(SOCKET_FILE))
+    kindling_home_dir().map(|home| home.join(SOCKET_FILE))
 }
 
 /// Default daemon TCP port file path: `~/.kindling/kindling.port`.
@@ -250,10 +260,48 @@ pub fn default_socket_path() -> Option<PathBuf> {
 /// at the side-channel file the TCP-transport daemon publishes its bound port
 /// to.
 pub fn default_port_path() -> Option<PathBuf> {
+    kindling_home_dir().map(|home| home.join(PORT_FILE))
+}
+
+/// Default spawn-failure log: `~/.kindling/spawn.log`.
+pub fn default_spawn_log_path() -> Option<PathBuf> {
+    kindling_home_dir().map(|home| home.join(SPAWN_LOG_FILE))
+}
+
+/// Resolve `~/.kindling` from `HOME` / `USERPROFILE` (mirrors socket path logic).
+fn kindling_home_dir() -> Option<PathBuf> {
     let home = std::env::var_os("HOME")
         .filter(|v| !v.is_empty())
         .or_else(|| std::env::var_os("USERPROFILE").filter(|v| !v.is_empty()))?;
-    Some(PathBuf::from(home).join(".kindling").join(PORT_FILE))
+    Some(PathBuf::from(home).join(".kindling"))
+}
+
+/// Append a timestamped spawn-failure line to `path`. Best-effort: errors are
+/// ignored so logging never masks the original connect failure.
+pub(crate) fn append_spawn_log(path: &std::path::Path, detail: &str) {
+    use std::io::Write;
+
+    let _ = (|| -> io::Result<()> {
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        let ts = spawn_log_timestamp_ms();
+        let mut file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)?;
+        writeln!(file, "[{ts}] {detail}")?;
+        file.flush()?;
+        Ok(())
+    })();
+}
+
+fn spawn_log_timestamp_ms() -> i64 {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as i64
 }
 
 #[cfg(test)]

@@ -84,6 +84,10 @@ pub enum Command {
 
     /// Open a local HTML viewer for memory in the database.
     Browse(BrowseArgs),
+
+    /// Inspect the durable-emit spool (pending count and live counters).
+    #[command(subcommand)]
+    Spool(SpoolCommand),
 }
 
 #[derive(Debug, Args)]
@@ -334,6 +338,23 @@ pub struct DemoArgs {
 
     #[command(flatten)]
     pub common: CommonOpts,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum SpoolCommand {
+    /// Show spool status for a spool file.
+    Status(SpoolStatusArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct SpoolStatusArgs {
+    /// Path to the NDJSON spool file to inspect.
+    #[arg(long, value_name = "path")]
+    pub spool_path: String,
+
+    /// Output as JSON.
+    #[arg(long)]
+    pub json: bool,
 }
 
 #[derive(Debug, Args)]

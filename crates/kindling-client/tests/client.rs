@@ -286,6 +286,7 @@ async fn cold_spawn_starts_daemon() {
         poll_interval: Duration::from_millis(5),
         spawn: spawner,
         transport: Transport::Uds,
+        spawn_log_path: None,
     });
 
     assert!(!socket_path.exists(), "socket must not pre-exist");
@@ -338,6 +339,7 @@ async fn refused_without_binary_is_unavailable() {
             ))
         }),
         transport: Transport::Uds,
+        spawn_log_path: None,
     });
 
     // Wrap in a timeout so a hang fails the test rather than blocking forever.
@@ -352,6 +354,47 @@ async fn refused_without_binary_is_unavailable() {
         }
         other => panic!("expected Unavailable, got {other:?}"),
     }
+}
+
+/// Spawn failures append a timestamped diagnostic line to the configured spawn log.
+#[tokio::test]
+async fn spawn_failure_writes_spawn_log() {
+    let dir = tempfile::tempdir().unwrap();
+    let socket_path: PathBuf = dir.path().join("nonexistent.sock");
+    let log_path = dir.path().join("spawn.log");
+
+    let client = Client::with_config(ClientConfig {
+        socket_path: socket_path.clone(),
+        port_path: dir.path().join("nonexistent.port"),
+        project_root: PROJECT_A.to_string(),
+        expected_schema_version: schema_version_u32(),
+        connect_timeout: Duration::from_millis(200),
+        poll_interval: Duration::from_millis(10),
+        spawn: Spawner::custom(|| {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "kindling binary not found (test)",
+            ))
+        }),
+        transport: Transport::Uds,
+        spawn_log_path: Some(log_path.clone()),
+    });
+
+    let _ = client.health().await;
+
+    let log = std::fs::read_to_string(&log_path).expect("spawn log written");
+    assert!(
+        log.contains("failed to spawn kindling daemon"),
+        "log should describe spawn failure: {log}"
+    );
+    assert!(
+        log.contains("kindling binary not found"),
+        "log should include underlying error: {log}"
+    );
+    assert!(
+        log.starts_with('['),
+        "log line should be timestamped: {log}"
+    );
 }
 
 /// 4b. Default `Spawner::Command` execs the (absent in CI) `kindling` binary;
@@ -370,6 +413,7 @@ async fn default_spawner_missing_binary_is_unavailable() {
         poll_interval: Duration::from_millis(10),
         spawn: Spawner::Command, // execs `kindling`, not on PATH in CI
         transport: Transport::Uds,
+        spawn_log_path: None,
     });
 
     let result = tokio::time::timeout(Duration::from_secs(3), client.health()).await;

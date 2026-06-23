@@ -65,10 +65,13 @@ mod transport;
 
 pub use body::{CloseCapsuleBody, CreatePinBody};
 pub use config::{
-    default_port_path, default_socket_path, ClientConfig, Spawner, Transport,
-    EXPECTED_SCHEMA_VERSION,
+    default_port_path, default_socket_path, default_spawn_log_path, ClientConfig, Spawner,
+    Transport, EXPECTED_SCHEMA_VERSION,
 };
+
 pub use error::ClientError;
+#[cfg(feature = "spool")]
+pub use spool::{SpoolConfig, SpoolError, SpoolStatus, SpooledClient};
 
 use hyper::StatusCode;
 use serde::de::DeserializeOwned;

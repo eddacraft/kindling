@@ -49,6 +49,7 @@
 //! cross-process lock in v1.
 
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
@@ -56,6 +57,32 @@ use uuid::Uuid;
 
 use crate::{Client, ClientError};
 use kindling_types::{Id, Observation, ObservationInput};
+
+/// Live + on-disk spool observability snapshot.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SpoolStatus {
+    /// Count of buffered NDJSON entries not yet replayed into the daemon.
+    pub pending_count: usize,
+    /// Path to the NDJSON spool file this status describes.
+    pub spool_path: PathBuf,
+    /// Epoch milliseconds of the last successful flush (in-memory per client).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_flush_time_ms: Option<i64>,
+    /// Last connectivity or flush error observed by this client instance.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_error: Option<String>,
+    /// Cumulative replay attempts (each flush try per spooled entry).
+    pub replay_attempts: u64,
+}
+
+/// In-memory counters recorded by a single [`SpooledClient`] instance.
+#[derive(Debug, Default)]
+struct SpoolRuntime {
+    last_flush_time_ms: Option<i64>,
+    last_error: Option<String>,
+    replay_attempts: u64,
+}
 
 /// Configuration for a [`SpooledClient`].
 ///
@@ -149,6 +176,8 @@ pub struct SpooledClient {
     /// Serializes read/append/rewrite of the spool file. The mutex guards the
     /// *file*, not the client (the client is internally `Send + Sync`).
     file_lock: Mutex<()>,
+    /// Live flush/error/replay counters for this client instance.
+    runtime: Mutex<SpoolRuntime>,
 }
 
 impl SpooledClient {
@@ -158,6 +187,7 @@ impl SpooledClient {
             client,
             spool_path,
             file_lock: Mutex::new(()),
+            runtime: Mutex::new(SpoolRuntime::default()),
         }
     }
 
@@ -215,6 +245,7 @@ impl SpooledClient {
         {
             Ok(observation) => Ok(AppendOutcome::Delivered(Box::new(observation))),
             Err(err) if is_connectivity_error(&err) => {
+                self.record_connectivity_error(&err).await;
                 let entry = SpoolEntry {
                     input,
                     capsule_id,
@@ -253,6 +284,7 @@ impl SpooledClient {
         let mut propagate: Option<ClientError> = None;
 
         for (idx, entry) in entries.iter().enumerate() {
+            self.bump_replay_attempts().await;
             match self
                 .client
                 .append_observation(
@@ -263,7 +295,10 @@ impl SpooledClient {
                 .await
             {
                 Ok(_) => replayed += 1,
-                Err(err) if is_connectivity_error(&err) => break,
+                Err(err) if is_connectivity_error(&err) => {
+                    self.record_connectivity_error(&err).await;
+                    break;
+                }
                 Err(err) => {
                     // Non-connectivity rejection: stop, keep this entry + the
                     // remainder, and propagate after rewriting the spool. We do
@@ -282,15 +317,63 @@ impl SpooledClient {
             return Err(SpoolError::Client(err));
         }
 
+        if replayed > 0 {
+            self.record_successful_flush().await;
+        }
+
         Ok(FlushReport {
             replayed,
             remaining: remainder.len(),
         })
     }
 
+    async fn bump_replay_attempts(&self) {
+        let mut rt = self.runtime.lock().await;
+        rt.replay_attempts = rt.replay_attempts.saturating_add(1);
+    }
+
+    async fn record_connectivity_error(&self, err: &ClientError) {
+        let mut rt = self.runtime.lock().await;
+        rt.last_error = Some(err.to_string());
+    }
+
+    async fn record_successful_flush(&self) {
+        let mut rt = self.runtime.lock().await;
+        rt.last_flush_time_ms = Some(now_ms());
+        rt.last_error = None;
+    }
+
     /// Count of pending (un-replayed) spool entries.
     pub fn pending_count(&self) -> Result<usize, SpoolError> {
         Ok(read_spool(&self.spool_path)?.len())
+    }
+
+    /// Observability snapshot for this client (pending count + live counters).
+    pub async fn spool_status(&self) -> Result<SpoolStatus, SpoolError> {
+        let runtime = self.runtime.lock().await;
+        Ok(SpoolStatus {
+            pending_count: self.pending_count()?,
+            spool_path: self.spool_path.clone(),
+            last_flush_time_ms: runtime.last_flush_time_ms,
+            last_error: runtime.last_error.clone(),
+            replay_attempts: runtime.replay_attempts,
+        })
+    }
+
+    /// Passive status from an on-disk spool file (pending count + path only).
+    ///
+    /// Historical flush/error/replay fields are not persisted across processes.
+    pub fn spool_status_from_path(
+        spool_path: impl Into<PathBuf>,
+    ) -> Result<SpoolStatus, SpoolError> {
+        let spool_path = spool_path.into();
+        Ok(SpoolStatus {
+            pending_count: read_spool(&spool_path)?.len(),
+            spool_path,
+            last_flush_time_ms: None,
+            last_error: None,
+            replay_attempts: 0,
+        })
     }
 
     /// Append one entry to the spool file (create + append), serialized by the
@@ -309,6 +392,13 @@ impl SpooledClient {
         file.flush()?;
         Ok(())
     }
+}
+
+fn now_ms() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as i64
 }
 
 /// Connectivity failures buffer to the spool; everything else propagates.
