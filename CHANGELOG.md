@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Claude Code plugin test script: `node --test test/*.test.js` (Node 26 no longer accepts a bare `test/` directory path).
+- `kindling browse` HTML viewer: escape `</` in embedded export JSON so observation content cannot break out of the bundle `<script>` block.
 
 ## [0.2.0] - 2026-06-22
 
