@@ -1,0 +1,19 @@
+{
+  "name": "kindling-adapter-minimal",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Minimal kindling adapter example using @eddacraft/kindling",
+  "scripts": {
+    "build": "tsc --build",
+    "start": "node dist/index.js",
+    "dev": "pnpm run build && pnpm run start"
+  },
+  "dependencies": {
+    "@eddacraft/kindling": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.0"
+  }
+}

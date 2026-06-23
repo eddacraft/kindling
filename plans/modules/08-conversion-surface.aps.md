@@ -1,14 +1,14 @@
 # Conversion Surface
 
-| ID   | Owner  | Status |
-| ---- | ------ | ------ |
-| CONV | @aneki | Ready  |
+| ID   | Owner  | Status      |
+| ---- | ------ | ----------- |
+| CONV | @aneki | In Progress |
 
 **Last reviewed:** 2026-06-23
 
 ## Purpose
 
-Public visitors and non-Anvil users need a clear path to try, understand, and adopt kindling without Claude Code or anvil. Much of the surface is built on `feat/conversion-surface` but not merged; remaining gaps are CLI depth, distribution polish, and docs sync.
+Public visitors and non-Anvil users need a clear path to try, understand, and adopt kindling without Claude Code or anvil. The conversion surface branch (`feat/conversion-surface`) is merging to main; remaining gaps are release ops, CLI depth, distribution polish, and docs sync.
 
 Execution plan: [../execution/2026-06-22-conversion-surface-delivery.md](../execution/2026-06-22-conversion-surface-delivery.md).
 
@@ -49,7 +49,7 @@ Execution plan: [../execution/2026-06-22-conversion-surface-delivery.md](../exec
 
 | ID  | Title                              | Wave | Status | Branch (suggested)                 |
 | --- | ---------------------------------- | ---- | ------ | ---------------------------------- |
-| C0  | Merge conversion surface + release | 0    | Ready  | `feat/conversion-surface`          |
+| C0  | Merge conversion surface + release | 0    | Merged | `feat/conversion-surface`          |
 | C12 | Post-release verification          | 0    | Draft  | —                                  |
 | C1  | install.sh demo prompt             | 1    | Draft  | `feat/install-demo-prompt`         |
 | C2  | VSIX + Cursor/Windsurf docs        | 1    | Draft  | `feat/vscode-vsix-and-cursor-docs` |
