@@ -35,6 +35,6 @@ pub use export::{
     BUNDLE_VERSION,
 };
 pub use service::{
-    AppendObservationOptions, CloseCapsuleOptions, CreatePinOptions, KindlingService,
-    OpenCapsuleOptions,
+    AppendObservationOptions, AppendOutcome, CloseCapsuleOptions, CreatePinOptions,
+    KindlingService, OpenCapsuleOptions,
 };

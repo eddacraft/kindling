@@ -60,6 +60,26 @@ pub struct AppendObservationOptions {
     pub validate: bool,
 }
 
+/// Outcome of [`KindlingService::append_observation`].
+///
+/// Carries the stored observation plus whether the write was deduplicated.
+/// When `deduplicated` is `true`, the incoming observation collided with an
+/// already-stored id: `observation` is the **existing** stored row (loaded
+/// fresh), never the incoming one, and the stored row was left untouched (no
+/// re-masking, no overwrite). When `false`, a new row was written and
+/// `observation` is that freshly-stored observation.
+///
+/// This makes spool replay after a crash exactly-once-ish on id: a replayed
+/// observation is surfaced as `deduplicated: true` rather than erroring or
+/// duplicating.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AppendOutcome {
+    /// The stored observation. On a dedup hit this is the pre-existing row.
+    pub observation: Observation,
+    /// `true` when the id already existed and the incoming write was ignored.
+    pub deduplicated: bool,
+}
+
 impl Default for AppendObservationOptions {
     fn default() -> Self {
         Self {
@@ -237,25 +257,32 @@ impl KindlingService {
     // ===== observations =====
 
     /// Validate/normalise, secret-mask, store, and (optionally) attach an
-    /// observation. Returns the stored observation (with masked content and
-    /// any defaulted fields). Ports `appendObservation`, plus the
-    /// service-boundary secret masking that has no TS equivalent.
+    /// observation. Returns an [`AppendOutcome`] carrying the stored
+    /// observation and whether the write was deduplicated. Ports
+    /// `appendObservation`, plus the service-boundary secret masking that has
+    /// no TS equivalent.
     pub fn append_observation(
         &self,
         input: ObservationInput,
         options: AppendObservationOptions,
-    ) -> ServiceResult<Observation> {
+    ) -> ServiceResult<AppendOutcome> {
         self.append_observation_at(input, options, now_ms())
     }
 
     /// [`Self::append_observation`] with an explicit clock for deterministic
     /// tests.
+    ///
+    /// Dedup contract: if an observation with the same id already exists, the
+    /// incoming write is ignored — the stored row is **not** overwritten and
+    /// the (already-masked) incoming content is discarded. The existing row is
+    /// loaded fresh and returned with `deduplicated: true`. This keeps spool
+    /// replay idempotent on id.
     pub fn append_observation_at(
         &self,
         input: ObservationInput,
         options: AppendObservationOptions,
         now: Timestamp,
-    ) -> ServiceResult<Observation> {
+    ) -> ServiceResult<AppendOutcome> {
         let mut observation = if options.validate {
             validation::validate_observation(input, now).map_err(ServiceError::Validation)?
         } else {
@@ -268,14 +295,37 @@ impl KindlingService {
         // validate:false path.
         observation.content = mask_secrets(&observation.content);
 
-        self.store.insert_observation(&observation)?;
+        let written = self.store.insert_observation(&observation)?;
 
+        // On a dedup hit, the stored row wins: load it fresh and return THAT,
+        // never the incoming (masked) observation. Re-masking or overwriting a
+        // previously stored row must never happen on replay.
+        let (observation, deduplicated) = if written {
+            (observation, false)
+        } else {
+            let existing = self
+                .store
+                .get_observation_by_id(&observation.id)?
+                .ok_or_else(|| {
+                    // INSERT OR IGNORE reported "not written" yet no row exists:
+                    // this is an internal invariant violation, not a dedup hit.
+                    ServiceError::Store(StoreError::ObservationNotFound(observation.id.clone()))
+                })?;
+            (existing, true)
+        };
+
+        // Attach is idempotent (INSERT OR IGNORE on the link's primary key), so
+        // re-attaching a deduplicated observation to the same capsule is a
+        // safe no-op.
         if let Some(capsule_id) = options.capsule_id.as_deref() {
             self.store
                 .attach_observation_to_capsule(capsule_id, &observation.id)?;
         }
 
-        Ok(observation)
+        Ok(AppendOutcome {
+            observation,
+            deduplicated,
+        })
     }
 
     // ===== retrieval =====

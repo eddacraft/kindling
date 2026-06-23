@@ -273,7 +273,8 @@ fn append_observation_happy_path_is_retrievable() {
             obs_input("the quick brown fox", scope.clone()),
             AppendObservationOptions::default(),
         )
-        .expect("append");
+        .expect("append")
+        .observation;
 
     assert!(!obs.id.is_empty());
     assert!(!obs.id.contains('_')); // bare UUID
@@ -315,7 +316,8 @@ fn append_observation_attaches_to_capsule() {
                 validate: true,
             },
         )
-        .expect("append");
+        .expect("append")
+        .observation;
 
     let fetched = svc.get_capsule(&capsule.id).expect("get").expect("present");
     assert_eq!(fetched.observation_ids, vec![obs.id]);
@@ -346,7 +348,8 @@ fn append_observation_validate_false_skips_validation() {
                 validate: false,
             },
         )
-        .expect("append without validation");
+        .expect("append without validation")
+        .observation;
     let stored = svc.get_observation(&obs.id).expect("get").expect("present");
     assert_eq!(stored.content, "   ");
 }
@@ -364,7 +367,8 @@ fn append_observation_masks_secrets_at_service_boundary() {
             obs_input(raw, session_scope("sec1")),
             AppendObservationOptions::default(),
         )
-        .expect("append");
+        .expect("append")
+        .observation;
 
     // Returned observation already carries the masked content.
     assert_eq!(obs.content, expected);
@@ -383,11 +387,122 @@ fn append_observation_masks_anthropic_key() {
             obs_input(raw, session_scope("sec2")),
             AppendObservationOptions::default(),
         )
-        .expect("append");
+        .expect("append")
+        .observation;
     assert!(!obs
         .content
         .contains("sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWxYz1234"));
     assert_eq!(obs.content, kindling_service::filter::mask_secrets(raw));
+}
+
+#[test]
+fn append_observation_dedups_on_id_returns_existing_unchanged() {
+    let svc = service();
+    let scope = session_scope("dedup1");
+
+    // First append with an explicit id → written, not deduplicated.
+    let mut first = obs_input("the original content", scope.clone());
+    first.id = Some("fixed-id".to_string());
+    let first_out = svc
+        .append_observation(first, AppendObservationOptions::default())
+        .expect("first append");
+    assert!(!first_out.deduplicated, "first append must not be a dedup");
+    assert_eq!(first_out.observation.content, "the original content");
+    assert_eq!(first_out.observation.id, "fixed-id");
+
+    // Second append reuses the id but carries DIFFERENT content. The store
+    // must ignore the write and the service must return the ORIGINAL stored
+    // row, marked deduplicated — never the incoming content.
+    let mut second = obs_input("a DIFFERENT body that must be discarded", scope);
+    second.id = Some("fixed-id".to_string());
+    let second_out = svc
+        .append_observation(second, AppendObservationOptions::default())
+        .expect("second append");
+    assert!(second_out.deduplicated, "duplicate id must be deduplicated");
+    assert_eq!(
+        second_out.observation.content, "the original content",
+        "dedup must return the original stored content, not the incoming one"
+    );
+    assert_eq!(second_out.observation.id, "fixed-id");
+
+    // The stored row itself is unchanged.
+    let stored = svc
+        .get_observation("fixed-id")
+        .expect("get")
+        .expect("present");
+    assert_eq!(stored.content, "the original content");
+}
+
+#[test]
+fn append_observation_dedup_does_not_remask_or_mutate_stored_row() {
+    let svc = service();
+    let scope = session_scope("dedup2");
+
+    // First append stores a clean (no-secret) body under a fixed id.
+    let mut first = obs_input("plain stored body", scope.clone());
+    first.id = Some("redact-id".to_string());
+    let first_out = svc
+        .append_observation(first, AppendObservationOptions::default())
+        .expect("first append");
+    assert_eq!(first_out.observation.content, "plain stored body");
+
+    // A second append reuses the id with content that DOES contain a secret.
+    // If the dedup path re-ran masking or overwrote the row, the stored content
+    // would change; it must not. The returned row is the untouched original.
+    let mut second = obs_input("api_key=abcdef123456789 leaked", scope);
+    second.id = Some("redact-id".to_string());
+    let second_out = svc
+        .append_observation(second, AppendObservationOptions::default())
+        .expect("second append");
+    assert!(second_out.deduplicated);
+    assert_eq!(
+        second_out.observation.content, "plain stored body",
+        "dedup must not re-mask or overwrite the stored row"
+    );
+
+    let stored = svc
+        .get_observation("redact-id")
+        .expect("get")
+        .expect("present");
+    assert_eq!(stored.content, "plain stored body");
+    assert!(!stored.content.contains("[REDACTED]"));
+}
+
+#[test]
+fn append_observation_dedup_reattach_to_capsule_is_idempotent() {
+    let svc = service();
+    let scope = session_scope("dedup3");
+    let capsule = svc
+        .open_capsule(OpenCapsuleOptions {
+            kind: CapsuleType::Session,
+            intent: "dedup attach".to_string(),
+            scope_ids: scope.clone(),
+            id: None,
+        })
+        .expect("open");
+
+    let mut first = obs_input("attached once", scope.clone());
+    first.id = Some("attach-id".to_string());
+    let opts = AppendObservationOptions {
+        capsule_id: Some(capsule.id.clone()),
+        validate: true,
+    };
+    svc.append_observation(first, opts.clone())
+        .expect("first append");
+
+    // Replay the same id, re-attaching to the same capsule. Must dedup and not
+    // duplicate the capsule link.
+    let mut second = obs_input("attached again (ignored)", scope);
+    second.id = Some("attach-id".to_string());
+    let out = svc.append_observation(second, opts).expect("second append");
+    assert!(out.deduplicated);
+
+    let fetched = svc.get_capsule(&capsule.id).expect("get").expect("present");
+    assert_eq!(
+        fetched.observation_ids,
+        vec!["attach-id"],
+        "re-attach of a deduplicated observation must not duplicate the link"
+    );
 }
 
 // ===== pin / unpin / list_pins =====
@@ -483,7 +598,8 @@ fn retrieve_surfaces_pinned_observation() {
             obs_input("pinned material here", scope.clone()),
             AppendObservationOptions::default(),
         )
-        .expect("append");
+        .expect("append")
+        .observation;
 
     svc.pin_at(
         CreatePinOptions {
@@ -526,7 +642,8 @@ fn forget_redacts_observation() {
             obs_input("sensitive note", session_scope("f1")),
             AppendObservationOptions::default(),
         )
-        .expect("append");
+        .expect("append")
+        .observation;
 
     svc.forget(&obs.id).expect("forget");
 
@@ -625,7 +742,8 @@ fn session_start_context_orders_recent_and_resolves_pins() {
                 AppendObservationOptions::default(),
                 ts,
             )
-            .expect("append");
+            .expect("append")
+            .observation;
         obs_ids.push(o.id);
     }
 
@@ -669,7 +787,8 @@ fn session_start_context_respects_max_results_and_redaction() {
                 AppendObservationOptions::default(),
                 ts,
             )
-            .expect("append");
+            .expect("append")
+            .observation;
         ids.push(o.id);
     }
     // Redact the newest — it must drop out.
@@ -691,7 +810,8 @@ fn session_start_context_excludes_expired_pins() {
             AppendObservationOptions::default(),
             1000,
         )
-        .expect("append");
+        .expect("append")
+        .observation;
     // Pin expires at 1000 + 500 = 1500.
     svc.pin_at(
         CreatePinOptions {
