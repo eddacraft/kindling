@@ -98,6 +98,57 @@ fn observation_roundtrip_and_fts_sync() {
 }
 
 #[test]
+fn insert_observation_is_idempotent_on_id() {
+    let store = SqliteKindlingStore::open_in_memory().unwrap();
+    let obs = observation("obs-dup", "original content", 1000, "sess-1");
+
+    // First insert writes a new row.
+    let written_first = store.insert_observation(&obs).unwrap();
+    assert!(written_first, "first insert must report a new row");
+
+    // A second insert of the SAME id is ignored: no new row, no error, and the
+    // stored content is unchanged even though we hand it different content.
+    let conflicting = observation("obs-dup", "DIFFERENT content", 9999, "sess-2");
+    let written_second = store.insert_observation(&conflicting).unwrap();
+    assert!(!written_second, "duplicate id insert must report ignored");
+
+    // Exactly one row, still carrying the ORIGINAL content/ts/scope.
+    assert_eq!(
+        count(&store, "SELECT COUNT(*) FROM observations WHERE id = 'obs-dup'"),
+        1
+    );
+    let loaded = store.get_observation_by_id("obs-dup").unwrap().unwrap();
+    assert_eq!(loaded, obs, "stored row must be the original, untouched");
+}
+
+#[test]
+fn attach_observation_to_capsule_is_idempotent() {
+    let store = SqliteKindlingStore::open_in_memory().unwrap();
+    store
+        .create_capsule(&capsule("cap-1", "sess-1", 1000))
+        .unwrap();
+    store
+        .insert_observation(&observation("obs-1", "content", 1000, "sess-1"))
+        .unwrap();
+
+    // Re-attaching the same observation to the same capsule must not error or
+    // duplicate the link (mirrors a deduplicated replay re-running attach).
+    store.attach_observation_to_capsule("cap-1", "obs-1").unwrap();
+    store.attach_observation_to_capsule("cap-1", "obs-1").unwrap();
+
+    assert_eq!(
+        count(
+            &store,
+            "SELECT COUNT(*) FROM capsule_observations WHERE capsule_id = 'cap-1'"
+        ),
+        1,
+        "re-attach must not create a duplicate link"
+    );
+    let loaded = store.get_capsule("cap-1").unwrap().unwrap();
+    assert_eq!(loaded.observation_ids, vec!["obs-1"]);
+}
+
+#[test]
 fn redaction_masks_content_and_drops_fts_row() {
     let store = SqliteKindlingStore::open_in_memory().unwrap();
     store
