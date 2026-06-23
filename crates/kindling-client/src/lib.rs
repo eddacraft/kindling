@@ -90,8 +90,24 @@ pub use kindling_types::{
 };
 
 use body::{
-    AppendObservationBody, OpenCapsuleBody, PreCompactContextBody, SessionStartContextBody,
+    AppendObservationBody, AppendObservationResponseBody, OpenCapsuleBody, PreCompactContextBody,
+    SessionStartContextBody,
 };
+
+/// Outcome of [`Client::append_observation`].
+///
+/// Carries the stored observation plus whether the daemon deduplicated the
+/// write. `deduplicated` is `true` when an observation with the same id already
+/// existed: `observation` is then the pre-existing stored row (the daemon did
+/// not overwrite it or re-run masking), making spool replay exactly-once-ish on
+/// id. When `false`, a new row was written and `observation` is it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AppendResult {
+    /// The stored observation. On a dedup hit this is the pre-existing row.
+    pub observation: Observation,
+    /// `true` when the id already existed and the daemon ignored the write.
+    pub deduplicated: bool,
+}
 
 /// Header carrying the project root string for per-project DB routing. Mirrors
 /// `kindling_server::PROJECT_HEADER`.
@@ -257,25 +273,36 @@ impl Client {
 
     /// `POST /v1/observations` — append an observation, optionally attaching it
     /// to `capsule_id` and toggling service-side `validate` (default true).
+    ///
+    /// Returns an [`AppendResult`] carrying the stored observation and the
+    /// daemon's `deduplicated` flag. A duplicate id is **not** an error: the
+    /// daemon ignores the write and returns the pre-existing row with
+    /// `deduplicated: true`, so replaying an already-delivered observation is a
+    /// no-op.
     pub async fn append_observation(
         &self,
         input: ObservationInput,
         capsule_id: Option<Id>,
         validate: Option<bool>,
-    ) -> Result<Observation, ClientError> {
+    ) -> Result<AppendResult, ClientError> {
         let body = AppendObservationBody {
             input,
             capsule_id,
             validate,
         };
-        self.call(
-            "POST",
-            "/v1/observations",
-            true,
-            Some(&body),
-            &[StatusCode::CREATED],
-        )
-        .await
+        let resp: AppendObservationResponseBody = self
+            .call(
+                "POST",
+                "/v1/observations",
+                true,
+                Some(&body),
+                &[StatusCode::CREATED],
+            )
+            .await?;
+        Ok(AppendResult {
+            observation: resp.observation,
+            deduplicated: resp.deduplicated,
+        })
     }
 
     /// `POST /v1/retrieve` — deterministic ranked retrieval.

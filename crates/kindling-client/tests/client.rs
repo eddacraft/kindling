@@ -68,7 +68,8 @@ async fn warm_call_round_trip_all_methods() {
             None,
         )
         .await
-        .expect("append observation");
+        .expect("append observation")
+        .observation;
     assert_eq!(obs.kind, ObservationKind::Message);
     assert_eq!(obs.content, "the quick brown fox jumps");
 
@@ -80,7 +81,8 @@ async fn warm_call_round_trip_all_methods() {
             None,
         )
         .await
-        .expect("append observation 2");
+        .expect("append observation 2")
+        .observation;
 
     // pin
     let pin = client
@@ -146,7 +148,8 @@ async fn forget_redacts_observation() {
     let obs = client
         .append_observation(message_input("forgettable client needle"), None, None)
         .await
-        .expect("append observation");
+        .expect("append observation")
+        .observation;
 
     // Surfaces before forgetting.
     let before = client
@@ -575,7 +578,8 @@ async fn observation_provenance_round_trips() {
     let obs = client
         .append_observation(input, None, None)
         .await
-        .expect("append");
+        .expect("append")
+        .observation;
     assert_eq!(
         obs.provenance.get("tool").unwrap(),
         &serde_json::json!("bash")
@@ -607,7 +611,8 @@ async fn session_start_context_returns_markdown() {
     let obs = client
         .append_observation(scoped("investigated the parser bug"), None, None)
         .await
-        .expect("append");
+        .expect("append")
+        .observation;
     client
         .pin(CreatePinBody {
             target_type: PinTargetType::Observation,

@@ -67,20 +67,24 @@ pub fn run(args: LogArgs, via_daemon: bool) -> CliResult {
 
     let observation = if via_daemon {
         let client = build_client()?;
-        runtime()?.block_on(async {
-            client
-                .append_observation(input, args.capsule.clone(), None)
-                .await
-        })?
+        runtime()?
+            .block_on(async {
+                client
+                    .append_observation(input, args.capsule.clone(), None)
+                    .await
+            })?
+            .observation
     } else {
         let (service, _db) = open_service(args.common.db.as_deref())?;
-        service.append_observation(
-            input,
-            AppendObservationOptions {
-                capsule_id: args.capsule.clone(),
-                validate: true,
-            },
-        )?
+        service
+            .append_observation(
+                input,
+                AppendObservationOptions {
+                    capsule_id: args.capsule.clone(),
+                    validate: true,
+                },
+            )?
+            .observation
     };
 
     if args.common.json {
