@@ -4,6 +4,8 @@
 | ------ | ------ | ----------- |
 | KINTEG | @aneki | In Progress |
 
+**Last reviewed:** 2026-06-23
+
 ## Purpose
 
 Harden the contract kindling exposes to downstream consumers — chiefly **anvil**,

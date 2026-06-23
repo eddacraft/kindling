@@ -82,3 +82,51 @@ jobs:
             dist/*.zip
             dist/*.sha256
           fail_on_unmatched_files: true
+
+  # ---- Homebrew tap PR (eddacraft/homebrew-tap) ---------------------------
+  # Opens a PR in the shared tap (same repo that ships anvil) once macOS and
+  # Linux glibc release assets and .sha256 sidecars are attached. Requires
+  # HOMEBREW_TAP_TOKEN: a
+  # PAT or fine-grained token with contents:write on eddacraft/homebrew-tap.
+  homebrew-tap-pr:
+    name: open homebrew-tap PR
+    needs: upload-release
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout kindling
+        uses: actions/checkout@v4
+
+      - name: Generate kindling formula
+        run: ./scripts/generate-homebrew-formula.sh "${{ github.event.release.tag_name }}"
+
+      - name: Checkout homebrew-tap
+        uses: actions/checkout@v4
+        with:
+          repository: eddacraft/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-tap
+
+      - name: Copy formula into tap
+        run: |
+          mkdir -p homebrew-tap/Formula
+          cp packaging/homebrew/kindling.rb homebrew-tap/Formula/kindling.rb
+
+      - name: Open PR in homebrew-tap
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-tap
+          commit-message: 'kindling ${{ github.event.release.tag_name }}'
+          title: 'kindling ${{ github.event.release.tag_name }}'
+          body: |
+            Automated update from [eddacraft/kindling release ${{ github.event.release.tag_name }}](https://github.com/eddacraft/kindling/releases/tag/${{ github.event.release.tag_name }}).
+
+            Merge to publish:
+
+            ```bash
+            brew update
+            brew install eddacraft/tap/kindling
+            ```
+          branch: kindling-${{ github.event.release.tag_name }}
+          delete-branch: true

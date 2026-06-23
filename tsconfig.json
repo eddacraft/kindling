@@ -19,7 +19,8 @@
   "references": [
     { "path": "./packages/kindling" },
     { "path": "./packages/kindling-adapter-opencode" },
-    { "path": "./packages/kindling-adapter-pocketflow" }
+    { "path": "./packages/kindling-adapter-pocketflow" },
+    { "path": "./packages/kindling-adapter-vscode" }
   ],
   "exclude": ["node_modules", "dist", "**/vendor/**"]
 }

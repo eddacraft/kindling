@@ -2,7 +2,9 @@
 //! the dispatch in `lib.rs`. Handlers print their own output (text or `--json`)
 //! and return [`CliResult`](crate::CliResult).
 
+pub mod browse;
 pub mod capsule;
+pub mod demo;
 pub mod export;
 pub mod forget;
 pub mod init;

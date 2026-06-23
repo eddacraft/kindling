@@ -1,0 +1,122 @@
+{
+  "bundleVersion": "1.0",
+  "exportedAt": 1735689600000,
+  "dataset": {
+    "version": "1.0",
+    "exportedAt": 1735689600000,
+    "observations": [
+      {
+        "id": "obs-demo-1",
+        "kind": "message",
+        "content": "Fix the JWT authentication bug in the login flow",
+        "provenance": { "source": "user" },
+        "ts": 1735689600000,
+        "scopeIds": { "sessionId": "demo-session-1", "repoId": "demo-auth-service" },
+        "redacted": false
+      },
+      {
+        "id": "obs-demo-2",
+        "kind": "tool_call",
+        "content": "Read src/auth/token.ts",
+        "provenance": { "tool": "Read", "args": { "path": "src/auth/token.ts" } },
+        "ts": 1735689601000,
+        "scopeIds": { "sessionId": "demo-session-1", "repoId": "demo-auth-service" },
+        "redacted": false
+      },
+      {
+        "id": "obs-demo-3",
+        "kind": "command",
+        "content": "npm test -- --grep auth",
+        "provenance": {
+          "command": "npm test -- --grep auth",
+          "exitCode": 1,
+          "stdout": "FAIL src/auth/token.test.ts\n  JWT validation failed: token expired"
+        },
+        "ts": 1735689602000,
+        "scopeIds": { "sessionId": "demo-session-1", "repoId": "demo-auth-service" },
+        "redacted": false
+      },
+      {
+        "id": "obs-demo-4",
+        "kind": "error",
+        "content": "JWT validation failed: token expired (expected 15m TTL, check used 1h constant)",
+        "provenance": { "source": "test", "file": "src/auth/token.ts", "line": 42 },
+        "ts": 1735689603000,
+        "scopeIds": { "sessionId": "demo-session-1", "repoId": "demo-auth-service" },
+        "redacted": false
+      },
+      {
+        "id": "obs-demo-5",
+        "kind": "file_diff",
+        "content": "src/auth/token.ts: changed TOKEN_TTL_MS from 3600000 to 900000",
+        "provenance": { "path": "src/auth/token.ts", "linesAdded": 1, "linesRemoved": 1 },
+        "ts": 1735689604000,
+        "scopeIds": { "sessionId": "demo-session-1", "repoId": "demo-auth-service" },
+        "redacted": false
+      },
+      {
+        "id": "obs-demo-6",
+        "kind": "command",
+        "content": "npm test -- --grep auth",
+        "provenance": {
+          "command": "npm test -- --grep auth",
+          "exitCode": 0,
+          "stdout": "PASS src/auth/token.test.ts (3 tests)"
+        },
+        "ts": 1735689605000,
+        "scopeIds": { "sessionId": "demo-session-1", "repoId": "demo-auth-service" },
+        "redacted": false
+      },
+      {
+        "id": "obs-demo-7",
+        "kind": "message",
+        "content": "Root cause: TOKEN_TTL_MS was set to 1 hour instead of 15 minutes",
+        "provenance": { "source": "assistant" },
+        "ts": 1735689606000,
+        "scopeIds": { "sessionId": "demo-session-1", "repoId": "demo-auth-service" },
+        "redacted": false
+      }
+    ],
+    "capsules": [
+      {
+        "id": "cap-demo-1",
+        "type": "session",
+        "intent": "debug JWT authentication bug",
+        "status": "closed",
+        "openedAt": 1735689600000,
+        "closedAt": 1735689607000,
+        "scopeIds": { "sessionId": "demo-session-1", "repoId": "demo-auth-service" },
+        "observationIds": [
+          "obs-demo-1",
+          "obs-demo-2",
+          "obs-demo-3",
+          "obs-demo-4",
+          "obs-demo-5",
+          "obs-demo-6",
+          "obs-demo-7"
+        ]
+      }
+    ],
+    "summaries": [
+      {
+        "id": "sum-demo-1",
+        "capsuleId": "cap-demo-1",
+        "content": "Fixed JWT expiry: TOKEN_TTL_MS was 3600000 (1h) instead of 900000 (15m). Tests now pass.",
+        "confidence": 0.95,
+        "createdAt": 1735689607000,
+        "evidenceRefs": ["obs-demo-4", "obs-demo-5", "obs-demo-6"]
+      }
+    ],
+    "pins": [
+      {
+        "id": "pin-demo-1",
+        "targetType": "observation",
+        "targetId": "obs-demo-4",
+        "reason": "Root cause of auth failures",
+        "createdAt": 1735689608000,
+        "scopeIds": { "sessionId": "demo-session-1", "repoId": "demo-auth-service" }
+      }
+    ]
+  },
+  "metadata": { "description": "kindling demo memory: JWT auth debugging session" }
+}

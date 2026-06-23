@@ -78,6 +78,12 @@ pub enum Command {
 
     /// Start the kindling daemon (HTTP/1 over a Unix domain socket).
     Serve(ServeArgs),
+
+    /// Load sample memory for trying search and browse.
+    Demo(DemoArgs),
+
+    /// Open a local HTML viewer for memory in the database.
+    Browse(BrowseArgs),
 }
 
 #[derive(Debug, Args)]
@@ -318,4 +324,28 @@ pub struct ServeArgs {
     /// Claude Code hook writing JSON to stdout).
     #[arg(long)]
     pub daemonize: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct DemoArgs {
+    /// Replace an existing demo database before importing sample memory.
+    #[arg(long)]
+    pub reset: bool,
+
+    #[command(flatten)]
+    pub common: CommonOpts,
+}
+
+#[derive(Debug, Args)]
+pub struct BrowseArgs {
+    /// Write HTML to this path instead of a temp file.
+    #[arg(long, value_name = "path")]
+    pub output: Option<String>,
+
+    /// Print the output path only; do not open a browser.
+    #[arg(long)]
+    pub no_open: bool,
+
+    #[command(flatten)]
+    pub common: CommonOpts,
 }
