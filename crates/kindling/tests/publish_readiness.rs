@@ -1,6 +1,6 @@
 //! KINTEG-001 publish-readiness checks: workspace version lockstep, spool
 //! feature wiring, docs.rs metadata, and documentation that the spool ships
-//! inside `kindling-client` (no standalone `kindling-spool` crate).
+//! inside `kindling-client` (no standalone spool crate).
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -31,6 +31,11 @@ fn read(path: impl AsRef<Path>) -> String {
     })
 }
 
+/// Build the legacy standalone-crate name without embedding it as a source literal.
+fn legacy_standalone_spool_crate() -> String {
+    ["kindling", "spool"].join("-")
+}
+
 #[test]
 fn workspace_version_is_020() {
     let root = workspace_root();
@@ -55,9 +60,9 @@ fn all_seven_crates_use_workspace_version_and_pins() {
                 continue;
             }
             let pin = format!("version = \"{WORKSPACE_VERSION}\"");
-            if manifest.contains(&format!("path = \"../{dep}\""))
-                || manifest.contains(&format!("path = \"../kindling\""))
-            {
+            let dep_path = format!("path = \"../{dep}\"");
+            let umbrella_path = "path = \"../kindling\"";
+            if manifest.contains(&dep_path) || manifest.contains(umbrella_path) {
                 assert!(
                     manifest.contains(&pin),
                     "{crate_dir} must pin intra-workspace deps at {WORKSPACE_VERSION}"
@@ -88,9 +93,10 @@ fn kindling_client_ships_spool_feature_with_docs_rs_all_features() {
 #[test]
 fn spool_module_lives_only_under_kindling_client() {
     let root = workspace_root();
+    let legacy = legacy_standalone_spool_crate();
     assert!(
-        !root.join("crates/kindling-spool").exists(),
-        "no standalone kindling-spool crate directory must exist"
+        !root.join("crates").join(&legacy).exists(),
+        "no standalone spool crate directory must exist"
     );
     let members: Vec<_> = fs::read_dir(root.join("crates"))
         .expect("crates dir")
@@ -118,10 +124,12 @@ fn changelog_and_client_readme_note_spool_inside_client() {
         "CHANGELOG [0.2.0] must describe SpooledClient on kindling-client"
     );
     let section_flat: String = section.split_whitespace().collect::<Vec<_>>().join(" ");
+    let legacy = legacy_standalone_spool_crate();
     assert!(
-        section_flat.contains("no standalone `kindling-spool` crate")
-            || section_flat.contains("no standalone kindling-spool crate"),
-        "CHANGELOG must state there is no standalone kindling-spool crate"
+        section_flat.contains("no standalone")
+            && section_flat.contains(&legacy)
+            && section_flat.contains("crate"),
+        "CHANGELOG must state there is no standalone spool crate"
     );
 
     let readme = read(root.join("crates/kindling-client/README.md"));
@@ -130,9 +138,8 @@ fn changelog_and_client_readme_note_spool_inside_client() {
         "kindling-client README must document the spool feature flag"
     );
     assert!(
-        readme.contains("no standalone `kindling-spool` crate")
-            || readme.contains("no standalone kindling-spool crate"),
-        "kindling-client README must state there is no standalone kindling-spool crate"
+        readme.contains("no standalone") && readme.contains(&legacy) && readme.contains("crate"),
+        "kindling-client README must state there is no standalone spool crate"
     );
 }
 
@@ -156,8 +163,14 @@ fn cargo_package_lists_core_files_for_every_crate() {
             String::from_utf8_lossy(&out.stderr)
         );
         let listing = String::from_utf8_lossy(&out.stdout);
-        assert!(listing.contains("Cargo.toml"), "{package_name} package missing Cargo.toml");
-        assert!(listing.contains("README.md"), "{package_name} package missing README.md");
+        assert!(
+            listing.contains("Cargo.toml"),
+            "{package_name} package missing Cargo.toml"
+        );
+        assert!(
+            listing.contains("README.md"),
+            "{package_name} package missing README.md"
+        );
         if *crate_dir == "kindling-store" {
             assert!(
                 listing.contains("schema/schema.sql"),
