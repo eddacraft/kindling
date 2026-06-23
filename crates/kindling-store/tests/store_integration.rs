@@ -114,7 +114,10 @@ fn insert_observation_is_idempotent_on_id() {
 
     // Exactly one row, still carrying the ORIGINAL content/ts/scope.
     assert_eq!(
-        count(&store, "SELECT COUNT(*) FROM observations WHERE id = 'obs-dup'"),
+        count(
+            &store,
+            "SELECT COUNT(*) FROM observations WHERE id = 'obs-dup'"
+        ),
         1
     );
     let loaded = store.get_observation_by_id("obs-dup").unwrap().unwrap();
@@ -133,8 +136,12 @@ fn attach_observation_to_capsule_is_idempotent() {
 
     // Re-attaching the same observation to the same capsule must not error or
     // duplicate the link (mirrors a deduplicated replay re-running attach).
-    store.attach_observation_to_capsule("cap-1", "obs-1").unwrap();
-    store.attach_observation_to_capsule("cap-1", "obs-1").unwrap();
+    store
+        .attach_observation_to_capsule("cap-1", "obs-1")
+        .unwrap();
+    store
+        .attach_observation_to_capsule("cap-1", "obs-1")
+        .unwrap();
 
     assert_eq!(
         count(
