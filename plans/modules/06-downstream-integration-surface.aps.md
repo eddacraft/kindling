@@ -4,14 +4,15 @@
 | ------ | ------ | ----------- |
 | KINTEG | @aneki | In Progress |
 
-**Last reviewed:** 2026-06-24 (KINTEG-001 Done, KINTEG-004 Done)
+**Last reviewed:** 2026-06-24 (KINTEG-001/004 Done; PORT-011 In Progress in anvil)
 
 ## Purpose
 
 Harden the contract kindling exposes to downstream consumers — chiefly **anvil**,
-whose KDS (kindling daemon source) module can now depend on `kindling-client`
-0.2.0 (with `spool`) on crates.io; remaining work is integration proof
-(PORT-011), the runtime facade (KINTEG-008), and contract hardening below. This
+whose KDS (kindling daemon source) module is integrating against `kindling-client`
+0.2.0 (with `spool`) on crates.io (**PORT-011 In Progress** — handoff at
+[`plans/execution/PORT-011-anvil-handoff.md`](../execution/PORT-011-anvil-handoff.md)).
+Kindling-side follow-ups: runtime facade (KINTEG-008) and contract hardening below. This
 module turns anvil's integration wishlist (received 2026-06-22) into a vetted,
 deduplicated work plan, grounded against what kindling already ships.
 

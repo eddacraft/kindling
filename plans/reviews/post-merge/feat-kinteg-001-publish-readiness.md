@@ -15,5 +15,5 @@
 
 ## Follow-up (not this PR)
 
-- [ ] PORT-011: anvil integration proof with raw `kindling-client`
+- [ ] PORT-011: anvil integration proof with raw `kindling-client` — **In Progress** in anvil; see [`plans/execution/PORT-011-anvil-handoff.md`](../../execution/PORT-011-anvil-handoff.md)
 - [ ] KINTEG-008: implement `kindling-runtime` facade (plan only in this PR)

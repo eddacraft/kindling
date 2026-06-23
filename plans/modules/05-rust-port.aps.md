@@ -4,7 +4,7 @@
 | ---- | ------ | ----------- |
 | PORT | @aneki | In Progress |
 
-**Last reviewed:** 2026-06-23
+**Last reviewed:** 2026-06-24 (PORT-011 In Progress in anvil)
 
 ## Purpose
 
@@ -163,10 +163,13 @@ Supersedes `02-rust-hook-binary` and `03-rust-cli`. Replaces the dual-maintain p
 - **Intent:** Demonstrate direct Rust-to-Rust integration from anvil with no TS bridge involvement
 - **Expected Outcome:** One anvil crate (pick the observation emitter that would otherwise call the TS bridge) depends on `kindling-client` (daemon path) and emits an observation directly to the kindling daemon; output matches what the TS bridge produces for the same input
 - **Validation:** Parity test in anvil comparing TS-bridge-emitted observation vs. Rust-direct-emitted observation for the same input; both land identically in the kindling database
-- **Status:** Ready
-- **Dependencies:** PORT-008
+- **Status:** In Progress — anvil KDS integration underway (external repo).
+  Handoff guide: [`plans/execution/PORT-011-anvil-handoff.md`](../execution/PORT-011-anvil-handoff.md).
+  Minimum: `command.invoked` → `kindling-client` with `spool`; parity test vs
+  NDJSON path closes the item.
+- **Dependencies:** PORT-008 (Done), KINTEG-001 (Done)
 
-> **Note (`kindling-spool`):** The reusable durable-emit layer is the `kindling-spool` crate, a thin opt-in wrapper over `kindling-client`. It keeps the daemon (SQLite) authoritative and treats a local append-only NDJSON spool as a transient write buffer: `append_observation` tries the socket and, on a connectivity failure only (`Unavailable`/`Http`), buffers to the spool; daemon-rejection errors (`Api`/`SchemaMismatch`/…) propagate and are never spooled. The spool drains on `flush()` and opportunistically on the next successful append. PORT-011's anvil sink (and any other producer that wants outage-survivable emits, e.g. the `usage.ndjson` pattern) builds on this instead of reinventing a fallback. v1 is at-least-once on a stable observation id; exactly-once is a noted follow-up (daemon-side dedup-on-id).
+> **Note (`kindling-client` spool):** The reusable durable-emit layer is `kindling-client::spool::SpooledClient` (opt-in `features = ["spool"]` — no standalone `kindling-spool` crate). It keeps the daemon (SQLite) authoritative and treats a local append-only NDJSON spool as a transient write buffer: `append_observation` tries the socket and, on a connectivity failure only (`Unavailable`/`Http`), buffers to the spool; daemon-rejection errors (`Api`/`SchemaMismatch`/…) propagate and are never spooled. The spool drains on `flush()` and opportunistically on the next successful append. PORT-011's anvil sink (and any other producer that wants outage-survivable emits, e.g. the `usage.ndjson` pattern) builds on this instead of reinventing a fallback. v1 is at-least-once on a stable observation id; exactly-once is a noted follow-up (daemon-side dedup-on-id).
 
 ### Phase 3 — CLI + Distribution
 
