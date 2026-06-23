@@ -469,6 +469,52 @@ fn append_observation_dedup_does_not_remask_or_mutate_stored_row() {
 }
 
 #[test]
+fn append_observation_replay_after_forget_keeps_redacted_row() {
+    let svc = service();
+    let scope = session_scope("dedup_forget");
+
+    // Store an observation under a fixed id.
+    let mut first = obs_input("content to be forgotten", scope.clone());
+    first.id = Some("forget-replay-id".to_string());
+    svc.append_observation(first, AppendObservationOptions::default())
+        .expect("first append");
+
+    // Forget it: content is redacted, the row (and its id) persists.
+    svc.forget("forget-replay-id").expect("forget");
+    let redacted = svc
+        .get_observation("forget-replay-id")
+        .expect("get")
+        .expect("present");
+    assert!(redacted.redacted);
+    assert_eq!(redacted.content, "[redacted]");
+
+    // Replay the same id with the original content. The id still exists, so the
+    // store ignores the write and the service returns the EXISTING (redacted)
+    // row, deduplicated. Forget wins; the original content is NOT restored.
+    let mut replay = obs_input("content to be forgotten", scope);
+    replay.id = Some("forget-replay-id".to_string());
+    let out = svc
+        .append_observation(replay, AppendObservationOptions::default())
+        .expect("replay append");
+    assert!(out.deduplicated, "replay of a forgotten id still dedups");
+    assert!(
+        out.observation.redacted,
+        "the returned row stays redacted (forget wins over replay)"
+    );
+    assert_eq!(
+        out.observation.content, "[redacted]",
+        "replay must not resurrect the forgotten content"
+    );
+
+    let stored = svc
+        .get_observation("forget-replay-id")
+        .expect("get")
+        .expect("present");
+    assert!(stored.redacted);
+    assert_eq!(stored.content, "[redacted]");
+}
+
+#[test]
 fn append_observation_dedup_reattach_to_capsule_is_idempotent() {
     let svc = service();
     let scope = session_scope("dedup3");
