@@ -50,7 +50,8 @@ to carry the opt-in `spool` durable-emit feature — `kindling-client`'s
   stays the sole source of truth; the spool is a transient write buffer, never a
   parallel one. Delivery is **at-least-once** in 0.2.0; daemon-side dedup for
   exactly-once is a tracked follow-up (KINTEG-002). New to crates.io — the
-  published `0.1.0` `kindling-client` shipped no `spool` feature.
+  published `0.1.0` `kindling-client` shipped no `spool` feature. There is no
+  standalone `kindling-spool` crate; the module lives in `kindling-client`.
 - **Rust engine** published to crates.io: `eddacraft-kindling` (the `kindling`
   CLI binary + Claude Code hooks), `kindling-client` (daemon-backed SDK, the
   default for integrations), `kindling-service` (embedded, in-process),
