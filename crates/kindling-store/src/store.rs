@@ -178,6 +178,15 @@ impl SqliteKindlingStore {
     /// observation to the same capsule is a no-op (`INSERT OR IGNORE` against
     /// the composite primary key), so replaying a deduplicated observation
     /// cannot error or create a duplicate link / a gap in `seq`.
+    ///
+    /// Concurrency note: the `SELECT MAX(seq)` then `INSERT` pair is NOT a
+    /// single atomic statement. It is only race-free because every caller is
+    /// serialized by the per-project service mutex (one writer at a time, the
+    /// daemon's single-writer rule). If that serialization is ever loosened
+    /// (finer-grained locking, a connection pool, direct concurrent store
+    /// access), two concurrent attaches to the same capsule could read the same
+    /// `MAX(seq)` and collide — wrap this read+write in a transaction (or use a
+    /// single `INSERT ... SELECT`) before relaxing the mutex granularity.
     pub fn attach_observation_to_capsule(
         &self,
         capsule_id: &str,
