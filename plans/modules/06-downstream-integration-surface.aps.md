@@ -172,7 +172,7 @@ Verified against the tree on 2026-06-22:
   registry test asserting every `ObservationKind` variant is present with its
   required fields.
 - **Dependencies:** —
-- **Status:** Proposed
+- **Status:** In Progress
 - **Notes:** Half-built today — `/v1/health` already returns version + schema +
   projects. Additive work: `supportedKinds`, `storagePath`, and folding the
   daemon/schema/version block into `kindling status --json` (currently
