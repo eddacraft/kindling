@@ -14,6 +14,7 @@ const CRATES: &[&str] = &[
     "kindling-service",
     "kindling-server",
     "kindling-client",
+    "kindling-runtime",
     "kindling",
 ];
 
@@ -47,7 +48,7 @@ fn workspace_version_is_020() {
 }
 
 #[test]
-fn all_seven_crates_use_workspace_version_and_pins() {
+fn all_workspace_crates_use_workspace_version_and_pins() {
     let root = workspace_root();
     for crate_dir in CRATES {
         let manifest = read(root.join("crates").join(crate_dir).join("Cargo.toml"));
@@ -103,8 +104,9 @@ fn spool_module_lives_only_under_kindling_client() {
         .filter_map(Result::ok)
         .map(|e| e.file_name().to_string_lossy().into_owned())
         .collect();
-    assert_eq!(members.len(), 7, "workspace must have exactly seven crates");
+    assert_eq!(members.len(), 8, "workspace must have exactly eight crates");
     assert!(members.contains(&"kindling-client".to_string()));
+    assert!(members.contains(&"kindling-runtime".to_string()));
     assert!(
         root.join("crates/kindling-client/src/spool.rs").is_file(),
         "spool.rs must live under kindling-client"
