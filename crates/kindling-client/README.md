@@ -13,6 +13,17 @@ This is the recommended Rust SDK for most integrations. It is a thin async clien
 kindling-client = "0.2"
 ```
 
+### Durable emit (`spool` feature)
+
+The opt-in `spool` feature adds [`SpooledClient`](https://docs.rs/kindling-client/latest/kindling_client/spool/struct.SpooledClient.html) — a durable-emit layer that buffers observations to a local NDJSON spool when the daemon is unreachable and replays them on the next successful append or an explicit `flush()`.
+
+```toml
+[dependencies]
+kindling-client = { version = "0.2", features = ["spool"] }
+```
+
+There is **no standalone `kindling-spool` crate**. The spool module ships inside `kindling-client` behind `features = ["spool"]` (off by default). Enable it only when your producer must survive daemon outages.
+
 ## Example
 
 ```rust
