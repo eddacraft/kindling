@@ -27,9 +27,19 @@
 //! the daemon now **deduplicates** on id: a write whose id already exists is
 //! ignored (the stored row is returned untouched, never overwritten or
 //! re-masked), surfaced via [`AppendResult::deduplicated`](crate::AppendResult).
-//! So a replay is an observable no-op rather than a duplicate row. ("-ish"
-//! because the dedup key is the observation id; two genuinely distinct writes
-//! that reuse an id would still collapse to one.)
+//! So a replay is an observable no-op rather than a duplicate row.
+//!
+//! Dedup only protects the **committed-but-not-yet-drained** window: an id was
+//! already assigned, the daemon stored the row, and a crash left a stale spool
+//! entry to replay. It does **not** make delivery durable end-to-end. In
+//! particular, an observation that is lost *before* its id reaches durable
+//! state — e.g. a crash between id assignment and the spool append, or a write
+//! the caller never spooled — is simply lost: there is nothing to replay, so
+//! nothing to dedup. So this is "at-most-once delivery of each *attempt*, with
+//! exactly-once *application* of whatever does reach the daemon", not
+//! at-least-once durability. ("-ish" also because the dedup key is the
+//! observation id; two genuinely distinct writes that reuse an id would
+//! collapse to one.)
 //!
 //! # Which failures spool vs propagate
 //!
