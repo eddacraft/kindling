@@ -365,6 +365,16 @@ async fn spool_status_after_outage_and_flush() {
     assert!(after_flush.last_flush_time_ms.is_some());
     assert!(after_flush.last_error.is_none());
     assert!(after_flush.replay_attempts >= 1);
+
+    drop(spooled);
+
+    // Passive inspection (CLI path) reads the persisted sidecar.
+    let passive = SpooledClient::spool_status_from_path(&spool_path).expect("passive status");
+    assert_eq!(passive.pending_count, 0);
+    assert_eq!(passive.spool_path, spool_path);
+    assert!(passive.last_flush_time_ms.is_some());
+    assert!(passive.last_error.is_none());
+    assert!(passive.replay_attempts >= 1);
 }
 
 /// Flush stops at the first connectivity failure, keeping the remainder.
