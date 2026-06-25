@@ -4,8 +4,10 @@
 | ------ | ------ | ----------- |
 | KINTEG | @aneki | In Progress |
 
-**Last reviewed:** 2026-06-24 (KINTEG-001/004 Done; KINTEG-002 PR #121 + KINTEG-008
-PR #122 In Progress awaiting merge; PORT-011 In Progress in anvil)
+**Last reviewed:** 2026-06-26 (D-009 accepted: KINTEG-003 Ready + new KINTEG-009
+spool cap, both unblocking anvil KDS-004/005 — issues #2910/#2916; KINTEG-001/004
+Done; KINTEG-002 PR #121 + KINTEG-008 PR #122 In Progress awaiting merge; PORT-011
+In Progress in anvil)
 
 ## Purpose
 
@@ -66,7 +68,8 @@ Verified against the tree on 2026-06-22:
 
 - Publish kindling 0.2.0 (client + spool) to crates.io
 - Daemon-side dedup on observation id (exactly-once-ish replay)
-- A structured (non-FTS) read/query API over the daemon
+- A structured (non-FTS) read/query API over the daemon (KINTEG-003)
+- A size/age retention cap on the client spool (KINTEG-009)
 - Capability handshake: version, schema version, supported observation kinds,
   storage path — over both `/v1/health` and `kindling status --json`
 - Machine-readable observation-kind registry (kinds + required fields)
@@ -163,12 +166,63 @@ Verified against the tree on 2026-06-22:
 - **Validation:** Endpoint tests covering each filter dimension + pagination
   determinism; client method round-trips the filters.
 - **Dependencies:** KINTEG-004 (shares the kind vocabulary)
-- **Status:** Proposed
+- **Status:** Ready — design accepted as D-009 (planning council, 2026-06-26).
+  Spec: `plans/specs/2026-06-26-kindling-read-api-and-spool-cap-design.md`.
 - **Notes:** This is FTS-independent retrieval (no BM25 query string). Reuse the
   existing `list` CLI semantics where possible but lift them to a daemon route
   with kind + time-range filters, which `list` lacks today. `taskId` is carried
   for provenance but is documented as not retrieval-filterable — keep that
   invariant unless anvil makes a concrete case.
+- **Design (D-009):** `POST /v1/observations/list` (POST+JSON, matches every data
+  route) with `{ scopeIds, kinds?, since?, until?, limit?, cursor?, includeRedacted? }`.
+  Keyset cursor (opaque base64 `<ts>:<id>`) over the store's stable `(ts ASC, id ASC)`
+  order — the only scheme complete under concurrent appends; **no offset**. Half-open
+  `[since, until)` bounds (kills boundary double-count); `kinds` is a list (omitted =
+  all); `limit` server-clamped to ≤1000; redacted excluded by default with a v1
+  `includeRedacted` flag (so a `forget()` on a `command.invoked` row doesn't inflate
+  anvil's `never_invoked`). Response `{ observations[], nextCursor? }` — **no
+  totalCount**, absent `nextCursor` = complete. **No server-side aggregation**
+  (anvil's view semantics stay in anvil — mechanism, not policy). **No schema bump**
+  (read-only, no DDL; stays v5; `idx_obs_repo_ts` serves the repo-scoped scan; a
+  dedicated ASC index + migration 006 is deferred until profiling proves a filesort;
+  old daemon → 404). New `store::list_observations` (not an overload of
+  `query_observations`), service method (no masking on reads), client
+  `list_observations`, and `kindling-types` request/result types. Consumer contract
+  (documented for anvil): `repo_id` must match append-time strings; the list is a
+  daemon-store view only (anvil flushes its spool before listing); daemon-down reads
+  return `Unavailable` with no fallback.
+
+### KINTEG-009: Spool retention cap (size + age)
+
+- **Intent:** Bound `SpooledClient`'s spool so retiring anvil's `usage.ndjson`
+  sidecar onto the spool (anvil KDS-005) is not a retention regression. The sidecar
+  trims to a rolling 7-day / 64 MiB window; the spool today has no cap and grows
+  unbounded under a prolonged daemon outage.
+- **Expected Outcome:** `SpoolConfig` gains `max_bytes: Option<u64>` and
+  `max_age_ms: Option<i64>` (struct becomes `#[non_exhaustive]` + builder), both
+  **defaulting to `None`/unbounded** (opt-in; anvil wires 64 MiB / 7d). `SpoolEntry`
+  gains `spooled_at` (real age basis). Trim drops the **oldest contiguous prefix
+  only** (age first, then bytes), **only inside the `flush()` lock** as part of the
+  existing atomic `temp_sibling`+rename rewrite — preserving drain order and never
+  dropping an un-drained entry ahead of a kept newer one. A lone entry larger than
+  `max_bytes` is kept (high-water target, not a hard ceiling). `dropped_count` added
+  to `SpoolStatus` so shed data is observable. Trim is documented as intentional
+  bounded loss — distinct from flush's "never silently drop" — i.e. "respect
+  at-least-once" means don't-reorder / don't-drop-newer-while-keeping-older, not
+  infinite retention. Client bumps **0.2 → 0.3**.
+- **Validation:** trim-by-bytes/age preserves order (oldest dropped); trim under
+  outage then flush still drains the remainder; lone oversize entry retained; legacy
+  entry without `spooled_at` is byte-trimmable but not age-trimmed; empty-spool trim
+  is a no-op; `dropped_count` increments; property test — survivors are always a
+  contiguous oldest-dropped suffix.
+- **Dependencies:** — (touches only `kindling-client`; independent of KINTEG-002/008)
+- **Status:** Ready — design accepted as D-009 (planning council, 2026-06-26).
+  Spec: `plans/specs/2026-06-26-kindling-read-api-and-spool-cap-design.md`. Sequenced
+  **first** (smaller, unblocks anvil's sidecar retirement; ships in the 0.3.0 bump).
+- **Notes:** No independent/concurrent trim and no CLI `spool trim` subcommand — an
+  out-of-band trim racing a flush (or a second process sharing the path) can drop
+  in-flight entries; single-producer-per-path stays the v1 invariant (the in-process
+  `Mutex` does not protect two processes). Source: anvil issue #2916.
 
 ### KINTEG-004: Capability handshake + machine-readable kind registry
 
