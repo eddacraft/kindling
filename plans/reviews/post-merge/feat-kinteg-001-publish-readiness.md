@@ -18,4 +18,4 @@
 - [x] PORT-011: anvil integration proof with raw `kindling-client` — **Merged**
       (anvil PR #2897 KDS-001/003 + #2906 KDS-002, 2026-06-24); see
       [`plans/execution/PORT-011-anvil-handoff.md`](../../execution/PORT-011-anvil-handoff.md)
-- [ ] KINTEG-008: implement `kindling-runtime` facade (plan only in this PR)
+- [x] KINTEG-008: `kindling-runtime` facade — **Merged** (PR #129, 2026-06-26); publish user-gated

@@ -4,8 +4,8 @@
 | ------ | ------ | ----------- |
 | KINTEG | @aneki | In Progress |
 
-**Last reviewed:** 2026-06-26 (KINTEG-009 Merged PR #126; KINTEG-003 Ready next;
-PORT-011 Merged; KINTEG-002 #121 + KINTEG-008 #122 awaiting merge)
+**Last reviewed:** 2026-06-26 (KINTEG-008 Merged PR #129; KINTEG-002 Merged PR #121;
+KINTEG-003 In Review PR #128; KINTEG-009 Merged PR #126; PORT-011 Merged)
 
 ## Purpose
 
@@ -14,7 +14,8 @@ whose KDS module proved direct `kindling-client` integration (**PORT-011 Merged*
 anvil PR #2897/2906). Anvil **KDS-004** remains blocked on kindling **KINTEG-003**
 (list API, #2910); **KDS-005** spool-cap prereq is satisfied (**KINTEG-009** Merged
 PR #126 — publish `kindling-client` 0.3.0 user-gated). Kindling-side
-follow-ups: runtime facade (KINTEG-008), dedup (#121), and contract hardening below. This
+follow-ups: contract hardening (KINTEG-006/007) and publish of the new runtime crate.
+This
 module turns anvil's integration wishlist (received 2026-06-22) into a vetted,
 deduplicated work plan, grounded against what kindling already ships.
 
@@ -45,9 +46,11 @@ Verified against the tree on 2026-06-22:
   _before_ spool so replay is idempotent on id. There is **no separate
   `kindling-spool` crate** — anvil's "publish kindling-spool" ask is really
   "publish the client, whose spool module ships with it."
-- **All seven workspace crates are published at 0.2.0** on crates.io (KINTEG-001,
-  completed 2026-06-24). `kindling-client` ships the opt-in `spool` feature
-  (`SpooledClient`); there is no standalone `kindling-spool` crate.
+- **Seven workspace crates published at 0.2.0** on crates.io (KINTEG-001,
+  completed 2026-06-24). An eighth crate, `kindling-runtime` (KINTEG-008 Merged
+  PR #129), is on `main` but not yet published. `kindling-client` ships the
+  opt-in `spool` feature (`SpooledClient`); there is no standalone
+  `kindling-spool` crate.
 - **Capability handshake is shipped (KINTEG-004).** `GET /v1/health` and
   `kindling status --json` return the full capability block (`version`,
   `schemaVersion`, `supportedKinds`, `storagePath`, `kindRegistry`); the TS thin
@@ -59,9 +62,10 @@ Verified against the tree on 2026-06-22:
 - **Redaction is enforced but silent.** `kindling-service/src/filter/secrets.rs`
   masks at the service boundary; the only signal returned is the `redacted`
   bool on an observation — no counts or classes.
-- **Dedup is a known, documented gap.** `spool.rs` states exactly-once "requires
-  the daemon to ignore (dedup) a write whose id already exists — a noted
-  follow-up, not yet implemented."
+- **Daemon-side dedup is shipped (KINTEG-002).** Append by stable observation `id`
+  is idempotent (`INSERT OR IGNORE` at the store boundary); responses surface a
+  `deduplicated` marker. Spool replay after outage is exactly-once-ish for the
+  drained window.
 
 ## In Scope
 
@@ -144,8 +148,7 @@ Verified against the tree on 2026-06-22:
 - **Validation:** Store-level test: appending the same id twice yields one row;
   client-level test: a replay of an already-delivered spool entry is a no-op.
 - **Dependencies:** —
-- **Status:** In Progress — PR #121 (`feat/kinteg-002-daemon-dedup`), gates green,
-  council review clean (no CRITICAL/MAJOR), awaiting review/merge.
+- **Status:** Merged — PR #121 (`feat/kinteg-002-daemon-dedup`, merged 2026-06-24).
 - **Notes:** Stable ids already exist (assigned in `SpooledClient` before spool).
   Contract decided: a **`deduplicated: bool`** marker (not silent) — `AppendOutcome`
   in `kindling-service`, `AppendResult` in `kindling-client`, top-level
@@ -337,16 +340,16 @@ Verified against the tree on 2026-06-22:
   - `cargo package --list -p kindling-runtime` includes `Cargo.toml`, `README.md`.
   - Post-publish: `cargo add kindling-runtime` resolves in a scratch crate; anvil
     KDS can drop direct `kindling-client` + `kindling-server` deps.
-- **Dependencies:** KINTEG-001 (Done); KINTEG-002 recommended before promoting
-  spool as runtime default (dedup closes the at-least-once gap). PORT-011 (Merged
-  in anvil with raw `kindling-client`) documents baseline integration pain; anvil
-  can migrate to `kindling-runtime` after #122 lands.
-- **Status:** In Progress — PR #122 (`feat/kinteg-008-runtime-facade`), stacked on
-  #121 (retarget to `main` once #121 merges). Gates green, council review clean after
-  remediation (TOCTOU doc, spool offline→drain test, `#[non_exhaustive]`), awaiting
-  review/merge. New crate `kindling-runtime` (v0.2.0) with `Runtime::start` /
-  `spooled_client()` / attach-or-start; `publish.sh` updated (runtime after client);
-  `publish_readiness` now asserts 8 crates.
+- **Dependencies:** KINTEG-001 (Done); KINTEG-002 (Merged — dedup closes the
+  at-least-once gap for spool-as-default). PORT-011 (Merged in anvil with raw
+  `kindling-client`) documents baseline integration pain; anvil can migrate to
+  `kindling-runtime` after publish.
+- **Status:** Merged — PR #129 (`feat/kinteg-008-onto-main`, merged 2026-06-26).
+  Cherry-picked onto current `main` (PR #122 had merged into `feat/kinteg-002-daemon-dedup`,
+  not `main`). New crate `kindling-runtime` (v0.2.0) with `Runtime::start` /
+  `spooled_client()` / attach-or-start; `spawn_log_path` compat fix for KINTEG-005;
+  `publish.sh` updated; `publish_readiness` asserts 8 crates. **Publish:** next
+  release should include `kindling-runtime` (user-gated `scripts/publish.sh`).
 - **Notes:**
   - **Not** a merge of the seven crates — composes `kindling-client` +
     `kindling-server`; CLI/npm adapters unchanged.
