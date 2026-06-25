@@ -16,8 +16,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-26
+
+Downstream-integration release. The daemon/client contract anvil consumes gains
+an exhaustive read API and a bounded spool, plus a one-dependency runtime facade.
+This is a **breaking** release for `kindling-client` (`SpoolConfig` is now
+`#[non_exhaustive]`); pre-1.0, a breaking change bumps the minor — hence 0.3.0.
+
+### Breaking
+
+- **`kindling-client::SpoolConfig` is now `#[non_exhaustive]`** and gains
+  `max_bytes` / `max_age_ms` fields. Construct it via `SpoolConfig::new(path)`
+  plus the `with_max_bytes` / `with_max_age_ms` builders rather than a struct
+  literal.
+- **`kindling-runtime`'s public config/error/strategy types are
+  `#[non_exhaustive]`** (built via their constructors/builders).
+
 ### Added
 
+- **Observation list/enumerate read API (KINTEG-003).** New
+  `POST /v1/observations/list` and `Client::list_observations` return the _full_
+  set of observations matching a `(kind, scope, half-open time-range)` filter,
+  deterministically paginated with an opaque keyset cursor over the stable
+  `(ts, id)` order — distinct from the ranked, capped `POST /v1/retrieve`. Lets a
+  consumer compute exact counts / set-differences over every matching row;
+  redacted rows are excluded unless `includeRedacted` is set. No schema change
+  (still v5). Unblocks anvil's daemon-backed usage views (KDS-004).
+- **Spool retention cap (KINTEG-009).** `SpoolConfig` gains optional
+  `max_bytes` / `max_age_ms` caps (default unbounded). When set, `flush()` trims
+  the oldest entries (age, then bytes) under its file lock — preserving drain
+  order and never dropping an un-drained entry ahead of a kept newer one; shed
+  entries are counted in `SpoolStatus::dropped_count`. Lets a downstream replace
+  a rolling NDJSON sidecar without a retention regression (KDS-005 prerequisite).
+- **`kindling-runtime` facade crate (KINTEG-008).** A single dependency bundling
+  attach-or-start daemon wiring and a spooled client, so a Rust consumer can embed
+  kindling without the `kindling` CLI on `PATH` or manual client + server glue.
+  First crates.io publish.
 - **Conversion surface** merged to main: `kindling demo`, `kindling browse`, `@eddacraft/kindling-adapter-vscode`, onboarding docs (`docs/quickstart/`, `docs/integrations.md`, adapter cookbook), Homebrew formula updates (macOS + Linux glibc), and automated homebrew-tap PR on release.
 
 ### Removed

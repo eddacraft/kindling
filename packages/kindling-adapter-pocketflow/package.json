@@ -1,6 +1,6 @@
 {
   "name": "@eddacraft/kindling-adapter-pocketflow",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "PocketFlow workflow adapter for kindling - capture node executions with intent and confidence",
   "type": "module",
   "main": "./dist/index.js",

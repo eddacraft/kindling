@@ -17,8 +17,8 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
-kindling-store = { path = "../kindling-store", version = "0.2.0" }
-kindling-types = { path = "../kindling-types", version = "0.2.0" }
+kindling-store = { path = "../kindling-store", version = "0.3.0" }
+kindling-types = { path = "../kindling-types", version = "0.3.0" }
 rusqlite = { version = "0.40", features = ["bundled"] }
 serde_json = "1"
 thiserror = "2"
