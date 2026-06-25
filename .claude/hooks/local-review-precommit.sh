@@ -1,0 +1,1 @@
+/home/aneki/Projects/src/code-env/.claude/hooks/local-review-precommit.sh
