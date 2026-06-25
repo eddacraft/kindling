@@ -73,27 +73,48 @@ export function extractMessageProvenance(event: MessageEvent): Record<string, un
 }
 
 /**
- * Sanitize tool arguments to remove sensitive data
+ * Sanitize tool arguments to remove sensitive data.
+ *
+ * Recurses into nested objects and arrays so that sensitive field names are
+ * redacted at any depth (e.g. `{ headers: { authorization: '…' } }`), not just
+ * at the top level.
  */
 function sanitizeArgs(args: Record<string, unknown>): Record<string, unknown> {
   const sanitized: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(args)) {
-    // Skip known sensitive fields
+    // Skip known sensitive fields (redact regardless of nesting depth)
     if (isSensitiveField(key)) {
       sanitized[key] = '[REDACTED]';
       continue;
     }
 
-    // Truncate long string values
-    if (typeof value === 'string' && value.length > 100) {
-      sanitized[key] = value.substring(0, 100) + '...';
-    } else {
-      sanitized[key] = value;
-    }
+    sanitized[key] = sanitizeValue(value);
   }
 
   return sanitized;
+}
+
+/**
+ * Recursively sanitize an arbitrary provenance value.
+ */
+function sanitizeValue(value: unknown): unknown {
+  // Truncate long string values
+  if (typeof value === 'string') {
+    return value.length > 100 ? value.substring(0, 100) + '...' : value;
+  }
+
+  // Recurse into arrays
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeValue(item));
+  }
+
+  // Recurse into plain objects so nested sensitive keys are redacted too
+  if (value !== null && typeof value === 'object') {
+    return sanitizeArgs(value as Record<string, unknown>);
+  }
+
+  return value;
 }
 
 /**

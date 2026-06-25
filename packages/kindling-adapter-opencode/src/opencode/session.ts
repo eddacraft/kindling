@@ -14,6 +14,7 @@
 import type { Capsule, Observation, ObservationInput, Kindling } from '@eddacraft/kindling';
 import type { OpenCodeEvent } from './events.js';
 import { mapEvent } from './mapping.js';
+import { filterContent, INGESTION_FILTER_OPTIONS } from './filter.js';
 
 /**
  * Session context tracking active session state
@@ -172,13 +173,19 @@ export class SessionManager {
       throw new Error(`No active session found for sessionId: ${sessionId}`);
     }
 
+    // Apply the safety policy to the summary at the ingestion boundary: mask
+    // secrets and truncate before it is persisted, same as observation content.
+    const summaryContent = signals?.summaryContent
+      ? filterContent(signals.summaryContent, INGESTION_FILTER_OPTIONS)
+      : undefined;
+
     const closed = await this.kindling.closeCapsule(context.activeCapsuleId, {
-      ...(signals?.summaryContent
+      ...(summaryContent
         ? {
             // The daemon only persists a summary when generateSummary is set.
             generateSummary: true,
-            summaryContent: signals.summaryContent,
-            confidence: signals.summaryConfidence ?? 0.8,
+            summaryContent,
+            confidence: signals?.summaryConfidence ?? 0.8,
           }
         : {}),
     });

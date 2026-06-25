@@ -63,6 +63,20 @@ export interface FilterOptions {
 }
 
 /**
+ * Safety policy applied to all captured content at the ingestion boundary.
+ *
+ * The package README promises that redaction and truncation are applied
+ * automatically. {@link filterContent} masks secrets only when explicitly
+ * asked (its default is truncation-only), so ingestion call sites pass this
+ * policy to actually enable masking before content is persisted.
+ */
+export const INGESTION_FILTER_OPTIONS: FilterOptions = {
+  maskSecrets: true,
+  maxLength: MAX_CONTENT_LENGTH,
+  showTruncationNotice: true,
+};
+
+/**
  * Truncate content if it exceeds max length
  *
  * @param content - Content to truncate
