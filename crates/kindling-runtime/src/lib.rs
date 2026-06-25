@@ -296,6 +296,7 @@ impl Runtime {
             poll_interval: Duration::from_millis(10),
             spawn: spawner,
             transport: Transport::default(),
+            spawn_log_path: None,
         };
 
         let client = Client::with_config(client_config);
