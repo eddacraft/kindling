@@ -4,18 +4,17 @@
 | ------ | ------ | ----------- |
 | KINTEG | @aneki | In Progress |
 
-**Last reviewed:** 2026-06-26 (D-009 accepted: KINTEG-003 Ready + new KINTEG-009
-spool cap, both unblocking anvil KDS-004/005 — issues #2910/#2916; KINTEG-001/004
-Done; KINTEG-002 PR #121 + KINTEG-008 PR #122 In Progress awaiting merge; PORT-011
-In Progress in anvil)
+**Last reviewed:** 2026-06-26 (PORT-011 Merged in anvil; D-009: KINTEG-003 Ready +
+KINTEG-009 Ready — unblocks anvil KDS-004/#2910 + KDS-005/#2916; KINTEG-002 #121 +
+KINTEG-008 #122 In Progress awaiting merge)
 
 ## Purpose
 
 Harden the contract kindling exposes to downstream consumers — chiefly **anvil**,
-whose KDS (kindling daemon source) module is integrating against `kindling-client`
-0.2.0 (with `spool`) on crates.io (**PORT-011 In Progress** — handoff at
-[`plans/execution/PORT-011-anvil-handoff.md`](../execution/PORT-011-anvil-handoff.md)).
-Kindling-side follow-ups: runtime facade (KINTEG-008) and contract hardening below. This
+whose KDS module proved direct `kindling-client` integration (**PORT-011 Merged** —
+anvil PR #2897/2906). Anvil KDS-004/005 remain blocked on kindling **KINTEG-003**
+(list API, #2910) and **KINTEG-009** (spool cap, #2916) per D-009. Kindling-side
+follow-ups: runtime facade (KINTEG-008), dedup (#121), and contract hardening below. This
 module turns anvil's integration wishlist (received 2026-06-22) into a vetted,
 deduplicated work plan, grounded against what kindling already ships.
 
@@ -332,10 +331,10 @@ Verified against the tree on 2026-06-22:
   - `cargo package --list -p kindling-runtime` includes `Cargo.toml`, `README.md`.
   - Post-publish: `cargo add kindling-runtime` resolves in a scratch crate; anvil
     KDS can drop direct `kindling-client` + `kindling-server` deps.
-- **Dependencies:** KINTEG-001 (published `kindling-client` 0.2.0 + spool);
-  KINTEG-002 recommended before promoting spool as runtime default (dedup closes
-  the at-least-once gap). PORT-011 (anvil integration proof) should land with
-  raw client first to document baseline pain, then migrate to runtime.
+- **Dependencies:** KINTEG-001 (Done); KINTEG-002 recommended before promoting
+  spool as runtime default (dedup closes the at-least-once gap). PORT-011 (Merged
+  in anvil with raw `kindling-client`) documents baseline integration pain; anvil
+  can migrate to `kindling-runtime` after #122 lands.
 - **Status:** In Progress — PR #122 (`feat/kinteg-008-runtime-facade`), stacked on
   #121 (retarget to `main` once #121 merges). Gates green, council review clean after
   remediation (TOCTOU doc, spool offline→drain test, `#[non_exhaustive]`), awaiting

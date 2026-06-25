@@ -1,11 +1,11 @@
 # kindling — Plan Index
 
-| Field   | Value                                                          |
-| ------- | -------------------------------------------------------------- |
-| Status  | In Progress                                                    |
-| Owner   | @aneki                                                         |
-| Created | 2026-03-14                                                     |
-| Updated | 2026-06-26 (D-009: read API + spool cap for anvil KDS-004/005) |
+| Field   | Value                                                    |
+| ------- | -------------------------------------------------------- |
+| Status  | In Progress                                              |
+| Owner   | @aneki                                                   |
+| Created | 2026-03-14                                               |
+| Updated | 2026-06-26 (PORT-011 Merged; D-009 read API + spool cap) |
 
 ## Problem
 
@@ -17,7 +17,7 @@ kindling is functional (596 tests passing, 10 packages building) and the TypeScr
 - [x] Single statically-linked `kindling` binary distributed via cargo (`cargo install eddacraft-kindling` @ 0.2.0 on crates.io); brew, curl|sh, and npm registry validation remain user-gated
 - [ ] `kindling serve` daemon: auto-spawn on first call, idle shutdown after 30 min default, UDS transport (TCP fallback on Windows)
 - [ ] All 7 Claude Code hook types complete in <10ms warm, <100ms cold
-- [ ] anvil emits observations directly via `kindling-client` or `kindling-service` — no TS bridge
+- [x] anvil emits observations directly via `kindling-client` — no TS bridge (`command.invoked` via `KindlingDaemonSink`, anvil PR #2897; opt-in `ANVIL_KINDLING_SINK=daemon`, default `ndjson` unchanged)
 - [x] `pnpm add @eddacraft/kindling` installs the binary and exposes a typed thin client with no native deps (in-repo: per-platform `optionalDependencies` injected at publish; end-to-end registry validation user-gated)
 - [x] All deprecated TS implementation packages removed from this repo (source dirs deleted; formal `1.0.0` tag + `npm deprecate` remain user-gated)
 
@@ -45,15 +45,16 @@ See `plans/specs/2026-05-03-rust-canonical-thin-client-design.md` for the curren
 
 ## Schedule
 
-| Phase | Modules                                   | Target                                                                                                                                 |
-| ----- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Now   | 05-rust-port (Phase 1)                    | Foundation crates: workspace, types, store, filter                                                                                     |
-| Next  | 05-rust-port (Phase 2)                    | Service + daemon + hook + Rust client; anvil unblocks                                                                                  |
-| Then  | 05-rust-port (Phase 3)                    | CLI + umbrella binary + cross-platform builds + cargo/brew/curl distribution                                                           |
-| Then  | 05-rust-port (Phase 4)                    | Thin TS client SDK on npm; deprecate TS implementation packages and anvil bridge                                                       |
-| Now   | 05-rust-port (PORT-011) + 06-downstream   | **PORT-011 In Progress** (anvil KDS); parallel: KINTEG-008 facade, KINTEG-002 dedup; then query / observability / redaction / fixtures |
-| Done  | 06-downstream-integration-surface (slice) | KINTEG-001 (crates.io 0.2.0 + spool), KINTEG-004 (capability handshake + kind registry)                                                |
-| Done  | 07-intent-capture-events                  | Intent capture primitive + export shipped (independent of the Rust port; KINTENT-001..006 merged)                                      |
+| Phase | Modules                                   | Target                                                                                                                  |
+| ----- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Now   | 05-rust-port (Phase 1)                    | Foundation crates: workspace, types, store, filter                                                                      |
+| Next  | 05-rust-port (Phase 2)                    | Service + daemon + hook + Rust client; anvil unblocks                                                                   |
+| Then  | 05-rust-port (Phase 3)                    | CLI + umbrella binary + cross-platform builds + cargo/brew/curl distribution                                            |
+| Then  | 05-rust-port (Phase 4)                    | Thin TS client SDK on npm; deprecate TS implementation packages and anvil bridge                                        |
+| Now   | 06-downstream-integration-surface         | KINTEG-009 spool cap (PR in flight), then KINTEG-003 list API (D-009); KINTEG-002/#121 + KINTEG-008/#122 awaiting merge |
+| Done  | 05-rust-port (slice)                      | PORT-011 (anvil KDS-001/003 parity proof, PR #2897)                                                                     |
+| Done  | 06-downstream-integration-surface (slice) | KINTEG-001, KINTEG-004, KINTEG-005 (spool observability)                                                                |
+| Done  | 07-intent-capture-events                  | Intent capture primitive + export shipped (independent of the Rust port; KINTENT-001..006 merged)                       |
 
 ## Risks
 
