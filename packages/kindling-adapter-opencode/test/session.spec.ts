@@ -256,6 +256,29 @@ describe.skipIf(!HAS_BINARY)('SessionManager (live daemon)', () => {
       expect(hits.candidates.some((c) => c.entity.content.includes('authsummarytoken'))).toBe(true);
     });
 
+    it('masks secrets in the summary before persisting', async () => {
+      await manager.onSessionStart({ sessionId: 's1', repoId: PROJECT_ROOT });
+
+      await manager.onSessionEnd('s1', {
+        reason: 'completed',
+        summaryContent: 'Done masksummaryneedle work; leftover api_key: SECRET123abc',
+        summaryConfidence: 0.9,
+      });
+
+      // The summary is retrievable by its non-secret token, but the secret
+      // value must have been redacted before the daemon stored it.
+      const hits = await client.retrieve({
+        query: 'masksummaryneedle',
+        scopeIds: { sessionId: 's1', repoId: PROJECT_ROOT },
+      });
+      const summaryHit = hits.candidates.find((c) =>
+        c.entity.content.includes('masksummaryneedle'),
+      );
+      expect(summaryHit).toBeDefined();
+      expect(summaryHit!.entity.content).not.toContain('SECRET123abc');
+      expect(summaryHit!.entity.content).toContain('[REDACTED]');
+    });
+
     it('throws for an unknown session', async () => {
       await expect(manager.onSessionEnd('unknown-session')).rejects.toThrow(
         'No active session found',

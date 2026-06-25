@@ -304,6 +304,140 @@ describe('Event Mapping', () => {
         expect(result.observation!.scopeIds.repoId).toBeUndefined();
       });
     });
+
+    describe('falsy tool results (presence over truthiness)', () => {
+      it.each([
+        ['empty string', '', 'Tool: compute\n\n'],
+        ['zero', 0, 'Tool: compute\n\n0'],
+        ['false', false, 'Tool: compute\n\nfalse'],
+        ['null', null, 'Tool: compute\n\nnull'],
+      ])('should preserve a %s tool result', (_label, resultValue, expectedContent) => {
+        const event: ToolCallEvent = {
+          type: 'tool_call',
+          timestamp: Date.now(),
+          sessionId: 's1',
+          toolName: 'compute',
+          args: {},
+          result: resultValue as unknown,
+        };
+
+        const result = mapEvent(event);
+
+        expect(result.observation).toBeDefined();
+        // The result section must be emitted, not silently dropped for a falsy value.
+        expect(result.observation!.content).toBe(expectedContent);
+      });
+    });
+
+    describe('content safety filtering at the ingestion boundary', () => {
+      it('should mask secrets in a tool result before persisting', () => {
+        const event: ToolCallEvent = {
+          type: 'tool_call',
+          timestamp: Date.now(),
+          sessionId: 's1',
+          toolName: 'http_get',
+          args: { url: 'https://api.example.com' },
+          result: 'response body\napi_key: SECRET123abc',
+        };
+
+        const result = mapEvent(event);
+
+        expect(result.observation).toBeDefined();
+        expect(result.observation!.content).toContain('[REDACTED]');
+        expect(result.observation!.content).not.toContain('SECRET123abc');
+      });
+
+      it('should mask secrets in command stderr before persisting', () => {
+        const event: CommandEvent = {
+          type: 'command',
+          timestamp: Date.now(),
+          sessionId: 's1',
+          command: 'deploy',
+          exitCode: 1,
+          stderr: 'auth failed token: SECRET123abc',
+        };
+
+        const result = mapEvent(event);
+
+        expect(result.observation).toBeDefined();
+        expect(result.observation!.content).toContain('[REDACTED]');
+        expect(result.observation!.content).not.toContain('SECRET123abc');
+      });
+
+      it('should mask secrets in a file diff before persisting', () => {
+        const event: FileChangeEvent = {
+          type: 'file_change',
+          timestamp: Date.now(),
+          sessionId: 's1',
+          paths: ['src/config.ts'],
+          diff: '@@ -1 +1 @@\n+const password = "SECRET123abc"',
+        };
+
+        const result = mapEvent(event);
+
+        expect(result.observation).toBeDefined();
+        expect(result.observation!.content).toContain('[REDACTED]');
+        expect(result.observation!.content).not.toContain('SECRET123abc');
+      });
+    });
+
+    describe('excluded path enforcement', () => {
+      it('should skip a file_change whose only path is excluded', () => {
+        const event: FileChangeEvent = {
+          type: 'file_change',
+          timestamp: Date.now(),
+          sessionId: 's1',
+          paths: ['.env'],
+          diff: 'API_KEY=SECRET123abc',
+        };
+
+        const result = mapEvent(event);
+
+        expect(result.skip).toBe(true);
+        expect(result.observation).toBeUndefined();
+      });
+
+      it('should drop excluded paths but keep capturable ones', () => {
+        const event: FileChangeEvent = {
+          type: 'file_change',
+          timestamp: Date.now(),
+          sessionId: 's1',
+          paths: ['src/index.ts', '.env'],
+        };
+
+        const result = mapEvent(event);
+
+        expect(result.observation).toBeDefined();
+        expect(result.observation!.content).toContain('src/index.ts');
+        expect(result.observation!.content).not.toContain('.env');
+        expect(result.observation!.provenance!.paths).toEqual(['src/index.ts']);
+      });
+    });
+
+    describe('nested provenance sanitization', () => {
+      it('should redact sensitive fields nested in args objects and arrays', () => {
+        const event: ToolCallEvent = {
+          type: 'tool_call',
+          timestamp: Date.now(),
+          sessionId: 's1',
+          toolName: 'http_request',
+          args: {
+            url: 'https://api.example.com',
+            headers: { authorization: 'Bearer abc123', accept: 'application/json' },
+            retries: [{ apiKey: 'nested-secret' }],
+          },
+        };
+
+        const result = mapEvent(event);
+
+        const args = result.observation!.provenance!.args as Record<string, unknown>;
+        const headers = args.headers as Record<string, unknown>;
+        expect(headers.authorization).toBe('[REDACTED]');
+        expect(headers.accept).toBe('application/json');
+        const retries = args.retries as Array<Record<string, unknown>>;
+        expect(retries[0].apiKey).toBe('[REDACTED]');
+      });
+    });
   });
 
   describe('mapEvents', () => {

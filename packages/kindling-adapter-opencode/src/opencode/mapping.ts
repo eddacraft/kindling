@@ -13,6 +13,7 @@ import {
   extractErrorProvenance,
   extractMessageProvenance,
 } from './provenance.js';
+import { filterContent, isExcludedPath, INGESTION_FILTER_OPTIONS } from './filter.js';
 
 /**
  * Mapping from OpenCode event types to kindling observation kinds
@@ -57,24 +58,42 @@ export function mapEvent(event: OpenCodeEvent): MapEventResult {
     };
   }
 
+  // Enforce excluded paths before building a file_diff observation. Drop any
+  // path the safety policy excludes (.env, credentials, keys, …); if nothing
+  // capturable remains, skip the event entirely so no file_diff is persisted.
+  let mappedEvent: OpenCodeEvent = event;
+  if (event.type === 'file_change') {
+    const includedPaths = event.paths.filter((p) => !isExcludedPath(p));
+    if (includedPaths.length === 0) {
+      return { skip: true };
+    }
+    mappedEvent = { ...event, paths: includedPaths };
+  }
+
   // Extract content
-  const content = extractContent(event);
-  if (!content) {
+  const rawContent = extractContent(mappedEvent);
+  // Use presence (not truthiness): an empty string is valid captured content.
+  if (rawContent === null) {
     return {
       error: `Could not extract content from event type: ${event.type}`,
     };
   }
 
-  // Extract provenance
-  const provenance = extractProvenance(event);
+  // Apply the safety policy at the ingestion boundary: mask secrets and
+  // truncate oversized output before the content is handed to the daemon for
+  // durable storage. This is the redaction the README promises is automatic.
+  const content = filterContent(rawContent, INGESTION_FILTER_OPTIONS);
+
+  // Extract provenance (a separate defence layer: structured arg sanitization)
+  const provenance = extractProvenance(mappedEvent);
 
   // Build scope IDs
   const scopeIds: ScopeIds = {
-    sessionId: event.sessionId,
+    sessionId: mappedEvent.sessionId,
   };
 
-  if (event.repoId) {
-    scopeIds.repoId = event.repoId;
+  if (mappedEvent.repoId) {
+    scopeIds.repoId = mappedEvent.repoId;
   }
 
   // Return observation input
@@ -122,7 +141,9 @@ function extractContent(event: OpenCodeEvent): string | null {
 function formatToolCallContent(event: OpenCodeEvent & { type: 'tool_call' }): string {
   const parts = [`Tool: ${event.toolName}`];
 
-  if (event.result) {
+  // Check for presence, not truthiness: a legitimate result of `false`, `0`,
+  // `''`, or `null` is still the tool outcome and must be captured.
+  if (event.result !== undefined) {
     const resultStr =
       typeof event.result === 'string' ? event.result : JSON.stringify(event.result, null, 2);
     parts.push(resultStr);
