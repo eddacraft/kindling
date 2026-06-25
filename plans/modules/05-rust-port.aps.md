@@ -4,7 +4,7 @@
 | ---- | ------ | ----------- |
 | PORT | @aneki | In Progress |
 
-**Last reviewed:** 2026-06-24 (PORT-011 In Progress in anvil)
+**Last reviewed:** 2026-06-26 (PORT-011 Merged in anvil via KDS-001/003)
 
 ## Purpose
 
@@ -163,10 +163,12 @@ Supersedes `02-rust-hook-binary` and `03-rust-cli`. Replaces the dual-maintain p
 - **Intent:** Demonstrate direct Rust-to-Rust integration from anvil with no TS bridge involvement
 - **Expected Outcome:** One anvil crate (pick the observation emitter that would otherwise call the TS bridge) depends on `kindling-client` (daemon path) and emits an observation directly to the kindling daemon; output matches what the TS bridge produces for the same input
 - **Validation:** Parity test in anvil comparing TS-bridge-emitted observation vs. Rust-direct-emitted observation for the same input; both land identically in the kindling database
-- **Status:** In Progress — anvil KDS integration underway (external repo).
-  Handoff guide: [`plans/execution/PORT-011-anvil-handoff.md`](../execution/PORT-011-anvil-handoff.md).
-  Minimum: `command.invoked` → `kindling-client` with `spool`; parity test vs
-  NDJSON path closes the item.
+- **Status:** Merged — anvil **eddacraft/anvil-001** PR #2897 (KDS-001 +
+  KDS-003, 2026-06-24) + PR #2906 (KDS-002 sink selection). `KindlingDaemonSink`
+  in `anvil-cli` over `kindling-client@0.2` + `spool`; NDJSON-vs-daemon parity
+  and spool replay tests green. Opt-in via `ANVIL_KINDLING_SINK=daemon` (default
+  `ndjson` unchanged). Tracked in kindling [#124](https://github.com/eddacraft/kindling/issues/124).
+  Handoff: [`plans/execution/PORT-011-anvil-handoff.md`](../execution/PORT-011-anvil-handoff.md).
 - **Dependencies:** PORT-008 (Done), KINTEG-001 (Done)
 
 > **Note (`kindling-client` spool):** The reusable durable-emit layer is `kindling-client::spool::SpooledClient` (opt-in `features = ["spool"]` — no standalone `kindling-spool` crate). It keeps the daemon (SQLite) authoritative and treats a local append-only NDJSON spool as a transient write buffer: `append_observation` tries the socket and, on a connectivity failure only (`Unavailable`/`Http`), buffers to the spool; daemon-rejection errors (`Api`/`SchemaMismatch`/…) propagate and are never spooled. The spool drains on `flush()` and opportunistically on the next successful append. PORT-011's anvil sink (and any other producer that wants outage-survivable emits, e.g. the `usage.ndjson` pattern) builds on this instead of reinventing a fallback. v1 is at-least-once on a stable observation id; exactly-once is a noted follow-up (daemon-side dedup-on-id).
@@ -244,5 +246,5 @@ Supersedes `02-rust-hook-binary` and `03-rust-cli`. Replaces the dual-maintain p
 - **Intent:** Retire the TS implementation surface that the Rust daemon now owns
 - **Expected Outcome:** `@eddacraft/kindling-core`, `-store-sqlite`, `-store-sqljs`, `-provider-local`, `-server`, `-cli` published with a `console.warn` deprecation in their entry point and an `npm deprecate` notice pointing at `@eddacraft/kindling`; anvil TS bridge `@eddacraft/anvil-kindling-integration` deprecated and removed in tandem with the anvil cutover (tracked in eddacraft repo); package source removed from this repo at `1.0.0` cut
 - **Validation:** `npm view <pkg>` shows deprecation notice for each retired package; this repo no longer contains the deprecated package source after the `1.0.0` tag; anvil builds without `@eddacraft/anvil-kindling-integration`
-- **Status:** In Progress — in-repo source removal done (`feat/next-release-prep`): the seven retired TS implementation package directories (`-core`, `-store-sqlite`, `-store-sqljs`, `-provider-local`, `-server`, `-cli`, `-adapter-claude-code`) and stale `tsconfig.base.json` path entries are gone; `pnpm install --frozen-lockfile` succeeds. Prior deprecation slice (warn-at-entry + `scripts/deprecate.sh`) landed earlier. REMAINING: credential-gated `npm deprecate` registry action (`scripts/deprecate.sh` after `npm login`); formal `1.0.0` tag cut naming the removal complete; anvil TS-bridge cutover (PORT-011) for any downstream coordination.
-- **Dependencies:** PORT-019, PORT-011
+- **Status:** In Progress — in-repo source removal done (`feat/next-release-prep`): the seven retired TS implementation package directories (`-core`, `-store-sqlite`, `-store-sqljs`, `-provider-local`, `-server`, `-cli`, `-adapter-claude-code`) and stale `tsconfig.base.json` path entries are gone; `pnpm install --frozen-lockfile` succeeds. Prior deprecation slice (warn-at-entry + `scripts/deprecate.sh`) landed earlier. REMAINING: credential-gated `npm deprecate` registry action (`scripts/deprecate.sh` after `npm login`); formal `1.0.0` tag cut naming the removal complete. Anvil `command.invoked` daemon path landed (PORT-011); full TS-bridge removal in anvil repo is separate follow-up.
+- **Dependencies:** PORT-019 (Done), PORT-011 (Merged)
