@@ -733,3 +733,106 @@ fn entity_id(e: &kindling_types::RetrievedEntity) -> kindling_types::Id {
         kindling_types::RetrievedEntity::Summary(s) => s.id.clone(),
     }
 }
+
+// ===== list_observations (KINTEG-003) =====
+
+fn command_input(id: &str, ts: i64) -> ObservationInput {
+    ObservationInput {
+        id: Some(id.to_string()),
+        kind: ObservationKind::Command,
+        content: format!("command {id}"),
+        provenance: None,
+        ts: Some(ts),
+        scope_ids: ScopeIds {
+            session_id: Some("s1".to_string()),
+            ..Default::default()
+        },
+        redacted: None,
+    }
+}
+
+#[tokio::test]
+async fn list_observations_round_trips_filters_and_paginates() {
+    let daemon = TestDaemon::start().await;
+    let client = daemon.client(PROJECT_A);
+
+    for (id, ts) in [("c1", 1000), ("c2", 2000), ("c3", 3000)] {
+        client
+            .append_observation(command_input(id, ts), None, None)
+            .await
+            .unwrap();
+    }
+    // A non-command in the same project DB must never appear in the results.
+    client
+        .append_observation(message_input("not a command"), None, None)
+        .await
+        .unwrap();
+
+    let base = kindling_client::ListObservationsRequest {
+        scope_ids: ScopeIds::default(),
+        kinds: vec![ObservationKind::Command],
+        since: None,
+        until: None,
+        limit: Some(2),
+        cursor: None,
+        include_redacted: None,
+    };
+
+    // Page 1: two commands, (ts ASC), with a next cursor.
+    let page1 = client.list_observations(base.clone()).await.unwrap();
+    assert_eq!(
+        page1
+            .observations
+            .iter()
+            .map(|o| o.id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["c1", "c2"]
+    );
+    assert!(page1
+        .observations
+        .iter()
+        .all(|o| o.kind == ObservationKind::Command));
+    let cursor = page1.next_cursor.clone().expect("more rows remain");
+
+    // Page 2: the last command, enumeration complete (no next cursor).
+    let page2 = client
+        .list_observations(kindling_client::ListObservationsRequest {
+            cursor: Some(cursor),
+            ..base.clone()
+        })
+        .await
+        .unwrap();
+    assert_eq!(
+        page2
+            .observations
+            .iter()
+            .map(|o| o.id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["c3"]
+    );
+    assert!(page2.next_cursor.is_none(), "no further pages");
+}
+
+#[tokio::test]
+async fn list_observations_rejects_malformed_cursor() {
+    let daemon = TestDaemon::start().await;
+    let client = daemon.client(PROJECT_A);
+
+    let err = client
+        .list_observations(kindling_client::ListObservationsRequest {
+            scope_ids: ScopeIds::default(),
+            kinds: vec![],
+            since: None,
+            until: None,
+            limit: None,
+            cursor: Some("!!! not a real cursor !!!".to_string()),
+            include_redacted: None,
+        })
+        .await
+        .unwrap_err();
+
+    match err {
+        ClientError::Api { status, .. } => assert_eq!(status, 400),
+        other => panic!("expected a 400 Api error, got {other:?}"),
+    }
+}

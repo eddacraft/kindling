@@ -487,6 +487,79 @@ impl SqliteKindlingStore {
         .collect()
     }
 
+    /// Exhaustive, deterministically-paginated observation list.
+    ///
+    /// Unlike [`Self::query_observations`] (ranked-adjacent, `ts DESC`), this
+    /// enumerates the **full** matching set in the stable `(ts ASC, id ASC)`
+    /// order via a keyset cursor — the only scheme that is complete under
+    /// concurrent appends (a row inserted after the cursor passed its position is
+    /// picked up on a later page, never skipped or duplicated by an offset shift).
+    ///
+    /// Filters: `scope` (denormalized columns), `kinds` (empty = all), and a
+    /// **half-open** `[since, until)` window on `ts`. `cursor` is the
+    /// `(ts, id)` of the last row of the previous page; rows strictly greater are
+    /// returned. Redacted rows are excluded unless `include_redacted`. Returns up
+    /// to `limit` rows; the caller fetches `limit + 1` to detect a next page.
+    #[allow(clippy::too_many_arguments)]
+    pub fn list_observations(
+        &self,
+        scope: Option<&ScopeIds>,
+        kinds: &[ObservationKind],
+        since: Option<Timestamp>,
+        until: Option<Timestamp>,
+        cursor: Option<(Timestamp, &str)>,
+        include_redacted: bool,
+        limit: u32,
+    ) -> StoreResult<Vec<Observation>> {
+        let mut sql = String::from(
+            "SELECT id, kind, content, provenance, ts, scope_ids, redacted
+             FROM observations
+             WHERE 1 = 1",
+        );
+        let mut params: Vec<SqlValue> = Vec::new();
+        if let Some(scope) = scope {
+            push_scope_filters(&mut sql, &mut params, scope);
+        }
+        if !include_redacted {
+            sql.push_str(" AND redacted = 0");
+        }
+        if !kinds.is_empty() {
+            sql.push_str(" AND kind IN (");
+            for (i, kind) in kinds.iter().enumerate() {
+                if i > 0 {
+                    sql.push(',');
+                }
+                sql.push('?');
+                params.push(SqlValue::Text(observation_kind_to_str(*kind).to_string()));
+            }
+            sql.push(')');
+        }
+        if let Some(since) = since {
+            sql.push_str(" AND ts >= ?");
+            params.push(SqlValue::Integer(since));
+        }
+        if let Some(until) = until {
+            sql.push_str(" AND ts < ?");
+            params.push(SqlValue::Integer(until));
+        }
+        if let Some((cur_ts, cur_id)) = cursor {
+            sql.push_str(" AND (ts > ? OR (ts = ? AND id > ?))");
+            params.push(SqlValue::Integer(cur_ts));
+            params.push(SqlValue::Integer(cur_ts));
+            params.push(SqlValue::Text(cur_id.to_string()));
+        }
+        sql.push_str(" ORDER BY ts ASC, id ASC LIMIT ?");
+        params.push(SqlValue::Integer(i64::from(limit)));
+
+        let mut stmt = self.conn.prepare(&sql)?;
+        let rows = stmt.query_map(params_from_iter(params), RawObservation::from_row)?;
+        rows.map(|row| {
+            row.map_err(StoreError::from)
+                .and_then(RawObservation::into_observation)
+        })
+        .collect()
+    }
+
     /// Evidence snippets for the given observation IDs, truncated to
     /// `max_chars` characters (with `...` appended when truncated). Preserves
     /// input order; silently skips IDs that do not exist.

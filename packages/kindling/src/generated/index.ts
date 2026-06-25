@@ -9,6 +9,8 @@ export type * from './CapsuleInput.js';
 export type * from './CapsuleStatus.js';
 export type * from './CapsuleType.js';
 export type * from './KindRegistryEntry.js';
+export type * from './ListObservationsRequest.js';
+export type * from './ListObservationsResult.js';
 export type * from './Observation.js';
 export type * from './ObservationInput.js';
 export type * from './ObservationKind.js';

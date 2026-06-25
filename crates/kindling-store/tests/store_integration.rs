@@ -645,3 +645,203 @@ fn per_project_paths_isolate_databases() {
     assert!(store_b.get_observation_by_id("obs-a").unwrap().is_none());
     assert!(Path::exists(&home.join("projects")));
 }
+
+// ===== list_observations (KINTEG-003) =====
+
+fn obs_full(
+    id: &str,
+    ts: i64,
+    kind: ObservationKind,
+    session: &str,
+    redacted: bool,
+) -> Observation {
+    Observation {
+        id: id.to_string(),
+        kind,
+        content: format!("content-{id}"),
+        provenance: serde_json::Map::new(),
+        ts,
+        scope_ids: scope(session),
+        redacted,
+    }
+}
+
+fn ids(rows: &[Observation]) -> Vec<String> {
+    rows.iter().map(|o| o.id.clone()).collect()
+}
+
+#[test]
+fn list_filters_by_kind() {
+    let store = SqliteKindlingStore::open_in_memory().unwrap();
+    store
+        .insert_observation(&obs_full("cmd", 1000, ObservationKind::Command, "s", false))
+        .unwrap();
+    store
+        .insert_observation(&obs_full(
+            "tool",
+            2000,
+            ObservationKind::ToolCall,
+            "s",
+            false,
+        ))
+        .unwrap();
+    store
+        .insert_observation(&obs_full("err", 3000, ObservationKind::Error, "s", false))
+        .unwrap();
+
+    // Single kind.
+    let only_cmd = store
+        .list_observations(
+            None,
+            &[ObservationKind::Command],
+            None,
+            None,
+            None,
+            false,
+            100,
+        )
+        .unwrap();
+    assert_eq!(ids(&only_cmd), vec!["cmd"]);
+
+    // Multiple kinds (kind IN (...)).
+    let cmd_and_err = store
+        .list_observations(
+            None,
+            &[ObservationKind::Command, ObservationKind::Error],
+            None,
+            None,
+            None,
+            false,
+            100,
+        )
+        .unwrap();
+    assert_eq!(ids(&cmd_and_err), vec!["cmd", "err"]); // (ts ASC)
+
+    // Empty kinds = all kinds.
+    let all = store
+        .list_observations(None, &[], None, None, None, false, 100)
+        .unwrap();
+    assert_eq!(ids(&all), vec!["cmd", "tool", "err"]);
+}
+
+#[test]
+fn list_time_bounds_are_half_open() {
+    let store = SqliteKindlingStore::open_in_memory().unwrap();
+    for (id, ts) in [("a", 1000), ("b", 2000), ("c", 3000)] {
+        store
+            .insert_observation(&obs_full(id, ts, ObservationKind::Command, "s", false))
+            .unwrap();
+    }
+    // [2000, 3000): since inclusive, until exclusive → only b.
+    let page = store
+        .list_observations(None, &[], Some(2000), Some(3000), None, false, 100)
+        .unwrap();
+    assert_eq!(ids(&page), vec!["b"]);
+}
+
+#[test]
+fn list_excludes_redacted_unless_requested() {
+    let store = SqliteKindlingStore::open_in_memory().unwrap();
+    store
+        .insert_observation(&obs_full(
+            "plain",
+            1000,
+            ObservationKind::Command,
+            "s",
+            false,
+        ))
+        .unwrap();
+    store
+        .insert_observation(&obs_full(
+            "secret",
+            2000,
+            ObservationKind::Command,
+            "s",
+            true,
+        ))
+        .unwrap();
+
+    let default = store
+        .list_observations(None, &[], None, None, None, false, 100)
+        .unwrap();
+    assert_eq!(ids(&default), vec!["plain"]);
+
+    let with_redacted = store
+        .list_observations(None, &[], None, None, None, true, 100)
+        .unwrap();
+    assert_eq!(ids(&with_redacted), vec!["plain", "secret"]);
+}
+
+#[test]
+fn list_keyset_cursor_paginates_without_skip_or_duplicate() {
+    let store = SqliteKindlingStore::open_in_memory().unwrap();
+    // Note the tie at ts=20 (ids b, c) to exercise the (ts, id) tiebreak.
+    for (id, ts) in [("a", 10), ("b", 20), ("c", 20), ("d", 30), ("e", 40)] {
+        store
+            .insert_observation(&obs_full(id, ts, ObservationKind::Command, "s", false))
+            .unwrap();
+    }
+
+    let page1 = store
+        .list_observations(None, &[], None, None, None, false, 2)
+        .unwrap();
+    assert_eq!(ids(&page1), vec!["a", "b"]);
+
+    // A concurrent append AFTER the cursor anchor must surface on a later page,
+    // exactly once — never skipped, never duplicated.
+    store
+        .insert_observation(&obs_full("m", 25, ObservationKind::Command, "s", false))
+        .unwrap();
+
+    let cursor = page1.last().map(|o| (o.ts, o.id.as_str())).unwrap();
+    let page2 = store
+        .list_observations(None, &[], None, None, Some(cursor), false, 2)
+        .unwrap();
+    assert_eq!(ids(&page2), vec!["c", "m"]); // (20,c) then (25,m)
+
+    let cursor = page2.last().map(|o| (o.ts, o.id.as_str())).unwrap();
+    let page3 = store
+        .list_observations(None, &[], None, None, Some(cursor), false, 2)
+        .unwrap();
+    assert_eq!(ids(&page3), vec!["d", "e"]);
+
+    let cursor = page3.last().map(|o| (o.ts, o.id.as_str())).unwrap();
+    let page4 = store
+        .list_observations(None, &[], None, None, Some(cursor), false, 2)
+        .unwrap();
+    assert!(page4.is_empty());
+
+    // Union across pages: every row once, in global order.
+    let mut all = Vec::new();
+    all.extend(ids(&page1));
+    all.extend(ids(&page2));
+    all.extend(ids(&page3));
+    assert_eq!(all, vec!["a", "b", "c", "m", "d", "e"]);
+}
+
+#[test]
+fn list_filters_by_repo_scope() {
+    let store = SqliteKindlingStore::open_in_memory().unwrap();
+    // `scope()` pins repo_id = "repo-1"; build a second repo inline.
+    store
+        .insert_observation(&obs_full(
+            "in-repo",
+            1000,
+            ObservationKind::Command,
+            "s",
+            false,
+        ))
+        .unwrap();
+    let mut other = obs_full("other-repo", 2000, ObservationKind::Command, "s", false);
+    other.scope_ids.repo_id = Some("repo-2".to_string());
+    store.insert_observation(&other).unwrap();
+
+    let filter = ScopeIds {
+        repo_id: Some("repo-1".to_string()),
+        ..Default::default()
+    };
+    let page = store
+        .list_observations(Some(&filter), &[], None, None, None, false, 100)
+        .unwrap();
+    assert_eq!(ids(&page), vec!["in-repo"]);
+}

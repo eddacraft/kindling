@@ -19,6 +19,7 @@
 //! GET    /v1/capsules/open?sessionId → 200 Capsule | null
 //! PATCH  /v1/capsules/:id/close      → 200 Capsule
 //! POST   /v1/observations            → 201 Observation
+//! POST   /v1/observations/list       → 200 ListObservationsResult (paginated)
 //! POST   /v1/observations/:id/forget  → 204 (redact an observation)
 //! POST   /v1/retrieve                → 200 RetrieveResult
 //! POST   /v1/pins                    → 201 Pin
@@ -83,10 +84,10 @@ use serde::Deserialize;
 /// stays an internal transitive dependency you never have to name.
 pub use kindling_types::{
     build_capability, kind_registry, supported_kind_names, CandidateResult, Capability, Capsule,
-    CapsuleStatus, CapsuleType, Id, KindRegistryEntry, Observation, ObservationInput,
-    ObservationKind, Pin, PinResult, PinTargetType, ProviderSearchOptions, ProviderSearchResult,
-    RetrieveOptions, RetrieveProvenance, RetrieveResult, RetrievedEntity, ScopeIds, Summary,
-    Timestamp,
+    CapsuleStatus, CapsuleType, Id, KindRegistryEntry, ListObservationsRequest,
+    ListObservationsResult, Observation, ObservationInput, ObservationKind, Pin, PinResult,
+    PinTargetType, ProviderSearchOptions, ProviderSearchResult, RetrieveOptions,
+    RetrieveProvenance, RetrieveResult, RetrievedEntity, ScopeIds, Summary, Timestamp,
 };
 
 use body::{
@@ -312,6 +313,25 @@ impl Client {
             "/v1/retrieve",
             true,
             Some(&options),
+            &[StatusCode::OK],
+        )
+        .await
+    }
+
+    /// `POST /v1/observations/list` — exhaustive, deterministically-paginated
+    /// observation list (FTS-independent; kind / scope / half-open time-range
+    /// filters with a keyset cursor). Returns one page; pass back
+    /// [`ListObservationsResult::next_cursor`] as
+    /// [`ListObservationsRequest::cursor`] until it is `None`.
+    pub async fn list_observations(
+        &self,
+        request: ListObservationsRequest,
+    ) -> Result<ListObservationsResult, ClientError> {
+        self.call(
+            "POST",
+            "/v1/observations/list",
+            true,
+            Some(&request),
             &[StatusCode::OK],
         )
         .await

@@ -12,6 +12,7 @@
 pub mod capability;
 pub mod capsule;
 pub mod common;
+pub mod list;
 pub mod observation;
 pub mod pin;
 pub mod retrieval;
@@ -23,6 +24,7 @@ pub use capability::{
 };
 pub use capsule::{Capsule, CapsuleInput, CapsuleStatus, CapsuleType};
 pub use common::{Id, ScopeIds, Timestamp, ValidationError};
+pub use list::{ListObservationsRequest, ListObservationsResult};
 pub use observation::{Observation, ObservationInput, ObservationKind};
 pub use pin::{is_pin_active, Pin, PinInput, PinTargetType};
 pub use retrieval::{
