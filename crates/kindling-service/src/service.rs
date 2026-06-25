@@ -9,9 +9,9 @@ use crate::filter::mask_secrets;
 use kindling_provider::{retrieve_at, LocalFtsProvider};
 use kindling_store::{SqliteKindlingStore, StoreError, StoreOptions};
 use kindling_types::{
-    Capsule, CapsuleInput, CapsuleStatus, CapsuleType, Id, Observation, ObservationInput, Pin,
-    PinInput, PinTargetType, RetrieveOptions, RetrieveResult, ScopeIds, Summary, SummaryInput,
-    Timestamp,
+    Capsule, CapsuleInput, CapsuleStatus, CapsuleType, Id, ListObservationsRequest,
+    ListObservationsResult, Observation, ObservationInput, Pin, PinInput, PinTargetType,
+    RetrieveOptions, RetrieveResult, ScopeIds, Summary, SummaryInput, Timestamp, ValidationError,
 };
 
 use crate::context::{PreCompactContext, ResolvedPin, SessionStartContext};
@@ -345,6 +345,66 @@ impl KindlingService {
         Ok(retrieve_at(&self.store, &provider, &options, now)?)
     }
 
+    /// Exhaustive, deterministically-paginated observation list — the
+    /// FTS-independent read path (no BM25 query string). Filters by kind, scope,
+    /// and a half-open `[since, until)` time window; paginates with an opaque
+    /// keyset cursor over the store's stable `(ts ASC, id ASC)` order.
+    ///
+    /// `limit` is clamped to `[1, 1000]` (default 100). A malformed `cursor`
+    /// yields a validation error (`400`). `scope_ids.task_id` is ignored — task
+    /// id is not a retrieval-filterable dimension.
+    pub fn list_observations(
+        &self,
+        request: ListObservationsRequest,
+    ) -> ServiceResult<ListObservationsResult> {
+        const DEFAULT_LIMIT: u32 = 100;
+        const MAX_LIMIT: u32 = 1000;
+
+        let limit = request.limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
+
+        let cursor = match request.cursor.as_deref() {
+            Some(raw) => Some(cursor::decode(raw).map_err(|()| {
+                ServiceError::Validation(vec![ValidationError {
+                    field: "cursor".to_string(),
+                    message: "malformed pagination cursor".to_string(),
+                    value: None,
+                }])
+            })?),
+            None => None,
+        };
+
+        // task_id is carried for provenance only; never a filter dimension.
+        let mut scope = request.scope_ids.clone();
+        scope.task_id = None;
+
+        let include_redacted = request.include_redacted.unwrap_or(false);
+        let cursor_ref = cursor.as_ref().map(|(ts, id)| (*ts, id.as_str()));
+
+        // Fetch one extra row to detect (and anchor) the next page.
+        let fetch = limit.saturating_add(1);
+        let mut observations = self.store.list_observations(
+            Some(&scope),
+            &request.kinds,
+            request.since,
+            request.until,
+            cursor_ref,
+            include_redacted,
+            fetch,
+        )?;
+
+        let next_cursor = if observations.len() as u32 > limit {
+            observations.truncate(limit as usize);
+            observations.last().map(|o| cursor::encode(o.ts, &o.id))
+        } else {
+            None
+        };
+
+        Ok(ListObservationsResult {
+            observations,
+            next_cursor,
+        })
+    }
+
     // ===== pins =====
 
     /// Create a pin. `note` → reason; `ttl_ms` → `expires_at = now + ttl_ms`.
@@ -532,4 +592,110 @@ fn now_ms() -> Timestamp {
         .duration_since(UNIX_EPOCH)
         .expect("system clock before Unix epoch")
         .as_millis() as Timestamp
+}
+
+/// Opaque keyset cursor for [`KindlingService::list_observations`].
+///
+/// Encodes `(ts, id)` as URL-safe base64 (no padding) of `"<ts>:<id>"`. Kept
+/// dependency-free and opaque so the wire token is stable and consumers cannot
+/// usefully parse or forge it. `id` (a UUID) never contains `:`.
+mod cursor {
+    use kindling_types::Timestamp;
+
+    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+
+    fn b64_encode(input: &[u8]) -> String {
+        let mut out = String::with_capacity(input.len().div_ceil(3) * 4);
+        for chunk in input.chunks(3) {
+            let b0 = chunk[0] as u32;
+            let b1 = *chunk.get(1).unwrap_or(&0) as u32;
+            let b2 = *chunk.get(2).unwrap_or(&0) as u32;
+            let n = (b0 << 16) | (b1 << 8) | b2;
+            out.push(ALPHABET[((n >> 18) & 0x3f) as usize] as char);
+            out.push(ALPHABET[((n >> 12) & 0x3f) as usize] as char);
+            if chunk.len() > 1 {
+                out.push(ALPHABET[((n >> 6) & 0x3f) as usize] as char);
+            }
+            if chunk.len() > 2 {
+                out.push(ALPHABET[(n & 0x3f) as usize] as char);
+            }
+        }
+        out
+    }
+
+    fn b64_decode(input: &str) -> Result<Vec<u8>, ()> {
+        fn val(c: u8) -> Result<u32, ()> {
+            match c {
+                b'A'..=b'Z' => Ok((c - b'A') as u32),
+                b'a'..=b'z' => Ok((c - b'a' + 26) as u32),
+                b'0'..=b'9' => Ok((c - b'0' + 52) as u32),
+                b'-' => Ok(62),
+                b'_' => Ok(63),
+                _ => Err(()),
+            }
+        }
+        let bytes = input.as_bytes();
+        let mut out = Vec::with_capacity(input.len() / 4 * 3);
+        for chunk in bytes.chunks(4) {
+            if chunk.len() < 2 {
+                return Err(());
+            }
+            let mut n = 0u32;
+            for (i, &c) in chunk.iter().enumerate() {
+                n |= val(c)? << (18 - 6 * i);
+            }
+            out.push((n >> 16) as u8);
+            if chunk.len() > 2 {
+                out.push((n >> 8) as u8);
+            }
+            if chunk.len() > 3 {
+                out.push(n as u8);
+            }
+        }
+        Ok(out)
+    }
+
+    /// Encode a `(ts, id)` anchor into an opaque cursor token.
+    pub(crate) fn encode(ts: Timestamp, id: &str) -> String {
+        b64_encode(format!("{ts}:{id}").as_bytes())
+    }
+
+    /// Decode a cursor token back to `(ts, id)`. `Err(())` on any malformed input.
+    pub(crate) fn decode(raw: &str) -> Result<(Timestamp, String), ()> {
+        let s = String::from_utf8(b64_decode(raw)?).map_err(|_| ())?;
+        let (ts_str, id) = s.split_once(':').ok_or(())?;
+        let ts = ts_str.parse::<Timestamp>().map_err(|_| ())?;
+        if id.is_empty() {
+            return Err(());
+        }
+        Ok((ts, id.to_string()))
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn round_trips_various_lengths() {
+            for id in [
+                "a",
+                "ab",
+                "abc",
+                "abcd",
+                "550e8400-e29b-41d4-a716-446655440000",
+            ] {
+                let token = encode(1_750_000_000_123, id);
+                assert_eq!(decode(&token).unwrap(), (1_750_000_000_123, id.to_string()));
+            }
+        }
+
+        #[test]
+        fn rejects_malformed() {
+            assert!(decode("").is_err()); // empty
+            assert!(decode("####").is_err()); // non-alphabet chars
+            assert!(decode(&b64_encode(b"no-colon-here")).is_err()); // missing ':'
+            assert!(decode(&b64_encode(b"notanumber:abc")).is_err()); // bad ts
+            assert!(decode(&b64_encode(b"123:")).is_err()); // empty id
+        }
+    }
 }

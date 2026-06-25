@@ -15,7 +15,10 @@ use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::Json;
 use kindling_service::AppendObservationOptions;
-use kindling_types::{build_capability, Capsule, Pin, RetrieveOptions, RetrieveResult};
+use kindling_types::{
+    build_capability, Capsule, ListObservationsRequest, ListObservationsResult, Pin,
+    RetrieveOptions, RetrieveResult,
+};
 use serde_json::{json, Value};
 
 use crate::dto::{
@@ -158,6 +161,22 @@ pub async fn append_observation(
         guard.append_observation(req.input, options)?
     };
     Ok((StatusCode::CREATED, Json(outcome.into())))
+}
+
+/// `POST /v1/observations/list` — exhaustive, paginated observation list
+/// (kind / scope / half-open time-range filters; keyset cursor). FTS-independent.
+pub async fn list_observations(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(request): Json<ListObservationsRequest>,
+) -> Result<Json<ListObservationsResult>, ApiError> {
+    let root = project_root(&headers)?;
+    let svc = state.service_for(&root)?;
+    let result = {
+        let guard = svc.lock().expect("service mutex poisoned");
+        guard.list_observations(request)?
+    };
+    Ok(Json(result))
 }
 
 /// `POST /v1/retrieve` — ranked retrieval.
