@@ -12,7 +12,7 @@ mod support;
 use std::io::Write;
 use std::path::PathBuf;
 
-use kindling_client::spool::{AppendOutcome, SpoolError, SpooledClient};
+use kindling_client::spool::{AppendOutcome, SpoolConfig, SpoolEntry, SpoolError, SpooledClient};
 use kindling_client::ClientError;
 use kindling_types::{ObservationInput, ObservationKind, RetrieveOptions, ScopeIds};
 use serde_json::Value;
@@ -520,4 +520,181 @@ async fn flush_keeps_remainder_when_down() {
     assert_eq!(report.replayed, 0);
     assert_eq!(report.remaining, 2);
     assert_eq!(spooled.pending_count().unwrap(), 2);
+}
+
+// --- Retention cap (KINTEG-009) ---------------------------------------------
+
+fn now_ms() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as i64
+}
+
+const DAY_MS: i64 = 86_400_000;
+
+/// Build a spool entry with an explicit `spooled_at` stamp.
+fn spool_entry(content: &str, spooled_at: Option<i64>) -> SpoolEntry {
+    let mut input = message_input(content);
+    input.id = Some(format!("id-{content}"));
+    SpoolEntry {
+        input,
+        capsule_id: None,
+        validate: None,
+        spooled_at,
+    }
+}
+
+/// Hand-write a spool file (NDJSON, one entry per line) so age can be controlled.
+fn write_spool(path: &PathBuf, entries: &[SpoolEntry]) {
+    let mut f = std::fs::File::create(path).unwrap();
+    for e in entries {
+        f.write_all(serde_json::to_string(e).unwrap().as_bytes())
+            .unwrap();
+        f.write_all(b"\n").unwrap();
+    }
+    f.flush().unwrap();
+}
+
+/// The `content` of each entry still buffered in the spool file, in order.
+fn spool_contents(path: &PathBuf) -> Vec<String> {
+    std::fs::read_to_string(path)
+        .unwrap_or_default()
+        .lines()
+        .filter(|l| !l.is_empty())
+        .map(|l| {
+            let v: Value = serde_json::from_str(l).unwrap();
+            v["input"]["content"].as_str().unwrap().to_string()
+        })
+        .collect()
+}
+
+/// A byte cap trims the oldest entries on flush even while the daemon is down,
+/// keeping a contiguous newest suffix; the retained remainder then drains
+/// cleanly once the daemon is up. Covers order preservation + `dropped_count`.
+#[tokio::test]
+async fn byte_cap_trims_oldest_on_flush_then_drains() {
+    let dir = tempfile::tempdir().unwrap();
+    let socket = dir.path().join("nope.sock");
+    let (_spool_dir, spool_path) = spool_tempdir();
+
+    // Spool four entries while down (no cap yet).
+    let down = SpooledClient::new(down_client(socket.clone(), PROJECT), spool_path.clone());
+    let all = ["one", "two", "three", "four"];
+    for c in all {
+        down.append_observation(message_input(c), None, None)
+            .await
+            .unwrap();
+    }
+    assert_eq!(down.pending_count().unwrap(), 4);
+    drop(down);
+
+    // Cap to ~half the file so the oldest entries must be shed.
+    let file_len = std::fs::metadata(&spool_path).unwrap().len();
+    let capped = SpooledClient::with_config(
+        down_client(socket.clone(), PROJECT),
+        SpoolConfig::new(spool_path.clone()).with_max_bytes(file_len / 2),
+    );
+
+    // Flush while STILL down: replays nothing, but trims the retained remainder.
+    let report = capped.flush().await.expect("flush while down ok");
+    assert_eq!(report.replayed, 0);
+
+    let kept = spool_contents(&spool_path);
+    assert!(
+        !kept.is_empty() && kept.len() < all.len(),
+        "expected a partial trim, got {kept:?}"
+    );
+    // Survivors are the newest contiguous suffix of the original order.
+    let expected: Vec<String> = all[all.len() - kept.len()..]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+    assert_eq!(kept, expected);
+    assert!(!kept.contains(&"one".to_string()), "oldest must be dropped");
+
+    let status = capped.spool_status().await.unwrap();
+    assert_eq!(status.dropped_count as usize, all.len() - kept.len());
+    drop(capped);
+
+    // Daemon up: the retained remainder still drains to zero.
+    let daemon = TestDaemon::start().await;
+    let live = SpooledClient::with_config(
+        daemon.client(PROJECT),
+        SpoolConfig::new(spool_path.clone()).with_max_bytes(file_len / 2),
+    );
+    let report = live.flush().await.expect("drain");
+    assert_eq!(report.replayed, kept.len());
+    assert_eq!(live.pending_count().unwrap(), 0);
+}
+
+/// An age cap drops the leading run of over-age entries and spares the rest.
+#[tokio::test]
+async fn age_cap_trims_old_entries_on_flush() {
+    let dir = tempfile::tempdir().unwrap();
+    let socket = dir.path().join("nope.sock");
+    let (_spool_dir, spool_path) = spool_tempdir();
+
+    let now = now_ms();
+    write_spool(
+        &spool_path,
+        &[
+            spool_entry("ancient", Some(now - 10 * DAY_MS)),
+            spool_entry("stale", Some(now - 8 * DAY_MS)),
+            spool_entry("fresh", Some(now - 1_000)),
+        ],
+    );
+
+    let capped = SpooledClient::with_config(
+        down_client(socket, PROJECT),
+        SpoolConfig::new(spool_path.clone()).with_max_age_ms(7 * DAY_MS),
+    );
+    let report = capped.flush().await.expect("flush while down ok");
+    assert_eq!(report.replayed, 0);
+    assert_eq!(spool_contents(&spool_path), vec!["fresh"]);
+    assert_eq!(capped.spool_status().await.unwrap().dropped_count, 2);
+}
+
+/// A legacy entry (no `spooled_at`) at the front blocks the age trim — it is
+/// never age-dropped, and it shields the entries behind it too.
+#[tokio::test]
+async fn legacy_entry_without_stamp_blocks_age_trim() {
+    let dir = tempfile::tempdir().unwrap();
+    let socket = dir.path().join("nope.sock");
+    let (_spool_dir, spool_path) = spool_tempdir();
+
+    let now = now_ms();
+    write_spool(
+        &spool_path,
+        &[
+            spool_entry("legacy", None),
+            spool_entry("ancient", Some(now - 30 * DAY_MS)),
+        ],
+    );
+
+    let capped = SpooledClient::with_config(
+        down_client(socket, PROJECT),
+        SpoolConfig::new(spool_path.clone()).with_max_age_ms(7 * DAY_MS),
+    );
+    capped.flush().await.expect("flush while down ok");
+    assert_eq!(spool_contents(&spool_path), vec!["legacy", "ancient"]);
+    assert_eq!(capped.spool_status().await.unwrap().dropped_count, 0);
+}
+
+/// The default (`SpooledClient::new`, no caps) never trims — existing behaviour.
+#[tokio::test]
+async fn unbounded_default_keeps_all_on_flush() {
+    let dir = tempfile::tempdir().unwrap();
+    let socket = dir.path().join("nope.sock");
+    let (_spool_dir, spool_path) = spool_tempdir();
+
+    let down = SpooledClient::new(down_client(socket, PROJECT), spool_path.clone());
+    for c in ["a", "b", "c"] {
+        down.append_observation(message_input(c), None, None)
+            .await
+            .unwrap();
+    }
+    let report = down.flush().await.expect("flush while down ok");
+    assert_eq!(report.remaining, 3);
+    assert_eq!(down.spool_status().await.unwrap().dropped_count, 0);
 }
