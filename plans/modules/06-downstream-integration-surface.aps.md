@@ -5,7 +5,8 @@
 | KINTEG | @aneki | In Progress |
 
 **Last reviewed:** 2026-06-26 (KINTEG-008 Merged PR #129; KINTEG-002 Merged PR #121;
-KINTEG-003 In Review PR #128; KINTEG-009 Merged PR #126; PORT-011 Merged)
+KINTEG-003 In Review PR #128; KINTEG-009 Merged PR #126; PORT-011 Merged;
+KINTEG-010/011/012 drafted from clawpatch review of `main`)
 
 ## Purpose
 
@@ -360,3 +361,65 @@ Verified against the tree on 2026-06-22:
     shared-socket-free hot path.
   - KINTEG-003/004 capability and query methods should eventually hang off
     `Runtime` (thin delegates), not duplicate wire shapes.
+
+### KINTEG-010: Authenticate the TCP daemon transport (no per-user boundary)
+
+- **Intent:** Close the gap where the TCP fallback transport exposes the same
+  router as the UDS path but with no per-user authentication — material on
+  platforms (e.g. Windows) where loopback TCP is the default transport.
+- **Expected Outcome:** Non-health requests over TCP require an unguessable
+  per-daemon secret (or an OS transport with per-user ACLs). The
+  `X-Kindling-Project` header is never treated as authorization, and any
+  discovery/port file is written owner-only.
+- **Validation:** Server test: a TCP data request without the secret is
+  rejected, with it accepted; assert an arbitrary `X-Kindling-Project` header
+  alone cannot read or modify another project's memory.
+- **Dependencies:** —
+- **Status:** Draft
+- **Notes:** Surfaced by clawpatch/codex review (2026-06-26), confirmed-bug
+  (high/high). `crates/kindling-server/src/lib.rs` (`serve_on_tcp`, ~L189-203).
+  The UDS path relies on filesystem permissions; the TCP path only publishes the
+  port number. Treat as a **design decision first** — confirm the intended TCP
+  trust model (a decision record may be warranted) before implementing.
+
+### KINTEG-011: Make capsule close atomic when the summary is missing
+
+- **Intent:** A close that fails summary validation must not leave the capsule
+  closed. Today the status update can succeed before `SummaryNotFound` is
+  returned, so callers get a failure while the capsule is left closed —
+  corrupting lifecycle state relative to the reported error and blocking a clean
+  retry.
+- **Expected Outcome:** `close_capsule` validates the summary exists for the
+  capsule before updating status (or wraps update + validation in a transaction
+  that rolls back on failure). A failed close leaves the capsule open with
+  `closed_at` unchanged.
+- **Validation:** Update
+  `crates/kindling-store/tests/store_integration.rs::close_capsule_validates_summary`
+  to assert the capsule remains open (status and `closed_at` unchanged) after a
+  `SummaryNotFound` failure.
+- **Dependencies:** —
+- **Status:** Draft
+- **Notes:** Surfaced by clawpatch/codex review (2026-06-26), confirmed-bug
+  (medium/high). Touches `kindling-store` — sequence after / coordinate with any
+  in-flight store work (KINTEG-002) to avoid collision.
+
+### KINTEG-012: Honor `--db` routing hint in daemon-backed commands
+
+- **Intent:** `build_client` is documented to honor `--db` as a socket-routing
+  project hint, but the implementation ignores it and always constructs a default
+  client. So `--via-daemon` commands with an explicit `--db` are silently routed
+  by process cwd / the default client, potentially reading or writing a different
+  project DB than the invocation names.
+- **Expected Outcome:** The resolved common `--db` value is threaded into
+  daemon-backed client construction and translated into the daemon routing /
+  project hint the API contract promises — or `--via-daemon` with `--db` is
+  rejected for all affected commands with a clear error.
+- **Validation:** Daemon test exercising `--via-daemon <cmd> --db <path>` that
+  asserts routing to the named project (or a clean rejection), extending the
+  current import-only `--via-daemon` + `--db` coverage.
+- **Dependencies:** Relates to KINTEG-003 (read/query API also rides daemon
+  routing).
+- **Status:** Draft
+- **Notes:** Surfaced by clawpatch/codex review (2026-06-26), contract-mismatch
+  (medium/medium). `crates/kindling/src/lib.rs` (`build_client`, ~L188); coverage
+  gap in `crates/kindling/tests/daemon.rs`.
