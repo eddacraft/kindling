@@ -19,7 +19,7 @@ const { createHash } = require('crypto');
 const { execFileSync } = require('child_process');
 const { existsSync, mkdirSync } = require('fs');
 const { homedir } = require('os');
-const { join, resolve, dirname } = require('path');
+const { join, resolve, dirname, sep } = require('path');
 
 /**
  * Resolve the project root directory.
@@ -33,8 +33,16 @@ const { join, resolve, dirname } = require('path');
  */
 function projectRoot(cwd) {
   const cached = process.env.KINDLING_REPO_ROOT;
-  if (cached && resolve(cwd).startsWith(cached)) {
-    return cached;
+  if (cached) {
+    // Only honour the override when the cwd is genuinely inside the root.
+    // A raw string prefix test would accept siblings (e.g. cwd
+    // `/work/repo-copy` for root `/work/repo`); require an exact match or a
+    // real path-boundary so we never target another project's hash/DB.
+    const cwdResolved = resolve(cwd);
+    const rootResolved = resolve(cached);
+    if (cwdResolved === rootResolved || cwdResolved.startsWith(rootResolved + sep)) {
+      return cached;
+    }
   }
   try {
     return execFileSync('git', ['rev-parse', '--show-toplevel'], {

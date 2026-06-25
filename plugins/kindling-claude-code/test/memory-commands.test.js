@@ -17,11 +17,12 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const { execFileSync } = require('node:child_process');
-const { mkdtempSync, existsSync } = require('node:fs');
+const { mkdtempSync, mkdirSync, existsSync } = require('node:fs');
 const { tmpdir } = require('node:os');
-const { join } = require('node:path');
+const { join, resolve } = require('node:path');
 
 const SCRIPTS = join(__dirname, '..', 'scripts');
+const { projectRoot } = require(join(SCRIPTS, 'lib', 'kindling.js'));
 
 function resolveBin() {
   const bin = process.env.KINDLING_BIN;
@@ -69,6 +70,57 @@ function cliJson(db, args) {
   });
   return JSON.parse(out);
 }
+
+// --- projectRoot path containment (no binary required) ----------------------
+//
+// KINDLING_REPO_ROOT must only be honoured when the cwd is genuinely inside the
+// root. A raw string prefix test would wrongly accept a sibling directory
+// (e.g. `/work/repo-copy` for root `/work/repo`), letting a command target
+// another project's hash → DB. These tests pin the real path-boundary check.
+
+test('projectRoot honours KINDLING_REPO_ROOT for the exact root', () => {
+  const root = mkdtempSync(join(tmpdir(), 'kindling-root-'));
+  const saved = process.env.KINDLING_REPO_ROOT;
+  process.env.KINDLING_REPO_ROOT = root;
+  try {
+    assert.equal(projectRoot(root), root);
+  } finally {
+    if (saved === undefined) delete process.env.KINDLING_REPO_ROOT;
+    else process.env.KINDLING_REPO_ROOT = saved;
+  }
+});
+
+test('projectRoot honours KINDLING_REPO_ROOT for a child path', () => {
+  const root = mkdtempSync(join(tmpdir(), 'kindling-root-'));
+  const child = join(root, 'nested', 'sub');
+  mkdirSync(child, { recursive: true });
+  const saved = process.env.KINDLING_REPO_ROOT;
+  process.env.KINDLING_REPO_ROOT = root;
+  try {
+    assert.equal(projectRoot(child), root);
+  } finally {
+    if (saved === undefined) delete process.env.KINDLING_REPO_ROOT;
+    else process.env.KINDLING_REPO_ROOT = saved;
+  }
+});
+
+test('projectRoot rejects a sibling path sharing a string prefix', () => {
+  const root = mkdtempSync(join(tmpdir(), 'kindling-root-'));
+  // A sibling whose path starts with `root` as a raw string but is NOT inside
+  // it: `<root>-copy`. The override must be ignored here.
+  const sibling = root + '-copy';
+  mkdirSync(sibling, { recursive: true });
+  const saved = process.env.KINDLING_REPO_ROOT;
+  process.env.KINDLING_REPO_ROOT = root;
+  try {
+    const resolved = projectRoot(sibling);
+    assert.notEqual(resolved, root, 'sibling path must not resolve to the override root');
+    assert.equal(resolved, resolve(sibling));
+  } finally {
+    if (saved === undefined) delete process.env.KINDLING_REPO_ROOT;
+    else process.env.KINDLING_REPO_ROOT = saved;
+  }
+});
 
 test('memory-search finds seeded content', { skip }, () => {
   const { db, env } = freshEnv();
@@ -162,6 +214,27 @@ test('memory-unpin reports not-found for an unknown prefix', { skip }, () => {
   assert.match(out, /Pin not found: nopenope/);
 });
 
+test('memory-unpin aborts on an ambiguous prefix without unpinning', { skip }, () => {
+  const { db, env } = freshEnv();
+  // Every pin id starts with the literal `pin_`, so that prefix matches all of
+  // them — a deterministic ambiguous prefix once more than one pin exists.
+  seed(db, 'first pin target');
+  runScript('memory-pin.js', ['pin one'], env);
+  seed(db, 'second pin target');
+  runScript('memory-pin.js', ['pin two'], env);
+
+  const before = cliJson(db, ['list', 'pins']);
+  assert.equal(before.length, 2);
+
+  const out = runScript('memory-unpin.js', ['pin_'], env);
+  assert.match(out, /Ambiguous pin id/);
+  assert.doesNotMatch(out, /Removed pin:/);
+
+  // Both pins must survive.
+  const after = cliJson(db, ['list', 'pins']);
+  assert.equal(after.length, 2);
+});
+
 test('memory-forget redacts by prefix; search no longer finds it', { skip }, () => {
   const { db, env } = freshEnv();
   seed(db, 'sensitive observation mentioning secretword');
@@ -189,6 +262,40 @@ test('memory-forget reports not-found for an unknown prefix', { skip }, () => {
   seed(db, 'an observation');
   const out = runScript('memory-forget.js', ['nopenope'], env);
   assert.match(out, /Observation not found: nopenope/);
+});
+
+test('memory-forget aborts on an ambiguous prefix without redacting', { skip }, () => {
+  const { db, env } = freshEnv();
+  // Observation ids are UUIDs (16 possible first hex chars). Seeding 17 of them
+  // guarantees, by pigeonhole, that at least two share a first character — a
+  // deterministic ambiguous one-char prefix.
+  for (let i = 0; i < 17; i++) seed(db, 'ambiguity observation number ' + i);
+  const obs = cliJson(db, ['list', 'observations']);
+
+  const counts = new Map();
+  for (const o of obs) {
+    const c = String(o.id)[0];
+    counts.set(c, (counts.get(c) || 0) + 1);
+  }
+  let prefix = null;
+  for (const [c, n] of counts) {
+    if (n >= 2) {
+      prefix = c;
+      break;
+    }
+  }
+  assert.ok(prefix, 'expected at least two observation ids to share a first char');
+
+  const out = runScript('memory-forget.js', [prefix], env);
+  assert.match(out, /Ambiguous observation id/);
+  assert.doesNotMatch(out, /Redacted observation:/);
+
+  // Nothing must have been redacted.
+  const after = cliJson(db, ['list', 'observations']);
+  assert.ok(
+    after.every((o) => !o.redacted),
+    'no observation should be redacted after an aborted ambiguous forget',
+  );
 });
 
 test('scripts fail soft (exit 0) when the binary is missing', { skip }, () => {
