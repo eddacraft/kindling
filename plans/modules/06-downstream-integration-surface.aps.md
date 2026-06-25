@@ -165,7 +165,10 @@ Verified against the tree on 2026-06-22:
 - **Validation:** Endpoint tests covering each filter dimension + pagination
   determinism; client method round-trips the filters.
 - **Dependencies:** KINTEG-004 (shares the kind vocabulary)
-- **Status:** Ready — design accepted as D-009 (planning council, 2026-06-26).
+- **Status:** In Review — PR #128 (`feat/kinteg-003-list-api`, opened 2026-06-26),
+  implementation complete and gates green (fmt/clippy/workspace tests + ts-rs &
+  vendored-types drift checks); flips to Merged on merge. Design accepted as D-009
+  (planning council, 2026-06-26).
   Spec: `plans/specs/2026-06-26-kindling-read-api-and-spool-cap-design.md`.
 - **Notes:** This is FTS-independent retrieval (no BM25 query string). Reuse the
   existing `list` CLI semantics where possible but lift them to a daemon route
