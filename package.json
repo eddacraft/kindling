@@ -1,6 +1,6 @@
 {
   "name": "kindling-monorepo",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "private": true,
   "description": "Local memory and continuity engine for AI-assisted development",

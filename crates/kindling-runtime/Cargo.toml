@@ -14,9 +14,9 @@ authors.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-kindling-types = { path = "../kindling-types", version = "0.2.0" }
-kindling-client = { path = "../kindling-client", version = "0.2.0", optional = true }
-kindling-server = { path = "../kindling-server", version = "0.2.0", optional = true }
+kindling-types = { path = "../kindling-types", version = "0.3.0" }
+kindling-client = { path = "../kindling-client", version = "0.3.0", optional = true }
+kindling-server = { path = "../kindling-server", version = "0.3.0", optional = true }
 tokio = { version = "1", features = ["rt", "macros", "net", "time", "sync"] }
 thiserror = "2"
 
@@ -37,7 +37,7 @@ external-spawn = ["client"]
 all-features = true
 
 [dev-dependencies]
-kindling-store = { path = "../kindling-store", version = "0.2.0" }
+kindling-store = { path = "../kindling-store", version = "0.3.0" }
 tempfile = "3"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time"] }
 

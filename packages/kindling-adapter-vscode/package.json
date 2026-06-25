@@ -1,6 +1,6 @@
 {
   "name": "@eddacraft/kindling-adapter-vscode",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "VS Code, Cursor, and Windsurf extension for kindling - capture file saves and editor activity into local memory",
   "type": "module",
   "main": "./dist/extension.js",
