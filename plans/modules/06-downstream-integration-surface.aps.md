@@ -4,16 +4,16 @@
 | ------ | ------ | ----------- |
 | KINTEG | @aneki | In Progress |
 
-**Last reviewed:** 2026-06-26 (PORT-011 Merged in anvil; D-009: KINTEG-003 Ready +
-KINTEG-009 Ready — unblocks anvil KDS-004/#2910 + KDS-005/#2916; KINTEG-002 #121 +
-KINTEG-008 #122 In Progress awaiting merge)
+**Last reviewed:** 2026-06-26 (KINTEG-009 Merged PR #126; KINTEG-003 Ready next;
+PORT-011 Merged; KINTEG-002 #121 + KINTEG-008 #122 awaiting merge)
 
 ## Purpose
 
 Harden the contract kindling exposes to downstream consumers — chiefly **anvil**,
 whose KDS module proved direct `kindling-client` integration (**PORT-011 Merged** —
-anvil PR #2897/2906). Anvil KDS-004/005 remain blocked on kindling **KINTEG-003**
-(list API, #2910) and **KINTEG-009** (spool cap, #2916) per D-009. Kindling-side
+anvil PR #2897/2906). Anvil **KDS-004** remains blocked on kindling **KINTEG-003**
+(list API, #2910); **KDS-005** spool-cap prereq is satisfied (**KINTEG-009** Merged
+PR #126 — publish `kindling-client` 0.3.0 user-gated). Kindling-side
 follow-ups: runtime facade (KINTEG-008), dedup (#121), and contract hardening below. This
 module turns anvil's integration wishlist (received 2026-06-22) into a vetted,
 deduplicated work plan, grounded against what kindling already ships.
@@ -215,9 +215,12 @@ Verified against the tree on 2026-06-22:
   is a no-op; `dropped_count` increments; property test — survivors are always a
   contiguous oldest-dropped suffix.
 - **Dependencies:** — (touches only `kindling-client`; independent of KINTEG-002/008)
-- **Status:** Ready — design accepted as D-009 (planning council, 2026-06-26).
-  Spec: `plans/specs/2026-06-26-kindling-read-api-and-spool-cap-design.md`. Sequenced
-  **first** (smaller, unblocks anvil's sidecar retirement; ships in the 0.3.0 bump).
+- **Status:** Merged — PR #126 (`feat/kinteg-009-spool-retention`, merged 2026-06-26).
+  `SpoolConfig` `max_bytes`/`max_age_ms` (default unbounded), `SpoolEntry.spooled_at`,
+  oldest-prefix trim inside `flush()` lock, `SpoolStatus::dropped_count`; 13 spool
+  tests green. Design: D-009 / `plans/specs/2026-06-26-kindling-read-api-and-spool-cap-design.md`
+  (landed PR #125). **Publish:** next `kindling-client` release must be **≥ 0.3.0**
+  (`SpoolConfig` field addition; user-gated `scripts/publish.sh`).
 - **Notes:** No independent/concurrent trim and no CLI `spool trim` subcommand — an
   out-of-band trim racing a flush (or a second process sharing the path) can drop
   in-flight entries; single-producer-per-path stays the v1 invariant (the in-process

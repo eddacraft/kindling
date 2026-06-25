@@ -13,10 +13,10 @@
 ## Anvil follow-on (not PORT-011 scope)
 
 - [ ] KDS-004 — usage views from daemon store (blocked on kindling KINTEG-003 / #2910)
-- [ ] KDS-005 — retire NDJSON writer (blocked on KDS-004 + KINTEG-009 / #2916)
+- [ ] KDS-005 — retire NDJSON writer (KINTEG-009 Done #126; still blocked on KDS-004 / #2910)
 - [ ] E2E with real `kindling` binary on PATH + `ANVIL_KINDLING_SINK=daemon` (dogfood)
 
 ## Kindling unblockers (D-009)
 
-- KINTEG-009 spool cap — feat/kinteg-009-spool-retention (first)
-- KINTEG-003 list API — after KINTEG-009
+- [x] KINTEG-009 spool cap — PR #126 (merged 2026-06-26); publish `kindling-client` ≥ 0.3.0 user-gated
+- [ ] KINTEG-003 list API — next (unblocks anvil KDS-004 / #2910)

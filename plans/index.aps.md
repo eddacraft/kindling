@@ -1,11 +1,11 @@
 # kindling — Plan Index
 
-| Field   | Value                                                    |
-| ------- | -------------------------------------------------------- |
-| Status  | In Progress                                              |
-| Owner   | @aneki                                                   |
-| Created | 2026-03-14                                               |
-| Updated | 2026-06-26 (PORT-011 Merged; D-009 read API + spool cap) |
+| Field   | Value                                                      |
+| ------- | ---------------------------------------------------------- |
+| Status  | In Progress                                                |
+| Owner   | @aneki                                                     |
+| Created | 2026-03-14                                                 |
+| Updated | 2026-06-26 (KINTEG-009 Merged #126; KINTEG-003 Ready next) |
 
 ## Problem
 
@@ -45,16 +45,16 @@ See `plans/specs/2026-05-03-rust-canonical-thin-client-design.md` for the curren
 
 ## Schedule
 
-| Phase | Modules                                   | Target                                                                                                                  |
-| ----- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Now   | 05-rust-port (Phase 1)                    | Foundation crates: workspace, types, store, filter                                                                      |
-| Next  | 05-rust-port (Phase 2)                    | Service + daemon + hook + Rust client; anvil unblocks                                                                   |
-| Then  | 05-rust-port (Phase 3)                    | CLI + umbrella binary + cross-platform builds + cargo/brew/curl distribution                                            |
-| Then  | 05-rust-port (Phase 4)                    | Thin TS client SDK on npm; deprecate TS implementation packages and anvil bridge                                        |
-| Now   | 06-downstream-integration-surface         | KINTEG-009 spool cap (PR in flight), then KINTEG-003 list API (D-009); KINTEG-002/#121 + KINTEG-008/#122 awaiting merge |
-| Done  | 05-rust-port (slice)                      | PORT-011 (anvil KDS-001/003 parity proof, PR #2897)                                                                     |
-| Done  | 06-downstream-integration-surface (slice) | KINTEG-001, KINTEG-004, KINTEG-005 (spool observability)                                                                |
-| Done  | 07-intent-capture-events                  | Intent capture primitive + export shipped (independent of the Rust port; KINTENT-001..006 merged)                       |
+| Phase | Modules                                   | Target                                                                                                                                 |
+| ----- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Now   | 05-rust-port (Phase 1)                    | Foundation crates: workspace, types, store, filter                                                                                     |
+| Next  | 05-rust-port (Phase 2)                    | Service + daemon + hook + Rust client; anvil unblocks                                                                                  |
+| Then  | 05-rust-port (Phase 3)                    | CLI + umbrella binary + cross-platform builds + cargo/brew/curl distribution                                                           |
+| Then  | 05-rust-port (Phase 4)                    | Thin TS client SDK on npm; deprecate TS implementation packages and anvil bridge                                                       |
+| Now   | 06-downstream-integration-surface         | KINTEG-003 list API (D-009); KINTEG-002/#121 + KINTEG-008/#122 awaiting merge; publish `kindling-client` 0.3.0 (KINTEG-009) user-gated |
+| Done  | 05-rust-port (slice)                      | PORT-011 (anvil KDS #2897)                                                                                                             |
+| Done  | 06-downstream-integration-surface (slice) | KINTEG-001, KINTEG-004, KINTEG-005, KINTEG-009 (D-009 design #125 + spool cap #126)                                                    |
+| Done  | 07-intent-capture-events                  | Intent capture primitive + export shipped (independent of the Rust port; KINTENT-001..006 merged)                                      |
 
 ## Risks
 
