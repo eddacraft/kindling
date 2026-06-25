@@ -23,12 +23,26 @@ const observations = runJson([
   '500',
   '--json',
 ]);
-const obs = (observations || []).find((o) => String(o.id).startsWith(obsId));
+const matches = (observations || []).filter((o) => String(o.id).startsWith(obsId));
 
-if (!obs) {
+if (matches.length === 0) {
   console.log('Observation not found: ' + obsId);
   process.exit(0);
 }
+
+// Refuse to act on an ambiguous prefix: redacting is destructive, so when more
+// than one observation matches we abort and show full IDs to disambiguate
+// rather than silently picking the first row.
+if (matches.length > 1) {
+  console.log('Ambiguous observation id: ' + obsId);
+  console.log('Multiple observations match this prefix. Re-run with a longer id:');
+  for (const m of matches) {
+    console.log('  ' + String(m.id));
+  }
+  process.exit(0);
+}
+
+const obs = matches[0];
 
 runJson(['forget', obs.id, '--db', db, '--json']);
 
