@@ -244,4 +244,40 @@ describe.skipIf(!HAS_BINARY)('KindlingFlow (live daemon)', () => {
     });
     expect(endHits.candidates.some((c) => c.entity.content.includes('lifecycleflow'))).toBe(true);
   });
+
+  it('closes the flow capsule and records a failure end when a child node throws', async () => {
+    const context = freshFlowContext();
+
+    // A child node whose exec always throws. Single-token names keep FTS
+    // MATCH queries unambiguous.
+    class FailingNode extends KindlingNode {
+      override async exec(): Promise<never> {
+        throw new Error('orchestrationboom');
+      }
+    }
+
+    const node = new FailingNode({ name: 'failingchild' });
+    const flow = new KindlingFlow(node, { name: 'failingflow' });
+
+    // Orchestration failure must propagate out of _run / run.
+    await expect(flow.run(context)).rejects.toThrow('orchestrationboom');
+
+    // The flow-level capsule must have been closed (a re-close 404s).
+    await expect(
+      context.kindling.closeCapsule((flow as unknown as { flowCapsuleId: string }).flowCapsuleId),
+    ).rejects.toThrow();
+
+    // A failure end observation for the flow must have been written.
+    const errorHits = await context.kindling.retrieve({
+      query: 'failingflow',
+      scopeIds: context.scopeIds,
+    });
+    const failedEnd = errorHits.candidates.find(
+      (c) =>
+        c.entity.content.includes('failingflow') &&
+        (c.entity as { provenance?: Record<string, unknown> }).provenance?.nodeType === 'flow' &&
+        (c.entity as { provenance?: Record<string, unknown> }).provenance?.status === 'error',
+    );
+    expect(failedEnd).toBeDefined();
+  });
 });
