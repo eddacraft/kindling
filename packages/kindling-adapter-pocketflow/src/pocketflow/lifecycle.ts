@@ -396,4 +396,71 @@ export class KindlingFlow<
 
     return undefined;
   }
+
+  /**
+   * Close the flow-level capsule on orchestration failure.
+   *
+   * Mirrors {@link KindlingNode.execFallback}: records a `node_error` followed
+   * by an error `node_end`, then closes the capsule so a failed flow leaves no
+   * open capsule behind. The error is rethrown so callers still observe the
+   * failure.
+   */
+  private async closeFlowOnError(shared: S, error: Error): Promise<void> {
+    const duration = this.flowStartTime ? Date.now() - this.flowStartTime : 0;
+
+    if (this.flowCapsuleId) {
+      await shared.kindling.appendObservation(
+        buildObservation(
+          'node_error',
+          `Flow "${this.flowMetadata.name}" failed: ${error.message}`,
+          {
+            nodeName: this.flowMetadata.name,
+            nodeType: 'flow',
+            errorType: error.name,
+            errorMessage: error.message,
+            stack: error.stack,
+          },
+          shared.scopeIds,
+        ),
+        { capsuleId: this.flowCapsuleId },
+      );
+
+      await shared.kindling.appendObservation(
+        buildObservation(
+          'node_end',
+          `Flow "${this.flowMetadata.name}" failed: ${error.message}`,
+          {
+            nodeName: this.flowMetadata.name,
+            nodeType: 'flow',
+            duration,
+            status: 'error',
+          },
+          shared.scopeIds,
+        ),
+        { capsuleId: this.flowCapsuleId },
+      );
+
+      await shared.kindling.closeCapsule(this.flowCapsuleId);
+    }
+  }
+
+  /**
+   * Wrap {@link Flow._run} so the flow-level capsule is always closed.
+   *
+   * {@link Flow._run} opens the capsule via {@link prep}, then awaits
+   * `_orchestrate` before calling {@link post}. If a child node fails,
+   * `_orchestrate` rejects and `post` never runs — leaking the open capsule.
+   * Catch that, write the failure end observation, close the capsule, and
+   * rethrow so the failure still propagates.
+   */
+  override async _run(shared: S): Promise<string | undefined> {
+    const pr = await this.prep(shared);
+    try {
+      await this._orchestrate(shared);
+    } catch (error) {
+      await this.closeFlowOnError(shared, error as Error);
+      throw error;
+    }
+    return await this.post(shared, pr, undefined);
+  }
 }
