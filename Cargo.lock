@@ -640,6 +640,7 @@ version = "0.3.0"
 dependencies = [
  "axum",
  "chrono",
+ "getrandom",
  "http-body-util",
  "hyper",
  "hyper-util",

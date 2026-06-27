@@ -60,7 +60,8 @@ pub(crate) async fn request(
                 cfg.effective_spawn_log_path().as_deref(),
             )
             .await?;
-            send_http(stream, req).await
+            // UDS authenticates by filesystem permissions; no bearer token.
+            send_http(stream, req, None).await
         }
         Transport::Tcp => {
             let stream = ensure_connected_tcp(
@@ -71,14 +72,33 @@ pub(crate) async fn request(
                 cfg.effective_spawn_log_path().as_deref(),
             )
             .await?;
-            send_http(stream, req).await
+            // Loopback TCP has no per-user boundary, so the daemon requires a
+            // per-daemon bearer secret on every non-health request (KINTEG-010).
+            // The secret lives in an owner-only sibling of the port file, written
+            // by the daemon before it binds — so it exists once we can connect.
+            // Read it best-effort: a missing token yields a 401 from the daemon
+            // (surfaced as a normal error) rather than a panic here.
+            let token = std::fs::read_to_string(token_path_for(&cfg.port_path))
+                .ok()
+                .map(|s| s.trim().to_string());
+            send_http(stream, req, token.as_deref()).await
         }
     }
 }
 
+/// Token-file path for a given port-file path (sibling file). Mirrors the
+/// daemon's `token_path_for` so both agree without a shared config field.
+fn token_path_for(port_path: &std::path::Path) -> std::path::PathBuf {
+    port_path.with_file_name("kindling.token")
+}
+
 /// Send one HTTP/1 request over an established byte stream and collect the
 /// response. Transport-agnostic: works over any `AsyncRead + AsyncWrite`.
-async fn send_http<S>(stream: S, req: OutgoingRequest<'_>) -> Result<RawResponse, ClientError>
+async fn send_http<S>(
+    stream: S,
+    req: OutgoingRequest<'_>,
+    auth_token: Option<&str>,
+) -> Result<RawResponse, ClientError>
 where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Send + Unpin + 'static,
 {
@@ -106,6 +126,11 @@ where
         .header("content-type", "application/json");
     if let Some(p) = project {
         builder = builder.header(crate::PROJECT_HEADER, p);
+    }
+    // TCP transport only: present the per-daemon bearer secret. Harmless on the
+    // health route (the daemon ignores it there) and never sent over UDS.
+    if let Some(token) = auth_token {
+        builder = builder.header("authorization", format!("Bearer {token}"));
     }
     let req = builder
         .body(body)
