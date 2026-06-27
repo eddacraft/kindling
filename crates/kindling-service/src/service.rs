@@ -5,13 +5,14 @@
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::filter::mask_secrets;
+use crate::filter::mask_secrets_with_evidence;
 use kindling_provider::{retrieve_at, LocalFtsProvider};
 use kindling_store::{SqliteKindlingStore, StoreError, StoreOptions};
 use kindling_types::{
     Capsule, CapsuleInput, CapsuleStatus, CapsuleType, Id, ListObservationsRequest,
     ListObservationsResult, Observation, ObservationInput, Pin, PinInput, PinTargetType,
-    RetrieveOptions, RetrieveResult, ScopeIds, Summary, SummaryInput, Timestamp, ValidationError,
+    RedactionEvidence, RetrieveOptions, RetrieveResult, ScopeIds, Summary, SummaryInput, Timestamp,
+    ValidationError,
 };
 
 use crate::context::{PreCompactContext, ResolvedPin, SessionStartContext};
@@ -72,12 +73,20 @@ pub struct AppendObservationOptions {
 /// This makes spool replay after a crash exactly-once-ish on id: a replayed
 /// observation is surfaced as `deduplicated: true` rather than erroring or
 /// duplicating.
+///
+/// `redaction` reports the secret masking applied to THIS request's incoming
+/// content (count + classes, never values), derived from the same masking pass
+/// that redacts the content. It reflects the request payload even on a dedup
+/// hit — where `observation` is the pre-existing row — so callers can always
+/// prove what sensitive data the submitted payload carried.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AppendOutcome {
     /// The stored observation. On a dedup hit this is the pre-existing row.
     pub observation: Observation,
     /// `true` when the id already existed and the incoming write was ignored.
     pub deduplicated: bool,
+    /// Redaction evidence for the incoming content's masking pass.
+    pub redaction: RedactionEvidence,
 }
 
 impl Default for AppendObservationOptions {
@@ -292,8 +301,10 @@ impl KindlingService {
         // Service-boundary secret masking: mask (do NOT truncate — truncation
         // is a hook-layer concern owned by PORT-009) so no consumer can route
         // around secret filtering. Applies on both the validated and the
-        // validate:false path.
-        observation.content = mask_secrets(&observation.content);
+        // validate:false path. Evidence is produced by the same pass, so it
+        // cannot be bypassed (KINTEG-006).
+        let (masked, redaction) = mask_secrets_with_evidence(&observation.content);
+        observation.content = masked;
 
         let written = self.store.insert_observation(&observation)?;
 
@@ -325,6 +336,7 @@ impl KindlingService {
         Ok(AppendOutcome {
             observation,
             deduplicated,
+            redaction,
         })
     }
 

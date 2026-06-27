@@ -18,7 +18,7 @@ mod tools;
 mod truncate;
 
 pub use paths::is_excluded_path;
-pub use secrets::{contains_secrets, mask_secrets};
+pub use secrets::{contains_secrets, mask_secrets, mask_secrets_with_evidence};
 pub use tools::{filter_tool_result, is_noisy_tool, should_capture_tool};
 pub use truncate::{truncate, MAX_CONTENT_LENGTH, NOISY_TOOL_MAX_LENGTH};
 

@@ -20,6 +20,7 @@ export type * from './PinResult.js';
 export type * from './PinTargetType.js';
 export type * from './ProviderSearchOptions.js';
 export type * from './ProviderSearchResult.js';
+export type * from './RedactionEvidence.js';
 export type * from './RetrieveOptions.js';
 export type * from './RetrieveProvenance.js';
 export type * from './RetrieveResult.js';
