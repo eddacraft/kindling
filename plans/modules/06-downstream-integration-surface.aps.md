@@ -4,9 +4,10 @@
 | ------ | ------ | ----------- |
 | KINTEG | @aneki | In Progress |
 
-**Last reviewed:** 2026-06-26 (KINTEG-008 Merged PR #129; KINTEG-002 Merged PR #121;
-KINTEG-003 In Review PR #128; KINTEG-009 Merged PR #126; PORT-011 Merged;
-KINTEG-010/011/012 drafted from clawpatch review of `main`)
+**Last reviewed:** 2026-06-27 (KINTEG-008 Merged PR #129; KINTEG-002 Merged PR #121;
+KINTEG-003 Merged PR #128; KINTEG-009 Merged PR #126; PORT-011 Merged;
+KINTEG-010/011/012 drafted from clawpatch review of `main`. All three 0.3.0 items
+shipped; crates.io publish user-gated.)
 
 ## Purpose
 
