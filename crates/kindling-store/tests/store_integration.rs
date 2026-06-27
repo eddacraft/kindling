@@ -228,8 +228,12 @@ fn close_capsule_validates_summary() {
         Err(StoreError::SummaryNotFound { .. })
     ));
 
-    // The status update itself succeeded before summary validation (mirrors
-    // the TS behaviour, where the UPDATE runs first).
+    // A failed close must leave the capsule untouched: validation runs before
+    // the status UPDATE, so cap-1 stays open with closed_at unchanged.
+    let unchanged = store.get_capsule("cap-1").unwrap().unwrap();
+    assert_eq!(unchanged.status, CapsuleStatus::Open);
+    assert_eq!(unchanged.closed_at, None);
+
     store
         .create_capsule(&capsule("cap-2", "sess-2", 1000))
         .unwrap();
