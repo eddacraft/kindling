@@ -83,6 +83,26 @@ This package exports the thin client and its types:
 
 All persistence, FTS retrieval, and concurrency are handled by the Rust daemon, not this package.
 
+## Hook-payload fixtures (for adapter authors)
+
+Building an adapter? Test your capture pipeline against the engine's **published,
+versioned** hook-payload fixtures instead of hand-copying doc examples. Each case
+pairs a captured hook input with the exact observation kindling produces, and the
+set is derived from (and drift-gated against) the engine's internal source of truth.
+
+```typescript
+// The published fixtures ship with the package and carry a pinnable `version`.
+import fixtures from '@eddacraft/kindling/fixtures' with { type: 'json' };
+
+for (const { name, hookInput, expected } of fixtures.cases) {
+  const observation = myAdapter.map(hookInput);
+  expect(observation).toMatchObject(expected); // { kind, content, provenance, scopeIds }
+}
+```
+
+The same JSON is published at the repo root under `fixtures/hook-payloads/` for
+non-npm consumers. Pin on `fixtures.version` to detect format changes.
+
 ## Adapters
 
 - [`@eddacraft/kindling-adapter-opencode`](https://www.npmjs.com/package/@eddacraft/kindling-adapter-opencode) — OpenCode session integration
