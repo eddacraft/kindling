@@ -139,19 +139,10 @@ impl SqliteKindlingStore {
         closed_at: Option<Timestamp>,
         summary_id: Option<&str>,
     ) -> StoreResult<()> {
-        let changes = self.conn.execute(
-            "UPDATE capsules
-             SET status = 'closed', closed_at = :closed_at
-             WHERE id = :id AND status = 'open'",
-            named_params! {
-                ":id": capsule_id,
-                ":closed_at": closed_at.unwrap_or_else(now_ms),
-            },
-        )?;
-        if changes == 0 {
-            return Err(StoreError::CapsuleNotOpen(capsule_id.to_string()));
-        }
-
+        // Validate the summary BEFORE mutating status so a failed close leaves
+        // the capsule open with `closed_at` unchanged. Otherwise the UPDATE
+        // would commit and we would still return SummaryNotFound, leaving the
+        // capsule closed against a summary that does not exist.
         if let Some(summary_id) = summary_id {
             let exists: Option<String> = self
                 .conn
@@ -167,6 +158,19 @@ impl SqliteKindlingStore {
                     capsule_id: capsule_id.to_string(),
                 });
             }
+        }
+
+        let changes = self.conn.execute(
+            "UPDATE capsules
+             SET status = 'closed', closed_at = :closed_at
+             WHERE id = :id AND status = 'open'",
+            named_params! {
+                ":id": capsule_id,
+                ":closed_at": closed_at.unwrap_or_else(now_ms),
+            },
+        )?;
+        if changes == 0 {
+            return Err(StoreError::CapsuleNotOpen(capsule_id.to_string()));
         }
         Ok(())
     }
