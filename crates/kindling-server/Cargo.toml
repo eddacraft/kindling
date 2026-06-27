@@ -27,6 +27,9 @@ tokio = { version = "1", features = [
     "sync",
 ] }
 tower = "0.5"
+# OS CSPRNG for the per-daemon TCP auth secret (KINTEG-010). Raw bytes only;
+# no formatting/encoding pulled in.
+getrandom = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
