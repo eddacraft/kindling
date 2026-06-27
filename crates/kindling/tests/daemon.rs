@@ -144,6 +144,57 @@ async fn via_daemon_log_roundtrip() {
     handle.abort();
 }
 
+/// `--via-daemon <cmd> --db <path>` is rejected for every daemon-backed verb.
+///
+/// The daemon routes per project root (hashed into a per-project DB), not by an
+/// explicit DB file, so honouring `--db` over the daemon is impossible. Rather
+/// than silently mis-route to the cwd's project DB, the CLI rejects the
+/// combination with a clear, non-zero-exit error mentioning both flags. This
+/// rejection happens in `build_client` before any socket connection, so no
+/// running daemon is required.
+#[test]
+fn via_daemon_with_db_is_rejected() {
+    let bin = env!("CARGO_BIN_EXE_kindling");
+    let db = tempfile::tempdir().unwrap().path().join("explicit.db");
+    let db = db.to_string_lossy().into_owned();
+
+    // One representative invocation per daemon-backed verb. Each must fail
+    // cleanly (non-zero) with an error naming both `--db` and `--via-daemon`,
+    // and must NOT attempt to spawn/contact a daemon.
+    let invocations: Vec<Vec<&str>> = vec![
+        vec!["--via-daemon", "log", "hello", "--db", &db],
+        vec![
+            "--via-daemon",
+            "capsule",
+            "open",
+            "--intent",
+            "x",
+            "--db",
+            &db,
+        ],
+        vec!["--via-daemon", "capsule", "close", "cap_1", "--db", &db],
+        vec!["--via-daemon", "search", "query", "--db", &db],
+        vec!["--via-daemon", "pin", "observation", "obs_1", "--db", &db],
+        vec!["--via-daemon", "unpin", "pin_1", "--db", &db],
+        vec!["--via-daemon", "forget", "obs_1", "--db", &db],
+    ];
+
+    for args in invocations {
+        let out = Command::new(bin).args(&args).output().expect("run cli");
+        assert!(
+            !out.status.success(),
+            "expected non-zero exit for {args:?}, got success\nstdout: {}\nstderr: {}",
+            stdout(&out),
+            stderr(&out)
+        );
+        let err = stderr(&out);
+        assert!(
+            err.contains("--db") && err.contains("--via-daemon"),
+            "error for {args:?} should mention both --db and --via-daemon, got: {err}"
+        );
+    }
+}
+
 /// Wait for a child to exit within `timeout`, returning its status (or `None`
 /// on timeout, after killing it).
 fn wait_with_timeout(

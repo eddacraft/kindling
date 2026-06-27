@@ -46,7 +46,7 @@ pub fn run_open(args: CapsuleOpenArgs, via_daemon: bool) -> CliResult {
     let scope = scope_from(args.session.as_deref(), args.repo.as_deref());
 
     let capsule = if via_daemon {
-        let client = build_client()?;
+        let client = build_client(args.common.db.as_deref())?;
         runtime()?.block_on(async {
             client
                 .open_capsule(kind, args.intent.clone(), scope, None)
@@ -78,7 +78,7 @@ pub fn run_open(args: CapsuleOpenArgs, via_daemon: bool) -> CliResult {
 
 pub fn run_close(args: CapsuleCloseArgs, via_daemon: bool) -> CliResult {
     let capsule = if via_daemon {
-        let client = build_client()?;
+        let client = build_client(args.common.db.as_deref())?;
         let body = match &args.summary {
             Some(content) => CloseCapsuleBody {
                 generate_summary: Some(true),
