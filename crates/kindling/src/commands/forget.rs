@@ -14,7 +14,7 @@ use crate::{build_client, open_service, runtime, CliResult};
 
 pub fn run(args: ForgetArgs, via_daemon: bool) -> CliResult {
     if via_daemon {
-        let client = build_client()?;
+        let client = build_client(args.common.db.as_deref())?;
         runtime()?.block_on(async { client.forget(&args.id).await })?;
     } else {
         let (service, _db) = open_service(args.common.db.as_deref())?;

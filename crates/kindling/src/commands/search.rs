@@ -22,7 +22,7 @@ pub fn run(args: SearchArgs, via_daemon: bool) -> CliResult {
     };
 
     let result = if via_daemon {
-        let client = build_client()?;
+        let client = build_client(args.common.db.as_deref())?;
         runtime()?.block_on(async { client.retrieve(options).await })?
     } else {
         let (service, _db) = open_service(args.common.db.as_deref())?;

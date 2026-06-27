@@ -66,7 +66,7 @@ pub fn run(args: LogArgs, via_daemon: bool) -> CliResult {
     };
 
     let observation = if via_daemon {
-        let client = build_client()?;
+        let client = build_client(args.common.db.as_deref())?;
         runtime()?
             .block_on(async {
                 client

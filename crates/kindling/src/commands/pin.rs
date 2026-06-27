@@ -32,7 +32,7 @@ pub fn run_pin(args: PinArgs, via_daemon: bool) -> CliResult {
     let target_type = parse_target_type(&args.target_type)?;
 
     let pin = if via_daemon {
-        let client = build_client()?;
+        let client = build_client(args.common.db.as_deref())?;
         let body = CreatePinBody {
             target_type,
             target_id: args.id.clone(),
@@ -75,7 +75,7 @@ pub fn run_pin(args: PinArgs, via_daemon: bool) -> CliResult {
 
 pub fn run_unpin(args: UnpinArgs, via_daemon: bool) -> CliResult {
     if via_daemon {
-        let client = build_client()?;
+        let client = build_client(args.common.db.as_deref())?;
         runtime()?.block_on(async { client.unpin(&args.id).await })?;
     } else {
         let (service, _db) = open_service(args.common.db.as_deref())?;

@@ -181,13 +181,35 @@ fn dispatch(cli: Cli) -> CliResult {
     }
 }
 
-/// Build a daemon client honouring `--db` as a socket-routing project hint.
+/// Build a daemon client, rejecting an explicit `--db` that cannot be honoured.
 ///
-/// The client routes by project root (hashed into a per-project DB by the
-/// daemon), not by an explicit DB file, so `--via-daemon` + `--db` cannot point
-/// the daemon at an arbitrary file. We use the default socket + the current
-/// working directory as the project root (mirroring `ClientConfig::defaults`).
-pub(crate) fn build_client() -> Result<kindling_client::Client, CliError> {
+/// The daemon routes by project *root* (a string it hashes into a per-project DB
+/// via `kindling_store::project_db_path`), carried in the `X-Kindling-Project`
+/// header — it never accepts an arbitrary DB *file* path. `--db` is an explicit
+/// DB file path, meaningful only in embedded mode (via [`resolve_db_path`]).
+/// There is therefore no faithful way to point the daemon at a `--db` file.
+///
+/// Rather than silently ignore `--db` and route by the current working directory
+/// (which could read/write a *different* project's database than the one named),
+/// we reject the combination: when `explicit_db` is `Some`, return a clear
+/// [`CliError::Invalid`] telling the user to drop `--db` (use the per-project
+/// default) or drop `--via-daemon` (embedded mode honours `--db`). When
+/// `explicit_db` is `None`, behave as before — [`kindling_client::Client::new`]
+/// routes by the current working directory (mirroring `ClientConfig::defaults`).
+///
+/// All daemon-backed verbs (log, capsule open/close, search, pin, unpin, forget)
+/// build their client through here, so the rejection covers every daemon path.
+pub(crate) fn build_client(explicit_db: Option<&str>) -> Result<kindling_client::Client, CliError> {
+    if explicit_db.is_some() {
+        return Err(CliError::Invalid(
+            "--db cannot be combined with --via-daemon: the daemon routes per \
+             project root (hashed into a per-project database), not by an explicit \
+             database file path, so --db cannot be honoured over the daemon. \
+             Either drop --db to use the project default, or drop --via-daemon to \
+             run embedded (which honours --db)."
+                .to_string(),
+        ));
+    }
     Ok(kindling_client::Client::new()?)
 }
 
