@@ -426,7 +426,31 @@ unless `include_redacted` is set.
 - Schema version tracked in `schema/version.json` (and `PRAGMA user_version`), with applied migrations recorded in the `schema_migrations` table
 - Current version is **5**; `minCompatible` is 1
 - Migrations are additive only (no destructive changes)
-- Export bundles include version for forward compatibility
+- Export bundles include version for forward compatibility (see below)
+
+### Export Bundle Compatibility
+
+Export bundles (produced by `KindlingService::export`, JSON-compatible with the
+TypeScript `ExportBundle`) are a **stable, portable interchange format**, decoupled
+from the SQLite schema version above. Each bundle carries `bundleVersion` and a
+`dataset.version`, both currently **`"1.0"`** (`BUNDLE_VERSION` in
+`crates/kindling-service/src/export.rs`).
+
+Stability guarantee:
+
+- **`1.0` is a stable contract.** A bundle written by any kindling release that
+  stamps `bundleVersion: "1.0"` will import into any other release that accepts
+  `1.0`. Field shapes already present in `1.0` will not be removed or repurposed
+  within the `1.0` line.
+- **Additive evolution stays `1.0`.** New optional fields may be added to the
+  bundle/dataset without bumping the version; older importers ignore unknown
+  fields. The version is bumped only for a breaking change.
+- **Forward-compatibility policy.** Importers validate `bundleVersion` /
+  `dataset.version` and reject versions they do not recognise (`Unsupported
+bundle version`) rather than silently mis-parsing. Pin on `bundleVersion` to
+  detect format changes deterministically.
+- Within a bundle, all entity lists use deterministic ordering (`ts`/`*_at` then
+  `id`), so re-exporting unchanged data is byte-stable.
 
 ### Cross-Language Type Parity
 

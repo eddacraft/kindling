@@ -9,11 +9,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    }
+    },
+    "./fixtures": "./fixtures/hook-payloads/claude-code.json",
+    "./fixtures/*": "./fixtures/*"
   },
   "files": [
     "dist",
     "schema",
+    "fixtures",
     "bin"
   ],
   "keywords": [
@@ -41,6 +44,8 @@
   "license": "Apache-2.0",
   "scripts": {
     "sync-types": "node scripts/sync-types.mjs",
+    "sync-fixtures": "node scripts/sync-fixtures.mjs",
+    "check:fixtures": "node scripts/sync-fixtures.mjs --check",
     "platform-packages": "node scripts/build-platform-packages.mjs",
     "check:platform-packages": "node scripts/build-platform-packages.mjs --check",
     "copy:schema": "node -e \"require('node:fs').mkdirSync('dist/schema',{recursive:true});require('node:fs').copyFileSync('schema/version.json','dist/schema/version.json')\"",

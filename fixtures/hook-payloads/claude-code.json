@@ -1,0 +1,613 @@
+{
+  "version": "1.0",
+  "description": "Public hook-payload fixtures for kindling adapter authors. Each case is a captured hook input (snake_case stdin shape) and the exact observation the engine produces. Derived from the internal capture-mapping source; do not edit by hand.",
+  "adapter": "claude-code",
+  "source": "crates/kindling/tests/fixtures/capture-cases.json",
+  "generator": "packages/kindling/scripts/sync-fixtures.mjs",
+  "cases": [
+    {
+      "name": "read",
+      "hookType": "post-tool-use",
+      "hookInput": {
+        "session_id": "s1",
+        "cwd": "/repo",
+        "tool_name": "Read",
+        "tool_input": {
+          "file_path": "/src/a.rs"
+        }
+      },
+      "expected": {
+        "kind": "tool_call",
+        "content": "Tool: Read\n\nFile: /src/a.rs",
+        "provenance": {
+          "toolName": "Read",
+          "hasError": false,
+          "filePath": "/src/a.rs"
+        },
+        "scopeIds": {
+          "sessionId": "s1",
+          "repoId": "/repo"
+        }
+      }
+    },
+    {
+      "name": "read_no_path",
+      "hookType": "post-tool-use",
+      "hookInput": {
+        "session_id": "s1",
+        "cwd": "/repo",
+        "tool_name": "Read",
+        "tool_input": {}
+      },
+      "expected": {
+        "kind": "tool_call",
+        "content": "Tool: Read",
+        "provenance": {
+          "toolName": "Read",
+          "hasError": false
+        },
+        "scopeIds": {
+          "sessionId": "s1",
+          "repoId": "/repo"
+        }
+      }
+    },
+    {
+      "name": "write",
+      "hookType": "post-tool-use",
+      "hookInput": {
+        "session_id": "s1",
+        "cwd": "/repo",
+        "tool_name": "Write",
+        "tool_input": {
+          "file_path": "/src/b.rs"
+        }
+      },
+      "expected": {
+        "kind": "file_diff",
+        "content": "Tool: Write\n\nFile: /src/b.rs\n\nAction: Created/overwrote file",
+        "provenance": {
+          "toolName": "Write",
+          "hasError": false,
+          "filePath": "/src/b.rs"
+        },
+        "scopeIds": {
+          "sessionId": "s1",
+          "repoId": "/repo"
+        }
+      }
+    },
+    {
+      "name": "edit",
+      "hookType": "post-tool-use",
+      "hookInput": {
+        "session_id": "s1",
+        "cwd": "/repo",
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "/src/c.rs",
+          "old_string": "foo"
+        }
+      },
+      "expected": {
+        "kind": "file_diff",
+        "content": "Tool: Edit\n\nFile: /src/c.rs\n\nAction: Edited file",
+        "provenance": {
+          "toolName": "Edit",
+          "hasError": false,
+          "filePath": "/src/c.rs",
+          "hasOldString": true
+        },
+        "scopeIds": {
+          "sessionId": "s1",
+          "repoId": "/repo"
+        }
+      }
+    },
+    {
+      "name": "edit_no_old_string",
+      "hookType": "post-tool-use",
+      "hookInput": {
+        "session_id": "s1",
+        "cwd": "/repo",
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "/src/c.rs"
+        }
+      },
+      "expected": {
+        "kind": "file_diff",
+        "content": "Tool: Edit\n\nFile: /src/c.rs\n\nAction: Edited file",
+        "provenance": {
+          "toolName": "Edit",
+          "hasError": false,
+          "filePath": "/src/c.rs",
+          "hasOldString": false
+        },
+        "scopeIds": {
+          "sessionId": "s1",
+          "repoId": "/repo"
+        }
+      }
+    },
+    {
+      "name": "bash_string_result",
+      "hookType": "post-tool-use",
+      "hookInput": {
+        "session_id": "s1",
+        "cwd": "/repo",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "cargo build --workspace"
+        },
+        "tool_result": "Compiling kindling\nFinished"
+      },
+      "expected": {
+        "kind": "command",
+        "content": "Tool: Bash\n\n$ cargo build --workspace\n\nCompiling kindling\nFinished",
+        "provenance": {
+          "toolName": "Bash",
+          "hasError": false,
+          "command": "cargo"
+        },
+        "scopeIds": {
+          "sessionId": "s1",
+          "repoId": "/repo"
+        }
+      }
+    },
+    {
+      "name": "bash_object_result_exit_code",
+      "hookType": "post-tool-use",
+      "hookInput": {
+        "session_id": "s1",
+        "cwd": "/repo",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "ls -la /tmp"
+        },
+        "tool_result": {
+          "exitCode": 0
+        }
+      },
+      "expected": {
+        "kind": "command",
+        "content": "Tool: Bash\n\n$ ls -la /tmp\n\n{\n  \"exitCode\": 0\n}",
+        "provenance": {
+          "toolName": "Bash",
+          "hasError": false,
+          "command": "ls",
+          "exitCode": 0
+        },
+        "scopeIds": {
+          "sessionId": "s1",
+          "repoId": "/repo"
+        }
+      }
+    },
+    {
+      "name": "bash_exit_code_snake",
+      "hookType": "post-tool-use",
+      "hookInput": {
+        "session_id": "s1",
+        "cwd": "/repo",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "false"
+        },
+        "tool_result": {
+          "exit_code": 1
+        }
+      },
+      "expected": {
+        "kind": "command",
+        "content": "Tool: Bash\n\n$ false\n\n{\n  \"exit_code\": 1\n}",
+        "provenance": {
+          "toolName": "Bash",
+          "hasError": false,
+          "command": "false",
+          "exitCode": 1
+        },
+        "scopeIds": {
+          "sessionId": "s1",
+          "repoId": "/repo"
+        }
+      }
+    },
+    {
+      "name": "bash_no_result",
+      "hookType": "post-tool-use",
+      "hookInput": {
+        "session_id": "s1",
+        "cwd": "/repo",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "echo hi"
+        }
+      },
+      "expected": {
+        "kind": "command",
+        "content": "Tool: Bash\n\n$ echo hi",
+        "provenance": {
+          "toolName": "Bash",
+          "hasError": false,
+          "command": "echo"
+        },
+        "scopeIds": {
+          "sessionId": "s1",
+          "repoId": "/repo"
+        }
+      }
+    },
+    {
+      "name": "glob",
+      "hookType": "post-tool-use",
+      "hookInput": {
+        "session_id": "s1",
+        "cwd": "/repo",
+        "tool_name": "Glob",
+        "tool_input": {
+          "pattern": "**/*.rs",
+          "path": "/src"
+        }
+      },
+      "expected": {
+        "kind": "tool_call",
+        "content": "Tool: Glob\n\nPattern: **/*.rs\n\nPath: /src",
+        "provenance": {
+          "toolName": "Glob",
+          "hasError": false,
+          "pattern": "**/*.rs",
+          "path": "/src"
+        },
+        "scopeIds": {
+          "sessionId": "s1",
+          "repoId": "/repo"
+        }
+      }
+    },
+    {
+      "name": "grep",
+      "hookType": "post-tool-use",
+      "hookInput": {
+        "session_id": "s1",
+        "cwd": "/repo",
+        "tool_name": "Grep",
+        "tool_input": {
+          "pattern": "TODO",
+          "path": "/src"
+        }
+      },
+      "expected": {
+        "kind": "tool_call",
+        "content": "Tool: Grep\n\nPattern: TODO\n\nPath: /src",
+        "provenance": {
+          "toolName": "Grep",
+          "hasError": false,
+          "pattern": "TODO",
+          "path": "/src"
+        },
+        "scopeIds": {
+          "sessionId": "s1",
+          "repoId": "/repo"
+        }
+      }
+    },
+    {
+      "name": "grep_no_path",
+      "hookType": "post-tool-use",
+      "hookInput": {
+        "session_id": "s1",
+        "cwd": "/repo",
+        "tool_name": "Grep",
+        "tool_input": {
+          "pattern": "fn main"
+        }
+      },
+      "expected": {
+        "kind": "tool_call",
+        "content": "Tool: Grep\n\nPattern: fn main",
+        "provenance": {
+          "toolName": "Grep",
+          "hasError": false,
+          "pattern": "fn main"
+        },
+        "scopeIds": {
+          "sessionId": "s1",
+          "repoId": "/repo"
+        }
+      }
+    },
+    {
+      "name": "task",
+      "hookType": "post-tool-use",
+      "hookInput": {
+        "session_id": "s1",
+        "cwd": "/repo",
+        "tool_name": "Task",
+        "tool_input": {
+          "subagent_type": "debugger",
+          "description": "find the bug"
+        }
+      },
+      "expected": {
+        "kind": "tool_call",
+        "content": "Tool: Task\n\nAgent: debugger\n\nTask: find the bug",
+        "provenance": {
+          "toolName": "Task",
+          "hasError": false,
+          "subagentType": "debugger",
+          "description": "find the bug"
+        },
+        "scopeIds": {
+          "sessionId": "s1",
+          "repoId": "/repo"
+        }
+      }
+    },
+    {
+      "name": "webfetch",
+      "hookType": "post-tool-use",
+      "hookInput": {
+        "session_id": "s1",
+        "cwd": "/repo",
+        "tool_name": "WebFetch",
+        "tool_input": {
+          "url": "https://example.com"
+        }
+      },
+      "expected": {
+        "kind": "tool_call",
+        "content": "Tool: WebFetch\n\nURL: https://example.com",
+        "provenance": {
+          "toolName": "WebFetch",
+          "hasError": false,
+          "url": "https://example.com"
+        },
+        "scopeIds": {
+          "sessionId": "s1",
+          "repoId": "/repo"
+        }
+      }
+    },
+    {
+      "name": "websearch",
+      "hookType": "post-tool-use",
+      "hookInput": {
+        "session_id": "s1",
+        "cwd": "/repo",
+        "tool_name": "WebSearch",
+        "tool_input": {
+          "query": "rust uds"
+        }
+      },
+      "expected": {
+        "kind": "tool_call",
+        "content": "Tool: WebSearch\n\nQuery: rust uds",
+        "provenance": {
+          "toolName": "WebSearch",
+          "hasError": false,
+          "query": "rust uds"
+        },
+        "scopeIds": {
+          "sessionId": "s1",
+          "repoId": "/repo"
+        }
+      }
+    },
+    {
+      "name": "unknown_tool",
+      "hookType": "post-tool-use",
+      "hookInput": {
+        "session_id": "s1",
+        "cwd": "/repo",
+        "tool_name": "Frobnicate",
+        "tool_input": {
+          "alpha": 1,
+          "beta": 2,
+          "gamma": 3
+        }
+      },
+      "expected": {
+        "kind": "tool_call",
+        "content": "Tool: Frobnicate\n\nInput keys: alpha, beta, gamma",
+        "provenance": {
+          "toolName": "Frobnicate",
+          "hasError": false,
+          "inputKeys": ["alpha", "beta", "gamma"]
+        },
+        "scopeIds": {
+          "sessionId": "s1",
+          "repoId": "/repo"
+        }
+      }
+    },
+    {
+      "name": "unknown_tool_empty_input",
+      "hookType": "post-tool-use",
+      "hookInput": {
+        "session_id": "s1",
+        "cwd": "/repo",
+        "tool_name": "Mystery",
+        "tool_input": {}
+      },
+      "expected": {
+        "kind": "tool_call",
+        "content": "Tool: Mystery\n\nInput keys: ",
+        "provenance": {
+          "toolName": "Mystery",
+          "hasError": false,
+          "inputKeys": []
+        },
+        "scopeIds": {
+          "sessionId": "s1",
+          "repoId": "/repo"
+        }
+      }
+    },
+    {
+      "name": "read_with_error",
+      "hookType": "post-tool-use",
+      "hookInput": {
+        "session_id": "s1",
+        "cwd": "/repo",
+        "tool_name": "Read",
+        "tool_input": {
+          "file_path": "/missing"
+        },
+        "tool_error": "ENOENT: no such file"
+      },
+      "expected": {
+        "kind": "tool_call",
+        "content": "Tool: Read\n\nFile: /missing\n\nError: ENOENT: no such file",
+        "provenance": {
+          "toolName": "Read",
+          "hasError": true,
+          "filePath": "/missing"
+        },
+        "scopeIds": {
+          "sessionId": "s1",
+          "repoId": "/repo"
+        }
+      }
+    },
+    {
+      "name": "bash_with_error",
+      "hookType": "post-tool-use-failure",
+      "hookInput": {
+        "session_id": "s1",
+        "cwd": "/repo",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "exit 1"
+        },
+        "tool_result": {
+          "exitCode": 1
+        },
+        "tool_error": "command failed"
+      },
+      "expected": {
+        "kind": "command",
+        "content": "Tool: Bash\n\n$ exit 1\n\n{\n  \"exitCode\": 1\n}\n\nError: command failed",
+        "provenance": {
+          "toolName": "Bash",
+          "hasError": true,
+          "command": "exit",
+          "exitCode": 1
+        },
+        "scopeIds": {
+          "sessionId": "s1",
+          "repoId": "/repo"
+        }
+      }
+    },
+    {
+      "name": "user_prompt_simple",
+      "hookType": "user-prompt-submit",
+      "hookInput": {
+        "session_id": "s1",
+        "cwd": "/repo",
+        "content": "Please refactor the parser."
+      },
+      "expected": {
+        "kind": "message",
+        "content": "Please refactor the parser.",
+        "provenance": {
+          "role": "user",
+          "length": 27
+        },
+        "scopeIds": {
+          "sessionId": "s1",
+          "repoId": "/repo"
+        }
+      }
+    },
+    {
+      "name": "user_prompt_multiline",
+      "hookType": "user-prompt-submit",
+      "hookInput": {
+        "session_id": "s1",
+        "cwd": "/repo",
+        "content": "line one\nline two\n\nline four"
+      },
+      "expected": {
+        "kind": "message",
+        "content": "line one\nline two\n\nline four",
+        "provenance": {
+          "role": "user",
+          "length": 28
+        },
+        "scopeIds": {
+          "sessionId": "s1",
+          "repoId": "/repo"
+        }
+      }
+    },
+    {
+      "name": "subagent_with_output",
+      "hookType": "subagent-stop",
+      "hookInput": {
+        "session_id": "s1",
+        "cwd": "/repo",
+        "agent_type": "code-reviewer",
+        "output": "Reviewed 3 files. LGTM."
+      },
+      "expected": {
+        "kind": "node_end",
+        "content": "Subagent: code-reviewer\n\nOutput:\nReviewed 3 files. LGTM.",
+        "provenance": {
+          "agentType": "code-reviewer",
+          "hasOutput": true,
+          "outputLength": 23
+        },
+        "scopeIds": {
+          "sessionId": "s1",
+          "repoId": "/repo"
+        }
+      }
+    },
+    {
+      "name": "subagent_no_output",
+      "hookType": "subagent-stop",
+      "hookInput": {
+        "session_id": "s1",
+        "cwd": "/repo",
+        "agent_type": "planner"
+      },
+      "expected": {
+        "kind": "node_end",
+        "content": "Subagent: planner",
+        "provenance": {
+          "agentType": "planner",
+          "hasOutput": false,
+          "outputLength": 0
+        },
+        "scopeIds": {
+          "sessionId": "s1",
+          "repoId": "/repo"
+        }
+      }
+    },
+    {
+      "name": "subagent_unknown_type",
+      "hookType": "subagent-stop",
+      "hookInput": {
+        "session_id": "s1",
+        "cwd": "/repo",
+        "output": "did some work"
+      },
+      "expected": {
+        "kind": "node_end",
+        "content": "Subagent: unknown\n\nOutput:\ndid some work",
+        "provenance": {
+          "hasOutput": true,
+          "outputLength": 13
+        },
+        "scopeIds": {
+          "sessionId": "s1",
+          "repoId": "/repo"
+        }
+      }
+    }
+  ]
+}
