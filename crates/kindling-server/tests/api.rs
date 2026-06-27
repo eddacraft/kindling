@@ -794,3 +794,67 @@ fn assert_capability_block(body: &serde_json::Value) {
         assert!(!fields.is_empty());
     }
 }
+
+/// `POST /v1/observations` surfaces redaction evidence (count + classes, never
+/// the matched values) on the response — KINTEG-006.
+#[tokio::test]
+async fn append_response_carries_redaction_evidence() {
+    let daemon = TestDaemon::start().await;
+    let mut c = daemon.connect().await;
+
+    let resp = c
+        .send(
+            "POST",
+            "/v1/observations",
+            Some(PROJECT_A),
+            Some(json!({
+                "kind": "message",
+                "content": "api_key=abcdef123456789 and Bearer abcdefghijklmnopqrstuvwxyz",
+                "scopeIds": { "sessionId": "s1" },
+            })),
+        )
+        .await;
+    assert_eq!(resp.status, StatusCode::CREATED, "append observation");
+    let body = resp.json();
+
+    // Content came back masked; the raw secrets never appear anywhere in the
+    // response body.
+    let serialized = body.to_string();
+    assert!(
+        !serialized.contains("abcdef123456789"),
+        "raw credential leaked"
+    );
+    assert!(
+        !serialized.contains("abcdefghijklmnopqrstuvwxyz"),
+        "raw bearer token leaked"
+    );
+
+    let redaction = &body["redaction"];
+    assert_eq!(redaction["count"], 2, "two secrets masked");
+    let classes = redaction["classes"].as_array().expect("classes array");
+    assert_eq!(
+        classes,
+        &vec![
+            serde_json::Value::from("credentialAssignment"),
+            serde_json::Value::from("bearerToken"),
+        ]
+    );
+
+    // A clean append reports empty evidence (the block is always present).
+    let resp = c
+        .send(
+            "POST",
+            "/v1/observations",
+            Some(PROJECT_A),
+            Some(json!({
+                "kind": "message",
+                "content": "nothing sensitive here",
+                "scopeIds": { "sessionId": "s1" },
+            })),
+        )
+        .await;
+    assert_eq!(resp.status, StatusCode::CREATED);
+    let body = resp.json();
+    assert_eq!(body["redaction"]["count"], 0);
+    assert!(body["redaction"]["classes"].as_array().unwrap().is_empty());
+}

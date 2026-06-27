@@ -9,7 +9,9 @@
 //! adds the `deduplicated` marker.
 
 use kindling_service::{AppendOutcome, CloseCapsuleOptions, CreatePinOptions, OpenCapsuleOptions};
-use kindling_types::{CapsuleType, Id, Observation, ObservationInput, PinTargetType, ScopeIds};
+use kindling_types::{
+    CapsuleType, Id, Observation, ObservationInput, PinTargetType, RedactionEvidence, ScopeIds,
+};
 use serde::{Deserialize, Serialize};
 
 /// `POST /v1/capsules` body — open a capsule.
@@ -105,12 +107,20 @@ pub struct AppendObservationRequest {
 /// id (the returned observation is then the pre-existing stored row, unchanged)
 /// and `false` when a new row was written. This makes spool replay observably
 /// exactly-once-ish on id.
+///
+/// The nested `redaction` block (KINTEG-006) reports the secret masking applied
+/// to the request's incoming content — a count and the matched classes, never
+/// the matched values — so callers can prove sensitive data was handled. It is
+/// a nested object (not flattened) so it cannot collide with observation
+/// fields, and it is always present (`{ count: 0, classes: [] }` when nothing
+/// matched).
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppendObservationResponse {
     #[serde(flatten)]
     pub observation: Observation,
     pub deduplicated: bool,
+    pub redaction: RedactionEvidence,
 }
 
 impl From<AppendOutcome> for AppendObservationResponse {
@@ -118,6 +128,7 @@ impl From<AppendOutcome> for AppendObservationResponse {
         Self {
             observation: outcome.observation,
             deduplicated: outcome.deduplicated,
+            redaction: outcome.redaction,
         }
     }
 }

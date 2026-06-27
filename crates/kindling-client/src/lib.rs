@@ -86,7 +86,7 @@ pub use kindling_types::{
     build_capability, kind_registry, supported_kind_names, CandidateResult, Capability, Capsule,
     CapsuleStatus, CapsuleType, Id, KindRegistryEntry, ListObservationsRequest,
     ListObservationsResult, Observation, ObservationInput, ObservationKind, Pin, PinResult,
-    PinTargetType, ProviderSearchOptions, ProviderSearchResult, RetrieveOptions,
+    PinTargetType, ProviderSearchOptions, ProviderSearchResult, RedactionEvidence, RetrieveOptions,
     RetrieveProvenance, RetrieveResult, RetrievedEntity, ScopeIds, Summary, Timestamp,
 };
 
@@ -102,12 +102,17 @@ use body::{
 /// existed: `observation` is then the pre-existing stored row (the daemon did
 /// not overwrite it or re-run masking), making spool replay exactly-once-ish on
 /// id. When `false`, a new row was written and `observation` is it.
+/// `redaction` reports the secret masking the daemon applied to this request's
+/// incoming content (count + classes, never values), even on a dedup hit. It
+/// lets callers prove sensitive data was handled.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AppendResult {
     /// The stored observation. On a dedup hit this is the pre-existing row.
     pub observation: Observation,
     /// `true` when the id already existed and the daemon ignored the write.
     pub deduplicated: bool,
+    /// Redaction evidence for the request's incoming content (KINTEG-006).
+    pub redaction: RedactionEvidence,
 }
 
 /// Header carrying the project root string for per-project DB routing. Mirrors
@@ -303,6 +308,7 @@ impl Client {
         Ok(AppendResult {
             observation: resp.observation,
             deduplicated: resp.deduplicated,
+            redaction: resp.redaction,
         })
     }
 

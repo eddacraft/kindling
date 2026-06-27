@@ -15,6 +15,7 @@ pub mod common;
 pub mod list;
 pub mod observation;
 pub mod pin;
+pub mod redaction;
 pub mod retrieval;
 pub mod summary;
 
@@ -27,6 +28,7 @@ pub use common::{Id, ScopeIds, Timestamp, ValidationError};
 pub use list::{ListObservationsRequest, ListObservationsResult};
 pub use observation::{Observation, ObservationInput, ObservationKind};
 pub use pin::{is_pin_active, Pin, PinInput, PinTargetType};
+pub use redaction::RedactionEvidence;
 pub use retrieval::{
     CandidateResult, PinResult, ProviderSearchOptions, ProviderSearchResult, RetrieveOptions,
     RetrieveProvenance, RetrieveResult, RetrievedEntity,

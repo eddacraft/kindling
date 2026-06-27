@@ -396,6 +396,94 @@ fn append_observation_masks_anthropic_key() {
 }
 
 #[test]
+fn append_observation_reports_redaction_evidence() {
+    let svc = service();
+    // Two distinct secret classes in one payload: a credential assignment and a
+    // bearer token. Evidence must count both and name both classes — never the
+    // matched substrings.
+    let raw = "api_key=abcdef123456789 and Bearer abcdefghijklmnopqrstuvwxyz here";
+    let outcome = svc
+        .append_observation(
+            obs_input(raw, session_scope("evid1")),
+            AppendObservationOptions::default(),
+        )
+        .expect("append");
+
+    assert_eq!(outcome.redaction.count, 2, "two secrets were masked");
+    assert_eq!(
+        outcome.redaction.classes,
+        vec![
+            "credentialAssignment".to_string(),
+            "bearerToken".to_string()
+        ],
+        "classes are reported in detection order"
+    );
+
+    // The evidence (and the whole outcome) must not leak any raw secret bytes:
+    // only counts, class names, and the already-masked content.
+    let debug = format!("{outcome:?}");
+    assert!(
+        !debug.contains("abcdef123456789"),
+        "no raw credential leaks"
+    );
+    assert!(
+        !debug.contains("abcdefghijklmnopqrstuvwxyz"),
+        "no raw bearer token leaks"
+    );
+    assert!(outcome.observation.content.contains("[REDACTED]"));
+}
+
+#[test]
+fn append_observation_clean_content_reports_empty_evidence() {
+    let svc = service();
+    let outcome = svc
+        .append_observation(
+            obs_input("nothing sensitive here", session_scope("evid2")),
+            AppendObservationOptions::default(),
+        )
+        .expect("append");
+    assert_eq!(outcome.redaction.count, 0);
+    assert!(outcome.redaction.classes.is_empty());
+}
+
+#[test]
+fn append_observation_reports_evidence_even_on_dedup() {
+    let svc = service();
+    let scope = session_scope("evid3");
+
+    // First append seeds the id with clean content.
+    let mut first = obs_input("clean original body", scope.clone());
+    first.id = Some("evid-fixed".to_string());
+    let first_out = svc
+        .append_observation(first, AppendObservationOptions::default())
+        .expect("first append");
+    assert!(!first_out.deduplicated);
+    assert_eq!(first_out.redaction.count, 0);
+
+    // Replay the same id with secret-bearing content. The stored row wins
+    // (deduplicated), but the evidence reflects THIS request's masking pass so
+    // the caller still learns the replayed payload carried a secret.
+    let mut second = obs_input("password=hunter2hunter2 in the replay", scope);
+    second.id = Some("evid-fixed".to_string());
+    let second_out = svc
+        .append_observation(second, AppendObservationOptions::default())
+        .expect("second append");
+    assert!(second_out.deduplicated, "duplicate id deduplicates");
+    assert_eq!(
+        second_out.observation.content, "clean original body",
+        "dedup returns the original stored row, unchanged"
+    );
+    assert_eq!(
+        second_out.redaction.count, 1,
+        "evidence reflects the incoming (replayed) content's masking"
+    );
+    assert_eq!(
+        second_out.redaction.classes,
+        vec!["credentialAssignment".to_string()]
+    );
+}
+
+#[test]
 fn append_observation_dedups_on_id_returns_existing_unchanged() {
     let svc = service();
     let scope = session_scope("dedup1");

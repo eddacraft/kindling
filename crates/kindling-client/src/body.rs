@@ -4,7 +4,9 @@
 //! Response bodies are the domain types from `kindling-types` (already
 //! camelCase) and are deserialized directly — no response DTOs needed.
 
-use kindling_types::{CapsuleType, Id, Observation, ObservationInput, PinTargetType, ScopeIds};
+use kindling_types::{
+    CapsuleType, Id, Observation, ObservationInput, PinTargetType, RedactionEvidence, ScopeIds,
+};
 use serde::{Deserialize, Serialize};
 
 /// `POST /v1/capsules` body — open a capsule.
@@ -47,8 +49,8 @@ pub(crate) struct AppendObservationBody {
 }
 
 /// `POST /v1/observations` response — the stored observation (flattened) plus
-/// the daemon's `deduplicated` marker. Mirrors `AppendObservationResponse` in
-/// `kindling-server`'s `dto.rs`.
+/// the daemon's `deduplicated` marker and redaction evidence. Mirrors
+/// `AppendObservationResponse` in `kindling-server`'s `dto.rs`.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct AppendObservationResponseBody {
@@ -59,6 +61,11 @@ pub(crate) struct AppendObservationResponseBody {
     /// semantically means "a fresh write" (not a duplicate).
     #[serde(default)]
     pub deduplicated: bool,
+    /// Redaction evidence for the request's incoming content (KINTEG-006).
+    /// Defaults to empty for rolling-upgrade safety: an older daemon does not
+    /// emit this field, and an absent block means "no evidence reported".
+    #[serde(default)]
+    pub redaction: RedactionEvidence,
 }
 
 /// `POST /v1/pins` body — create a pin.
