@@ -1,11 +1,11 @@
 # kindling — Plan Index
 
-| Field   | Value                                                          |
-| ------- | -------------------------------------------------------------- |
-| Status  | In Progress                                                    |
-| Owner   | @aneki                                                         |
-| Created | 2026-03-14                                                     |
-| Updated | 2026-06-26 (KINTEG-008 Merged #129; KINTEG-003 In Review #128) |
+| Field   | Value                                                                       |
+| ------- | --------------------------------------------------------------------------- |
+| Status  | In Progress                                                                 |
+| Owner   | @aneki                                                                      |
+| Created | 2026-03-14                                                                  |
+| Updated | 2026-07-19 (PUBDIR drafted for public direction and contribution readiness) |
 
 ## Problem
 
@@ -20,6 +20,7 @@ kindling is functional (596 tests passing, 10 packages building) and the TypeScr
 - [x] anvil emits observations directly via `kindling-client` — no TS bridge (`command.invoked` via `KindlingDaemonSink`, anvil PR #2897; opt-in `ANVIL_KINDLING_SINK=daemon`, default `ndjson` unchanged)
 - [x] `pnpm add @eddacraft/kindling` installs the binary and exposes a typed thin client with no native deps (in-repo: per-platform `optionalDependencies` injected at publish; end-to-end registry validation user-gated)
 - [x] All deprecated TS implementation packages removed from this repo (source dirs deleted; formal `1.0.0` tag + `npm deprecate` remain user-gated)
+- [ ] Public north star, contribution acceptance lanes, curated roadmap, and contributor-ready issue surface are established without making GitHub a second planning authority
 
 ## Constraints
 
@@ -30,31 +31,33 @@ kindling is functional (596 tests passing, 10 packages building) and the TypeScr
 
 ## Modules
 
-| Module                                                                                  | Purpose                                                                                                                                | Status      | Dependencies       |
-| --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ----------- | ------------------ |
-| [01-npm-publish](./modules/01-npm-publish.aps.md)                                       | Package metadata, READMEs, publish scripts, CI                                                                                         | Done        | —                  |
-| [02-rust-hook-binary](./modules/02-rust-hook-binary.aps.md)                             | Rust binary for Claude Code hook invocations                                                                                           | Superseded  | by 05              |
-| [03-rust-cli](./modules/03-rust-cli.aps.md)                                             | Full Rust CLI replacing Commander.js                                                                                                   | Superseded  | by 05              |
-| [04-schema-contract](./modules/04-schema-contract.aps.md)                               | Cross-language SQLite schema contract for Rust+TS                                                                                      | Done        | —                  |
-| [05-rust-port](./modules/05-rust-port.aps.md)                                           | Rust-canonical kindling + thin TS client over local daemon (UDS)                                                                       | In Progress | 04-schema-contract |
-| [06-downstream-integration-surface](./modules/06-downstream-integration-surface.aps.md) | Harden the daemon/client contract anvil consumes (publish, dedup, query, handshake, observability, redaction evidence, runtime facade) | In Progress | 05-rust-port       |
-| [07-intent-capture-events](./modules/07-intent-capture-events.aps.md)                   | kindling-native intent event primitive + export (independent of the Rust port)                                                         | Done        | —                  |
-| [08-conversion-surface](./modules/08-conversion-surface.aps.md)                         | Public first impressions: merge built work, release ops, CLI depth, adapter/docs distribution                                          | In Progress | 05-rust-port       |
+| Module                                                                                        | Purpose                                                                                                                                | Status      | Dependencies       |
+| --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ----------- | ------------------ |
+| [01-npm-publish](./modules/01-npm-publish.aps.md)                                             | Package metadata, READMEs, publish scripts, CI                                                                                         | Done        | —                  |
+| [02-rust-hook-binary](./modules/02-rust-hook-binary.aps.md)                                   | Rust binary for Claude Code hook invocations                                                                                           | Superseded  | by 05              |
+| [03-rust-cli](./modules/03-rust-cli.aps.md)                                                   | Full Rust CLI replacing Commander.js                                                                                                   | Superseded  | by 05              |
+| [04-schema-contract](./modules/04-schema-contract.aps.md)                                     | Cross-language SQLite schema contract for Rust+TS                                                                                      | Done        | —                  |
+| [05-rust-port](./modules/05-rust-port.aps.md)                                                 | Rust-canonical kindling + thin TS client over local daemon (UDS)                                                                       | In Progress | 04-schema-contract |
+| [06-downstream-integration-surface](./modules/06-downstream-integration-surface.aps.md)       | Harden the daemon/client contract anvil consumes (publish, dedup, query, handshake, observability, redaction evidence, runtime facade) | In Progress | 05-rust-port       |
+| [07-intent-capture-events](./modules/07-intent-capture-events.aps.md)                         | kindling-native intent event primitive + export (independent of the Rust port)                                                         | Done        | —                  |
+| [08-conversion-surface](./modules/08-conversion-surface.aps.md)                               | Public first impressions: merge built work, release ops, CLI depth, adapter/docs distribution                                          | In Progress | 05-rust-port       |
+| [09-public-direction-and-contribution](./modules/09-public-direction-and-contribution.aps.md) | Public north star, contribution boundaries, curated roadmap, contributor opportunities, and one-way APS-to-Issues projection           | Draft       | —                  |
 
 See `plans/specs/2026-05-03-rust-canonical-thin-client-design.md` for the current design (daemon, transport, distribution, TS deprecation strategy). The earlier dual-maintain spec at `plans/specs/2026-04-15-rust-port-design.md` is superseded but retained for historical context.
 
 ## Schedule
 
-| Phase | Modules                                   | Target                                                                                                                  |
-| ----- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Now   | 05-rust-port (Phase 1)                    | Foundation crates: workspace, types, store, filter                                                                      |
-| Next  | 05-rust-port (Phase 2)                    | Service + daemon + hook + Rust client; anvil unblocks                                                                   |
-| Then  | 05-rust-port (Phase 3)                    | CLI + umbrella binary + cross-platform builds + cargo/brew/curl distribution                                            |
-| Then  | 05-rust-port (Phase 4)                    | Thin TS client SDK on npm; deprecate TS implementation packages and anvil bridge                                        |
-| Now   | 06-downstream-integration-surface         | KINTEG-003 list API In Review (#128); publish `kindling-client` ≥0.3.0 + `kindling-runtime` (KINTEG-009/008) user-gated |
-| Done  | 05-rust-port (slice)                      | PORT-011 (anvil KDS #2897)                                                                                              |
-| Done  | 06-downstream-integration-surface (slice) | KINTEG-001, KINTEG-002 (#121), KINTEG-004, KINTEG-005, KINTEG-008 (#129), KINTEG-009 (D-009 #125 + spool cap #126)      |
-| Done  | 07-intent-capture-events                  | Intent capture primitive + export shipped (independent of the Rust port; KINTENT-001..006 merged)                       |
+| Phase | Modules                                   | Target                                                                                                                        |
+| ----- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Now   | 05-rust-port (Phase 1)                    | Foundation crates: workspace, types, store, filter                                                                            |
+| Next  | 05-rust-port (Phase 2)                    | Service + daemon + hook + Rust client; anvil unblocks                                                                         |
+| Then  | 05-rust-port (Phase 3)                    | CLI + umbrella binary + cross-platform builds + cargo/brew/curl distribution                                                  |
+| Then  | 05-rust-port (Phase 4)                    | Thin TS client SDK on npm; deprecate TS implementation packages and anvil bridge                                              |
+| Now   | 06-downstream-integration-surface         | KINTEG-003 list API In Review (#128); publish `kindling-client` ≥0.3.0 + `kindling-runtime` (KINTEG-009/008) user-gated       |
+| Next  | 09-public-direction-and-contribution      | Accept the north star and contribution lanes, then publish a small curated contributor-opportunity set before automating sync |
+| Done  | 05-rust-port (slice)                      | PORT-011 (anvil KDS #2897)                                                                                                    |
+| Done  | 06-downstream-integration-surface (slice) | KINTEG-001, KINTEG-002 (#121), KINTEG-004, KINTEG-005, KINTEG-008 (#129), KINTEG-009 (D-009 #125 + spool cap #126)            |
+| Done  | 07-intent-capture-events                  | Intent capture primitive + export shipped (independent of the Rust port; KINTENT-001..006 merged)                             |
 
 ## Risks
 
