@@ -15,7 +15,7 @@ step-by-step guide.
 
 ## Prerequisites
 
-- Node.js >= 20 and pnpm
+- Node.js >= 24 and pnpm
 - The `kindling` binary on `PATH`:
 
   ```bash

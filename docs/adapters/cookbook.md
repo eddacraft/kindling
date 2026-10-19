@@ -20,7 +20,7 @@ The full runnable example lives at [examples/adapter-minimal](../../examples/ada
 
 ## Prerequisites
 
-- Node.js >= 20
+- Node.js >= 24
 - The `kindling` binary on `PATH` (via [install.sh](../../install.sh) or `cargo install eddacraft-kindling`)
 
 ```bash
