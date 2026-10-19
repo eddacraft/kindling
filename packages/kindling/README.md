@@ -114,7 +114,7 @@ Full documentation at [docs.eddacraft.ai/docs/kindling](https://docs.eddacraft.a
 
 ## Requirements
 
-- Node.js >= 20.0.0
+- Node.js >= 24
 - ESM only (`"type": "module"`)
 
 ## License

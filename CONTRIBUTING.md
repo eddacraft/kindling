@@ -35,7 +35,7 @@ kindling/
 ### Prerequisites
 
 - Rust (stable) — the toolchain is pinned in [`rust-toolchain.toml`](rust-toolchain.toml); `rustup` installs it automatically.
-- Node.js >= 20.0.0 and pnpm >= 8.0.0 — only needed to work on the npm thin client / adapters.
+- Node.js >= 24 and pnpm >= 8.0.0 — only needed to work on the npm thin client / adapters.
 
 ### Development Setup
 
