@@ -4,9 +4,9 @@
 | ------ | ------ | ----------- |
 | KINTEG | @aneki | In Progress |
 
-**Last reviewed:** 2026-08-04 (KINTEG-006 Merged PR #136; KINTEG-007 Merged PR #135;
-KINTEG-010 Merged PR #140; KINTEG-011 Merged PR #133; KINTEG-012 Merged PR #134.
-KINTEG-013/014 are In Progress; release and crates.io publication remain user-gated.)
+**Last reviewed:** 2026-10-19 (all KINTEG items Merged. v0.4.0 release prep opened
+covering KINTEG-006/007/010/011/012/013/014; crates.io is at 0.3.0 and the GitHub
+Release that publishes npm + binaries has never run since v0.1.2, see ISS-003.)
 
 ## Purpose
 

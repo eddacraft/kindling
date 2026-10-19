@@ -393,7 +393,7 @@ dependencies = [
 
 [[package]]
 name = "eddacraft-kindling"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -723,7 +723,7 @@ dependencies = [
 
 [[package]]
 name = "kindling-bench"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "criterion",
  "kindling-client",
@@ -738,7 +738,7 @@ dependencies = [
 
 [[package]]
 name = "kindling-client"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "http-body-util",
  "hyper",
@@ -756,7 +756,7 @@ dependencies = [
 
 [[package]]
 name = "kindling-provider"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "kindling-store",
  "kindling-types",
@@ -768,7 +768,7 @@ dependencies = [
 
 [[package]]
 name = "kindling-runtime"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "kindling-client",
  "kindling-server",
@@ -781,7 +781,7 @@ dependencies = [
 
 [[package]]
 name = "kindling-server"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "axum",
  "chrono",
@@ -803,7 +803,7 @@ dependencies = [
 
 [[package]]
 name = "kindling-service"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "kindling-provider",
  "kindling-store",
@@ -817,7 +817,7 @@ dependencies = [
 
 [[package]]
 name = "kindling-store"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "kindling-types",
  "rusqlite",
@@ -830,7 +830,7 @@ dependencies = [
 
 [[package]]
 name = "kindling-types"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "serde",
  "serde_json",

@@ -16,6 +16,94 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-19
+
+Integration-hardening release. Closes out the post-0.3 downstream-integration
+work (KINTEG-006, 007, 010, 011, 012, 013, 014) plus the CodeQL security
+triage. This is a **breaking** release for `kindling-server` (the router
+constructor gains a TCP secret), for mixed-version TCP deployments (the daemon
+now requires a bearer token on the loopback-TCP transport), and it bumps the
+SQLite schema contract from v5 to v6. Pre-1.0, a breaking change bumps the
+minor, hence 0.4.0.
+
+> **npm note.** This is the first GitHub Release since v0.1.2, so it is the
+> first release that publishes the thin `@eddacraft/kindling` client and the
+> per-platform binary packages to npm. The 0.2.0 and 0.3.0 crates.io releases
+> were tagged but never published as GitHub Releases, so npm `latest` stayed at
+> the retired 0.1.2 TypeScript implementation until now.
+
+### Breaking
+
+- **Loopback-TCP daemon transport now requires a bearer token (KINTEG-010).**
+  The daemon mints a 256-bit per-daemon secret at startup and writes it to an
+  owner-only (0600) token file beside the port file. Every request except
+  `GET /v1/health` must present `Authorization: Bearer <secret>` or it is
+  rejected with 401. `kindling-client` 0.4 reads the sibling token file on the
+  TCP path automatically; a 0.3 client talking to a 0.4 daemon over TCP (the
+  Windows default) is rejected, so upgrade client and daemon together. The UDS
+  path is unchanged and sends no token.
+- **`kindling_server::build_router` takes a second argument,**
+  `tcp_secret: Option<Arc<str>>`. Pass `None` for UDS-only embedding.
+- **Schema contract v5 to v6.** Migration 006 rebuilds the repo and session
+  scope indexes as `(scope_id, ts, id)` so keyset list queries no longer sort
+  through a temporary B-tree (KINTEG-014). Read-write opens migrate v5
+  databases in place on first open; read-only opens of v5 databases still
+  work. A v6 database cannot be opened by a 0.3 engine.
+
+### Added
+
+- **Redaction evidence in append responses (KINTEG-006).** `AppendOutcome`
+  (service), `AppendObservationResponse` (server) and `AppendResult` (client)
+  now carry a `RedactionEvidence { count, classes }` value: the number of
+  masked matches and the distinct secret classes matched (for example
+  `credentialAssignment`, `bearerToken`), never the matched values. Produced by
+  the same masking pass that redacts at the service boundary, reported even on
+  a dedup hit, and decoded with a serde default so 0.4 clients tolerate older
+  daemons. New shared type `kindling_types::RedactionEvidence` with ts-rs
+  bindings; new `mask_secrets_with_evidence` in `kindling-service`.
+- **Published hook-payload fixtures for adapter authors (KINTEG-007).**
+  `fixtures/hook-payloads/claude-code.json` (repo root) and the vendored copy
+  exported from `@eddacraft/kindling` under the `./fixtures` subpath, both
+  carrying a pinnable `version: "1.0"` envelope and generated from the internal
+  capture cases by `scripts/sync-fixtures.mjs` (`--check` gates drift). The
+  export-bundle compatibility guarantee is now written down in
+  `docs/data-model.md`.
+- **`kindling-bench` workspace crate** (private, `publish = false`): a
+  reproducible local benchmark harness covering bundled-daemon startup,
+  direct and daemon writes, spooled outage writes and scoped reads, with
+  `--isolated-process` resource groups and logical I/O reporting.
+- **`kindling_store::validate_db_path`** rejects database paths containing
+  `..`, NUL bytes or SQLite URI names before anything is created on disk.
+
+### Changed
+
+- **Outage spooling is independent of backlog depth (KINTEG-013).** A
+  single-producer `SpooledClient` caches its live pending count, probes daemon
+  health first with bounded backoff after a connectivity failure, and appends
+  behind an existing backlog without rescanning it. Ordered replay, stable ids,
+  retention trimming and exactly-once-ish application are unchanged.
+- Project ids used for per-project database routing are confined to a hashed
+  hex path component, and the store no longer opens SQLite with
+  `SQLITE_OPEN_URI`.
+
+### Fixed
+
+- **Capsule close is atomic when the summary is missing (KINTEG-011).**
+  `close_capsule` now checks that the summary exists before the status update,
+  so a failed close leaves the capsule open instead of closed-without-summary.
+- **`--via-daemon` with `--db` is rejected instead of silently mis-routing
+  (KINTEG-012).** The daemon routes by project root, not database file, so the
+  CLI now returns a clear error naming both flags for every daemon-backed verb
+  (`log`, `capsule open/close`, `search`, `pin`, `unpin`, `forget`) rather than
+  reading or writing a different project's database.
+- CodeQL `rust/path-injection` alert #15 (store path validation, above).
+- CodeQL `rust/cleartext-logging` alerts #11 to #14 triaged as false positives
+  after redaction: a log-injection barrier model ships in
+  `.github/codeql/extensions/kindling-rust/`, and the disposition is recorded
+  in `SECURITY.md`.
+- Dev-toolchain Dependabot alerts cleared by raising `pnpm.overrides` floors
+  (no shipped package affected; the thin client has no runtime dependencies).
+
 ## [0.3.0] - 2026-06-26
 
 Downstream-integration release. The daemon/client contract anvil consumes gains

@@ -49,6 +49,26 @@ Example:
 
 **Context:** After merging conversion surface, `pnpm install` reports 7 workspace projects (4 packages + vscode adapter + plugin + `examples/adapter-minimal`), not the 5 estimated in the release plan. All install cleanly with `--frozen-lockfile`.
 
+### ISS-003: No GitHub Release published since v0.1.2
+
+| Field      | Value                 |
+| ---------- | --------------------- |
+| Status     | Open                  |
+| Severity   | High                  |
+| Discovered | C12 (release-prep)    |
+| Module     | 08-conversion-surface |
+
+**Context:** The v0.3.0 tag was pushed and the crates were published to crates.io,
+but no GitHub Release was created, and none exists for 0.2.0 either. Both
+`publish.yml` (npm) and `release.yml` (binaries, Homebrew tap PR) trigger on
+`release: published`, so neither has run for a Rust-canonical version.
+
+**Impact:** npm `@eddacraft/kindling` `latest` is still the retired 0.1.2
+TypeScript implementation; no prebuilt binaries are attached to any release;
+`install.sh` fails because `releases/latest` is 404; the Homebrew formula was
+never updated. The v0.4.0 release prep is written so that publishing its GitHub
+Release closes all of this in one go (runbook section 4).
+
 ---
 
 ## Questions
