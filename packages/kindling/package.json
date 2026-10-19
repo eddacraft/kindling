@@ -1,6 +1,6 @@
 {
   "name": "@eddacraft/kindling",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Thin TypeScript client for the kindling daemon — local memory and continuity engine for AI-assisted development",
   "type": "module",
   "main": "./dist/index.js",
