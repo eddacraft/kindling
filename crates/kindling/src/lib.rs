@@ -6,8 +6,8 @@
 //! open/close, search, pin, unpin, forget) to route through [`kindling_client`]
 //! for safe concurrent use alongside other kindling tools.
 //!
-//! `export`/`import`/`status`/`list`/`init` are always in-process (they operate
-//! on the DB file directly or have no daemon endpoint). `serve` starts the UDS
+//! `export`/`import`/`status`/`stats`/`list`/`init` are always in-process
+//! (they operate on the DB file directly or have no daemon endpoint). `serve` starts the UDS
 //! daemon via [`kindling_server::serve`].
 //!
 //! This library backs the single `kindling` binary (`src/main.rs`); the hook
@@ -22,7 +22,7 @@ mod output;
 pub use cli::{
     BrowseArgs, CapsuleCloseArgs, CapsuleCommand, CapsuleOpenArgs, Cli, Command, CommonOpts,
     DemoArgs, ExportArgs, ForgetArgs, ImportArgs, InitArgs, ListArgs, LogArgs, PinArgs, SearchArgs,
-    ServeArgs, SpoolCommand, SpoolStatusArgs, StatusArgs, UnpinArgs,
+    ServeArgs, SpoolCommand, SpoolStatusArgs, StatsArgs, StatusArgs, UnpinArgs,
 };
 
 use std::path::PathBuf;
@@ -138,6 +138,7 @@ fn json_flag(command: &Command) -> bool {
         Command::Capsule(CapsuleCommand::Open(a)) => a.common.json,
         Command::Capsule(CapsuleCommand::Close(a)) => a.common.json,
         Command::Status(a) => a.common.json,
+        Command::Stats(a) => a.common.json,
         Command::Search(a) => a.common.json,
         Command::List(a) => a.common.json,
         Command::Pin(a) => a.common.json,
@@ -164,6 +165,7 @@ fn dispatch(cli: Cli) -> CliResult {
             commands::capsule::run_close(args, via_daemon)
         }
         Command::Status(args) => commands::status::run(args),
+        Command::Stats(args) => commands::stats::run(args),
         Command::Search(args) => commands::search::run(args, via_daemon),
         Command::List(args) => commands::list::run(args),
         Command::Pin(args) => commands::pin::run_pin(args, via_daemon),

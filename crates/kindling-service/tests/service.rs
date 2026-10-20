@@ -1055,3 +1055,56 @@ fn pre_compact_context_is_empty_when_nothing() {
     assert!(ctx.is_empty());
     assert!(ctx.latest_summary.is_none());
 }
+
+#[test]
+fn stats_counts_without_exposing_redacted_content() {
+    let svc = service();
+    let scope = session_scope("s1");
+    let capsule = svc
+        .open_capsule(OpenCapsuleOptions {
+            kind: CapsuleType::Session,
+            intent: "stats".to_string(),
+            scope_ids: scope.clone(),
+            id: None,
+        })
+        .unwrap();
+    let kept = svc
+        .append_observation(
+            obs_input("kept note", scope.clone()),
+            AppendObservationOptions {
+                capsule_id: Some(capsule.id.clone()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    let mut secret = obs_input("forget this secret", scope.clone());
+    secret.kind = ObservationKind::Error;
+    let forgotten = svc
+        .append_observation(secret, AppendObservationOptions::default())
+        .unwrap();
+    svc.forget(&forgotten.observation.id).unwrap();
+    svc.pin_at(
+        CreatePinOptions {
+            target_type: PinTargetType::Observation,
+            target_id: kept.observation.id.clone(),
+            note: None,
+            ttl_ms: None,
+            scope_ids: Some(scope.clone()),
+        },
+        1_000,
+    )
+    .unwrap();
+
+    let stats = svc.stats_at(2_000).unwrap();
+    assert_eq!(stats.observations.total, 2);
+    assert_eq!(stats.observations.redacted, 1);
+    let by_kind: std::collections::HashMap<_, _> =
+        stats.observations.by_kind.iter().copied().collect();
+    assert_eq!(by_kind[&ObservationKind::Message], 1);
+    assert_eq!(by_kind[&ObservationKind::Error], 1);
+    assert_eq!(stats.capsules.open, 1);
+    assert_eq!(stats.pins.active, 1);
+    // Counts only: nothing in the stats carries observation content.
+    assert!(!format!("{stats:?}").contains("secret"));
+    assert_eq!(stats, svc.stats_at(2_000).unwrap());
+}

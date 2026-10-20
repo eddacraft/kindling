@@ -1011,3 +1011,103 @@ fn list_filters_by_repo_scope() {
         .unwrap();
     assert_eq!(ids(&page), vec!["in-repo"]);
 }
+
+#[test]
+fn memory_stats_empty_database_is_zero_filled() {
+    let store = SqliteKindlingStore::open_in_memory().unwrap();
+    let stats = store.memory_stats(1000).unwrap();
+
+    assert_eq!(stats.observations.total, 0);
+    assert_eq!(stats.observations.redacted, 0);
+    assert_eq!(stats.observations.earliest_ts, None);
+    assert_eq!(stats.observations.latest_ts, None);
+    let kinds: Vec<_> = stats.observations.by_kind.iter().map(|(k, _)| *k).collect();
+    assert_eq!(kinds, ObservationKind::ALL);
+    assert!(stats.observations.by_kind.iter().all(|(_, n)| *n == 0));
+    assert_eq!(stats.capsules.by_type.len(), CapsuleType::ALL.len());
+    assert_eq!(stats.capsules.total, 0);
+    assert_eq!(stats.pins.by_target.len(), PinTargetType::ALL.len());
+    assert_eq!(stats.pins.total, 0);
+    assert_eq!(stats.summaries, 0);
+}
+
+#[test]
+fn memory_stats_counts_by_kind_capsules_and_pins() {
+    let store = SqliteKindlingStore::open_in_memory().unwrap();
+    store
+        .insert_observation(&observation("obs-1", "first", 1000, "s"))
+        .unwrap();
+    store
+        .insert_observation(&observation("obs-2", "second", 3000, "s"))
+        .unwrap();
+    let mut err = observation("obs-3", "top secret token", 2000, "s");
+    err.kind = ObservationKind::Error;
+    store.insert_observation(&err).unwrap();
+    store.redact_observation("obs-3").unwrap();
+
+    store.create_capsule(&capsule("cap-1", "s", 1000)).unwrap();
+    let mut node = capsule("cap-2", "t", 1500);
+    node.kind = CapsuleType::PocketflowNode;
+    store.create_capsule(&node).unwrap();
+    store.close_capsule("cap-2", Some(2500), None).unwrap();
+
+    let pin = |id: &str, target_type: PinTargetType, expires_at: Option<i64>| Pin {
+        id: id.to_string(),
+        target_type,
+        target_id: "obs-1".to_string(),
+        reason: None,
+        created_at: 1000,
+        expires_at,
+        scope_ids: scope("s"),
+    };
+    store
+        .insert_pin(&pin("pin-1", PinTargetType::Observation, None))
+        .unwrap();
+    store
+        .insert_pin(&pin("pin-2", PinTargetType::Observation, Some(1500)))
+        .unwrap();
+    store
+        .insert_pin(&pin("pin-3", PinTargetType::Summary, Some(9000)))
+        .unwrap();
+
+    let stats = store.memory_stats(2000).unwrap();
+
+    let obs = &stats.observations;
+    assert_eq!(obs.total, 3);
+    assert_eq!(obs.redacted, 1);
+    assert_eq!(obs.earliest_ts, Some(1000));
+    assert_eq!(obs.latest_ts, Some(3000));
+    let kind_count = |kind: ObservationKind| {
+        obs.by_kind
+            .iter()
+            .find(|(k, _)| *k == kind)
+            .map(|(_, n)| *n)
+            .unwrap()
+    };
+    assert_eq!(kind_count(ObservationKind::ToolCall), 2);
+    assert_eq!(kind_count(ObservationKind::Error), 1);
+    assert_eq!(kind_count(ObservationKind::Message), 0);
+
+    assert_eq!(stats.capsules.total, 2);
+    assert_eq!(stats.capsules.open, 1);
+    assert_eq!(stats.capsules.closed, 1);
+    assert_eq!(
+        stats.capsules.by_type,
+        vec![(CapsuleType::Session, 1), (CapsuleType::PocketflowNode, 1)]
+    );
+
+    assert_eq!(stats.pins.total, 3);
+    assert_eq!(stats.pins.active, 2);
+    assert_eq!(stats.pins.expired, 1);
+    assert_eq!(
+        stats.pins.by_target,
+        vec![(PinTargetType::Observation, 2), (PinTargetType::Summary, 1)]
+    );
+
+    // Deterministic: the same database and clock give identical stats.
+    assert_eq!(stats, store.memory_stats(2000).unwrap());
+    // The clock only moves the active/expired split.
+    let later = store.memory_stats(10_000).unwrap();
+    assert_eq!(later.pins.active, 1);
+    assert_eq!(later.pins.expired, 2);
+}

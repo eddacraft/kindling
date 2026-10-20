@@ -202,6 +202,7 @@ kindling log
 kindling search <query>
 kindling capsule open | close
 kindling status
+kindling stats [--json]
 kindling list
 kindling pin    | unpin
 kindling forget <observation-id>

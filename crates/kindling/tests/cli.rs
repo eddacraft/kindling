@@ -510,3 +510,87 @@ fn browse_escapes_script_breakout_in_embedded_json() {
         "payload must round-trip in embedded JSON: {bundle:#}"
     );
 }
+
+#[test]
+fn stats_json_on_empty_database_is_zero_filled() {
+    let env = CliEnv::new();
+    let out = env.run_db(&["stats", "--json"]);
+    assert_success(&out);
+    let v = json_stdout(&out);
+    assert_eq!(v["observations"]["total"], json!(0));
+    assert_eq!(v["observations"]["latestTimestamp"], json!(null));
+    let by_kind = v["observations"]["byKind"].as_object().unwrap();
+    assert_eq!(by_kind.len(), 9);
+    assert!(by_kind.values().all(|n| n == &json!(0)));
+    assert_eq!(v["capsules"]["byType"]["session"], json!(0));
+    assert_eq!(v["capsules"]["byType"]["pocketflow_node"], json!(0));
+    assert_eq!(v["pins"]["total"], json!(0));
+    assert_eq!(v["summaries"], json!(0));
+}
+
+#[test]
+fn stats_json_counts_kinds_capsules_pins_and_latest_ts() {
+    let env = CliEnv::new();
+
+    let open = env.run_db(&["capsule", "open", "--intent", "stats probe", "--json"]);
+    assert_success(&open);
+    let cap_id = json_stdout(&open)["id"].as_str().unwrap().to_string();
+    let log = env.run_db(&["log", "keep me", "--kind", "message", "--json"]);
+    assert_success(&log);
+    let keep_id = json_stdout(&log)["id"].as_str().unwrap().to_string();
+    assert_success(&env.run_db(&["log", "cargo test", "--kind", "command"]));
+    let secret = env.run_db(&["log", "hush-hush-stats-probe", "--kind", "error", "--json"]);
+    assert_success(&secret);
+    let secret_id = json_stdout(&secret)["id"].as_str().unwrap().to_string();
+    assert_success(&env.run_db(&["forget", &secret_id]));
+    assert_success(&env.run_db(&["pin", "observation", &keep_id]));
+    assert_success(&env.run_db(&["capsule", "close", &cap_id, "--summary", "done"]));
+
+    let out = env.run_db(&["stats", "--json"]);
+    assert_success(&out);
+    let raw = stdout(&out);
+    assert!(
+        !raw.contains("hush-hush-stats-probe"),
+        "stats must not leak redacted content"
+    );
+    let v = json_stdout(&out);
+    assert_eq!(v["observations"]["total"], json!(3));
+    assert_eq!(v["observations"]["redacted"], json!(1));
+    assert_eq!(v["observations"]["byKind"]["message"], json!(1));
+    assert_eq!(v["observations"]["byKind"]["command"], json!(1));
+    assert_eq!(v["observations"]["byKind"]["error"], json!(1));
+    assert_eq!(v["observations"]["byKind"]["tool_call"], json!(0));
+    assert!(v["observations"]["latestTimestamp"].is_number());
+    assert!(v["observations"]["latestDate"].is_string());
+    assert_eq!(v["capsules"]["total"], json!(1));
+    assert_eq!(v["capsules"]["closed"], json!(1));
+    assert_eq!(v["capsules"]["byType"]["session"], json!(1));
+    assert_eq!(v["summaries"], json!(1));
+    assert_eq!(v["pins"]["total"], json!(1));
+    assert_eq!(v["pins"]["active"], json!(1));
+    assert_eq!(v["pins"]["byTarget"]["observation"], json!(1));
+
+    // Read-only and deterministic: a second run is identical.
+    let again = env.run_db(&["stats", "--json"]);
+    assert_eq!(raw, stdout(&again));
+}
+
+#[test]
+fn stats_text_output_has_table_sections() {
+    let env = CliEnv::new();
+    assert_success(&env.run_db(&["log", "table probe", "--kind", "message"]));
+    let out = env.run_db(&["stats"]);
+    assert_success(&out);
+    let text = stdout(&out);
+    for heading in [
+        "Kindling Memory Stats",
+        "Observations",
+        "Capsules",
+        "Pins",
+        "Activity",
+    ] {
+        assert!(text.contains(heading), "missing {heading} in:\n{text}");
+    }
+    assert!(text.contains("message"));
+    assert!(text.contains("Latest"));
+}

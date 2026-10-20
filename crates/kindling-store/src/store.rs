@@ -878,6 +878,92 @@ impl SqliteKindlingStore {
         })
     }
 
+    /// Read-only aggregate counts for the `stats` verb (and the later TUI).
+    ///
+    /// Every figure is a plain `COUNT(*)` / `MIN` / `MAX` over metadata
+    /// columns (`kind`, `type`, `status`, `target_type`, `expires_at`, `ts`):
+    /// no content column is read, so redacted content cannot leak through it.
+    /// Breakdowns list every known variant in declaration order (zero-filled),
+    /// so the output is deterministic for a given database and `now`.
+    ///
+    /// `now` decides which pins count as active (`expires_at IS NULL OR
+    /// expires_at > now`, the same rule as [`Self::list_active_pins`]).
+    pub fn memory_stats(&self, now: Timestamp) -> StoreResult<MemoryStats> {
+        let count =
+            |sql: &str| -> StoreResult<i64> { Ok(self.conn.query_row(sql, [], |row| row.get(0))?) };
+        let grouped = |sql: &str| -> StoreResult<Vec<(String, i64)>> {
+            let mut stmt = self.conn.prepare(sql)?;
+            let rows = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
+            Ok(rows.collect::<Result<Vec<_>, _>>()?)
+        };
+
+        let mut by_kind: Vec<(ObservationKind, i64)> =
+            ObservationKind::ALL.iter().map(|k| (*k, 0)).collect();
+        for (raw, n) in grouped("SELECT kind, COUNT(*) FROM observations GROUP BY kind")? {
+            let kind = observation_kind_from_str(&raw)?;
+            if let Some(slot) = by_kind.iter_mut().find(|(k, _)| *k == kind) {
+                slot.1 = n;
+            }
+        }
+        let (earliest_ts, latest_ts): (Option<i64>, Option<i64>) =
+            self.conn
+                .query_row("SELECT MIN(ts), MAX(ts) FROM observations", [], |row| {
+                    Ok((row.get(0)?, row.get(1)?))
+                })?;
+        let observations = ObservationStats {
+            total: by_kind.iter().map(|(_, n)| n).sum(),
+            redacted: count("SELECT COUNT(*) FROM observations WHERE redacted = 1")?,
+            by_kind,
+            earliest_ts,
+            latest_ts,
+        };
+
+        let mut by_type: Vec<(CapsuleType, i64)> =
+            CapsuleType::ALL.iter().map(|t| (*t, 0)).collect();
+        for (raw, n) in grouped("SELECT type, COUNT(*) FROM capsules GROUP BY type")? {
+            let kind = capsule_type_from_str(&raw)?;
+            if let Some(slot) = by_type.iter_mut().find(|(t, _)| *t == kind) {
+                slot.1 = n;
+            }
+        }
+        let open = count("SELECT COUNT(*) FROM capsules WHERE status = 'open'")?;
+        let total_capsules: i64 = by_type.iter().map(|(_, n)| n).sum();
+        let capsules = CapsuleStats {
+            total: total_capsules,
+            open,
+            closed: total_capsules - open,
+            by_type,
+        };
+
+        let mut by_target: Vec<(PinTargetType, i64)> =
+            PinTargetType::ALL.iter().map(|t| (*t, 0)).collect();
+        for (raw, n) in grouped("SELECT target_type, COUNT(*) FROM pins GROUP BY target_type")? {
+            let target = pin_target_type_from_str(&raw)?;
+            if let Some(slot) = by_target.iter_mut().find(|(t, _)| *t == target) {
+                slot.1 = n;
+            }
+        }
+        let active: i64 = self.conn.query_row(
+            "SELECT COUNT(*) FROM pins WHERE expires_at IS NULL OR expires_at > ?1",
+            [now],
+            |row| row.get(0),
+        )?;
+        let total_pins: i64 = by_target.iter().map(|(_, n)| n).sum();
+        let pins = PinStats {
+            total: total_pins,
+            active,
+            expired: total_pins - active,
+            by_target,
+        };
+
+        Ok(MemoryStats {
+            observations,
+            capsules,
+            summaries: count("SELECT COUNT(*) FROM summaries")?,
+            pins,
+        })
+    }
+
     fn hydrate_capsule(&self, raw: RawCapsule) -> StoreResult<Capsule> {
         let mut stmt = self.conn.prepare(
             "SELECT observation_id FROM capsule_observations WHERE capsule_id = ?1 ORDER BY seq",
@@ -903,6 +989,51 @@ pub struct DatabaseStats {
     pub latest_ts: Option<Timestamp>,
     /// `page_count * page_size`.
     pub size_bytes: i64,
+}
+
+/// Aggregate memory statistics returned by
+/// [`SqliteKindlingStore::memory_stats`]. Counts only: no content is carried.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MemoryStats {
+    pub observations: ObservationStats,
+    pub capsules: CapsuleStats,
+    pub summaries: i64,
+    pub pins: PinStats,
+}
+
+/// Observation counts, broken down by kind.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ObservationStats {
+    /// All stored observations, including redacted ones.
+    pub total: i64,
+    /// Observations whose content has been redacted (`forget`).
+    pub redacted: i64,
+    /// One entry per [`ObservationKind::ALL`] variant, in that order.
+    pub by_kind: Vec<(ObservationKind, i64)>,
+    /// Oldest observation timestamp, or `None` when there are none.
+    pub earliest_ts: Option<Timestamp>,
+    /// Newest observation timestamp, or `None` when there are none.
+    pub latest_ts: Option<Timestamp>,
+}
+
+/// Capsule counts, broken down by lifecycle status and type.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CapsuleStats {
+    pub total: i64,
+    pub open: i64,
+    pub closed: i64,
+    /// One entry per [`CapsuleType::ALL`] variant, in that order.
+    pub by_type: Vec<(CapsuleType, i64)>,
+}
+
+/// Pin counts, split into active and expired as of the supplied `now`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PinStats {
+    pub total: i64,
+    pub active: i64,
+    pub expired: i64,
+    /// One entry per [`PinTargetType::ALL`] variant, in that order.
+    pub by_target: Vec<(PinTargetType, i64)>,
 }
 
 fn now_ms() -> Timestamp {

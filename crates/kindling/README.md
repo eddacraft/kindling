@@ -22,6 +22,7 @@ kindling search "JWT"
 kindling browse
 kindling log "JWT tokens expire after 15 minutes, not 1 hour"
 kindling status
+kindling stats
 ```
 
 To run the daemon:
@@ -44,7 +45,7 @@ Most users should start with the CLI and only move to the Rust SDK crates when b
 
 The `kindling` binary provides:
 
-- CLI commands for logging, searching, capsules, pins, export/import and status.
+- CLI commands for logging, searching, capsules, pins, export/import, status and stats.
 - A daemon entry point via `kindling serve`.
 - Hook support for Claude Code session capture.
 - Local SQLite-backed project memory.

@@ -7,7 +7,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::filter::mask_secrets_with_evidence;
 use kindling_provider::{retrieve_at, LocalFtsProvider};
-use kindling_store::{SqliteKindlingStore, StoreError, StoreOptions};
+use kindling_store::{MemoryStats, SqliteKindlingStore, StoreError, StoreOptions};
 use kindling_types::{
     Capsule, CapsuleInput, CapsuleStatus, CapsuleType, Id, ListObservationsRequest,
     ListObservationsResult, Observation, ObservationInput, Pin, PinInput, PinTargetType,
@@ -499,6 +499,20 @@ impl KindlingService {
         now: Timestamp,
     ) -> ServiceResult<Vec<Pin>> {
         Ok(self.store.list_active_pins(scope, Some(now))?)
+    }
+
+    // ===== statistics =====
+
+    /// Read-only aggregate memory statistics (counts by kind, capsules, pins,
+    /// activity range), with pins judged active as of the current time.
+    /// Carries no observation content, so redacted text cannot leak.
+    pub fn stats(&self) -> ServiceResult<MemoryStats> {
+        self.stats_at(now_ms())
+    }
+
+    /// [`Self::stats`] with an explicit clock for deterministic tests.
+    pub fn stats_at(&self, now: Timestamp) -> ServiceResult<MemoryStats> {
+        Ok(self.store.memory_stats(now)?)
     }
 
     // ===== injection context (hook support) =====
