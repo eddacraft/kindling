@@ -36,7 +36,7 @@ These are the tests a proposal is measured against.
    the service boundary before they are stored. Capturing less, correctly, is
    better than capturing everything.
 5. **Rust is the canonical engine; clients and adapters stay thin.** There is
-   one engine. The npm package, adapters, and SDKs reach it through the daemon
+   one engine. The TypeScript client, adapters, and SDKs reach it through the daemon
    or the embedded service and do not reimplement storage or retrieval.
 6. **Mechanisms, not policy.** kindling provides memory mechanisms: capture,
    capsules, pins, retrieval, redaction, and export. Deciding what is

@@ -1,6 +1,7 @@
 {
   "name": "@eddacraft/kindling-adapter-pocketflow",
   "version": "0.4.0",
+  "private": true,
   "description": "PocketFlow workflow adapter for kindling - capture node executions with intent and confidence",
   "type": "module",
   "main": "./dist/index.js",
@@ -42,8 +43,7 @@
     "test:watch": "vitest",
     "type-check": "tsc --noEmit",
     "lint": "eslint src",
-    "clean": "rm -rf dist",
-    "prepublishOnly": "pnpm run build"
+    "clean": "rm -rf dist"
   },
   "dependencies": {
     "@eddacraft/kindling": "workspace:*"
@@ -52,8 +52,5 @@
     "@types/node": "^24.0.0",
     "typescript": "^5.3.0",
     "vitest": "^3.2.6"
-  },
-  "publishConfig": {
-    "access": "public"
   }
 }

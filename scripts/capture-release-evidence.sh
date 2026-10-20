@@ -17,8 +17,6 @@ MANDATED=(
   pnpm-clean.txt
   packages-list.txt
   post-merge-cli.txt
-  port018-check.txt
-  port018-pipeline.txt
   preflight-rust.txt
   preflight-npm.txt
   version-align.txt
@@ -68,14 +66,6 @@ step3_merge_state() {
   git log --oneline -1 --grep='conversion surface' main | cat
   cargo test -p eddacraft-kindling --test cli -- demo browse 2>&1 | tail -5 \
     >"$SCRATCH/post-merge-cli.txt"
-}
-
-step4_port018() {
-  node packages/kindling/scripts/build-platform-packages.mjs --check \
-    >"$SCRATCH/port018-check.txt" 2>&1
-  grep -E 'platform|optionalDependencies|cross-build' \
-    .github/workflows/publish.yml .github/workflows/release.yml \
-    | cat >"$SCRATCH/port018-pipeline.txt"
 }
 
 step5_preflight_rust() {
@@ -144,11 +134,6 @@ mechanical_checks() {
     echo "CHECK FAIL: post-merge-cli.txt missing passing tests" >&2
     failed=1
   fi
-  if ! grep -Fx 'OK: no committed optionalDependencies (7 targets are injected at publish).' \
-    "$SCRATCH/port018-check.txt" >/dev/null; then
-    echo "CHECK FAIL: port018-check.txt missing OK line" >&2
-    failed=1
-  fi
 
   return "$failed"
 }
@@ -159,7 +144,6 @@ main() {
   step1_aps_format
   step2_package_cleanup
   step3_merge_state
-  step4_port018
 
   local rust_exit=0 npm_exit=0
   step5_preflight_rust || rust_exit=$?
@@ -172,8 +156,6 @@ main() {
   cat "$SCRATCH/pnpm-clean.txt"
   echo "--- post-merge-cli.txt ---"
   cat "$SCRATCH/post-merge-cli.txt"
-  echo "--- port018-check.txt ---"
-  cat "$SCRATCH/port018-check.txt"
   echo "--- preflight-rust.txt (head) ---"
   head -8 "$SCRATCH/preflight-rust.txt"
   echo "--- preflight-npm.txt ---"

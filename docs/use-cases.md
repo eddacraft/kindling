@@ -115,8 +115,10 @@ All data is stored locally using embedded SQLite with FTS5—no cloud dependenci
 
 ## Integration Points
 
-kindling integrates through **adapters**. The npm adapters run over the thin
-`@eddacraft/kindling` client, which speaks HTTP-over-UDS to the Rust daemon.
+kindling integrates through **adapters**. The TypeScript adapters run over the
+thin `@eddacraft/kindling` client, which speaks HTTP-over-UDS to the Rust daemon.
+They are in-repo source packages, not published to npm; the editor extension
+ships as a VSIX on each GitHub Release.
 Claude Code integration is built into the `kindling` binary as hooks, with no
 separate package:
 
@@ -196,11 +198,12 @@ call `KindlingService::open(path)?` directly — it exposes the same lifecycle
 (`open_capsule`, `close_capsule`, `append_observation`, `retrieve`, `pin`,
 `unpin`, `forget`).
 
-> For Node/TypeScript callers, `@eddacraft/kindling` is a thin HTTP-over-UDS
-> client over the same Rust binary. The legacy TS implementation packages
-> (including the standalone CLI `@eddacraft/kindling-cli`) are **deprecated** and
-> will be removed at 1.0.0; prefer `cargo install eddacraft-kindling` (or the
-> install script) for the CLI.
+> For Node/TypeScript callers, `@eddacraft/kindling` (in `packages/kindling`,
+> used from source) is a thin HTTP-over-UDS client over the same Rust binary.
+> kindling no longer publishes to npm: the `@eddacraft/*` packages there,
+> including the standalone CLI `@eddacraft/kindling-cli`, are the retired
+> TypeScript engine and are **deprecated**. Use `cargo install eddacraft-kindling`
+> (or the install script) for the CLI.
 
 ## Summary
 

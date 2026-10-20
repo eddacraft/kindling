@@ -22,8 +22,11 @@ installer asks you to.
 Other install options:
 
 - **Cargo:** `cargo install eddacraft-kindling`
-- **npm (thin client + bundled binary):** `npm install @eddacraft/kindling`
 - **Homebrew (macOS/Linux):** `brew install eddacraft/tap/kindling` from the same [eddacraft/homebrew-tap](https://github.com/eddacraft/homebrew-tap) that ships anvil (glibc Linux; Alpine/musl: use the install script)
+
+- **GitHub Release:** download a prebuilt archive (with its `.sha256`) from [Releases](https://github.com/eddacraft/kindling/releases)
+
+kindling is not published to npm; the `@eddacraft/*` packages there are the retired TypeScript engine.
 
 Full install guide: [docs.eddacraft.ai/kindling/quickstart/install](https://docs.eddacraft.ai/kindling/quickstart/install)
 
@@ -117,7 +120,7 @@ kindling serve
 
 The daemon listens on a Unix domain socket (`~/.kindling/kindling.sock` by
 default). Rust integrations use [`kindling-client`](https://crates.io/crates/kindling-client);
-Node integrations use [`@eddacraft/kindling`](https://www.npmjs.com/package/@eddacraft/kindling).
+Node integrations use the thin client in [`packages/kindling`](../../packages/kindling/) (from source; not on npm).
 Both auto-spawn the daemon on first use if it is not already running.
 
 ## Connect your own tool
@@ -131,10 +134,10 @@ runner, build a thin adapter over the Node client or Rust SDK.
 
 ## What next?
 
-| Goal                                         | Where to go                                                                                                      |
-| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Core concepts (observations, capsules, pins) | [docs.eddacraft.ai/kindling/concepts/capsules](https://docs.eddacraft.ai/kindling/concepts/capsules)             |
-| CLI reference                                | [docs.eddacraft.ai/kindling/reference/cli](https://docs.eddacraft.ai/kindling/reference/cli)                     |
-| Rust SDK                                     | [`kindling-client` on crates.io](https://crates.io/crates/kindling-client)                                       |
-| OpenCode adapter                             | [`@eddacraft/kindling-adapter-opencode`](https://www.npmjs.com/package/@eddacraft/kindling-adapter-opencode)     |
-| PocketFlow adapter                           | [`@eddacraft/kindling-adapter-pocketflow`](https://www.npmjs.com/package/@eddacraft/kindling-adapter-pocketflow) |
+| Goal                                         | Where to go                                                                                          |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Core concepts (observations, capsules, pins) | [docs.eddacraft.ai/kindling/concepts/capsules](https://docs.eddacraft.ai/kindling/concepts/capsules) |
+| CLI reference                                | [docs.eddacraft.ai/kindling/reference/cli](https://docs.eddacraft.ai/kindling/reference/cli)         |
+| Rust SDK                                     | [`kindling-client` on crates.io](https://crates.io/crates/kindling-client)                           |
+| OpenCode adapter                             | [`packages/kindling-adapter-opencode`](../../packages/kindling-adapter-opencode/) (from source)      |
+| PocketFlow adapter                           | [`packages/kindling-adapter-pocketflow`](../../packages/kindling-adapter-pocketflow/) (from source)  |

@@ -2,8 +2,7 @@ name: release
 
 # Cross-platform release build pipeline for the `kindling` umbrella binary
 # (PORT-010). The actual cross-build lives in the reusable `_cross-build.yml`
-# workflow (shared with publish.yml so the npm platform packages build the exact
-# same artifacts). This workflow calls it and, on a published Release, attaches
+# workflow. This workflow calls it and, on a published Release, attaches
 # the archives + SHA256 sidecars to the Release. A published Release also gets
 # the editor extension VSIX (`package-vsix`); no other trigger builds it.
 #

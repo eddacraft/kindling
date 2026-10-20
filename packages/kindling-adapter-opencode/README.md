@@ -2,14 +2,25 @@
 
 OpenCode session adapter for kindling - capture tool calls, commands, and file changes from AI coding sessions.
 
-[![npm version](https://img.shields.io/npm/v/@eddacraft/kindling-adapter-opencode.svg)](https://www.npmjs.com/package/@eddacraft/kindling-adapter-opencode)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](../../LICENSE)
 
 ## Installation
 
+> **Not published to npm.** kindling no longer publishes to npm. The versions of
+> `@eddacraft/kindling-adapter-opencode` on npm are 0.1.x releases built on the retired
+> TypeScript engine and are deprecated. Use this package from a clone of the repository, as below.
+
+From a clone of [the repository](https://github.com/eddacraft/kindling) (Node.js 24 and pnpm required):
+
 ```bash
-npm install @eddacraft/kindling-adapter-opencode
+git clone https://github.com/eddacraft/kindling.git && cd kindling
+pnpm install
+pnpm --filter @eddacraft/kindling-adapter-opencode run build
 ```
+
+Inside the workspace, depend on it with `"@eddacraft/kindling-adapter-opencode": "workspace:*"`. Outside it, bundle the built `packages/kindling-adapter-opencode/dist` into your own tool (the editor extension bundles the thin client this way with esbuild).
+
+A ready-to-install OpenCode plugin, bundled and installed by the `kindling` binary, is planned; until then this adapter is a from-source integration. It needs the `kindling` binary on `PATH` (or `KINDLING_BIN`); see the [install options](../../README.md#install).
 
 ## Overview
 

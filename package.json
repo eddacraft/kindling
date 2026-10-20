@@ -37,8 +37,6 @@
     "lint": "pnpm -r run lint",
     "type-check": "pnpm -r run type-check",
     "clean": "pnpm -r run clean && rm -rf node_modules",
-    "publish:dry-run": "pnpm run build && pnpm run test && pnpm -r publish --dry-run --no-git-checks",
-    "publish:release": "pnpm run build && pnpm run test && pnpm -r publish",
     "prepare": "husky"
   },
   "lint-staged": {

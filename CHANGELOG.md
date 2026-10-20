@@ -6,13 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 > **Heads-up.** kindling is now Rust-canonical: the engine is a Cargo workspace
-> in `crates/`, and the npm `@eddacraft/kindling` package is a thin
-> HTTP-over-UDS client that bundles the Rust `kindling` binary via per-platform
-> `optionalDependencies` (or use `cargo install eddacraft-kindling` / the install
-> script). As of 0.2.0 the retired TypeScript implementation packages have been
-> removed from the repo; their last `0.1.x` npm versions remain published and
-> are marked deprecated on the registry. See
-> `plans/specs/2026-05-03-rust-canonical-thin-client-design.md`.
+> in `crates/`, distributed as the `kindling` binary (`cargo install
+eddacraft-kindling`, Homebrew, the install script), the crates on crates.io,
+> and GitHub Release assets (binaries and the editor extension VSIX). As of
+> 0.4.0 kindling **no longer publishes to npm**: the thin `@eddacraft/kindling`
+> HTTP-over-UDS client and the adapters stay in the repo as private source
+> packages, and every `@eddacraft/*` version on npm (the retired `0.1.x`
+> TypeScript engine) is deprecated or being deprecated on the registry. See
+> decision D-010 in `plans/index.aps.md`.
 
 ## [Unreleased]
 
@@ -39,11 +40,19 @@ now requires a bearer token on the loopback-TCP transport), and it bumps the
 SQLite schema contract from v5 to v6. Pre-1.0, a breaking change bumps the
 minor, hence 0.4.0.
 
-> **npm note.** This is the first GitHub Release since v0.1.2, so it is the
-> first release that publishes the thin `@eddacraft/kindling` client and the
-> per-platform binary packages to npm. The 0.2.0 and 0.3.0 crates.io releases
-> were tagged but never published as GitHub Releases, so npm `latest` stayed at
-> the retired 0.1.2 TypeScript implementation until now.
+> **npm publishing discontinued (D-010).** kindling no longer publishes to
+> npm. This release ships as GitHub Release assets (the 7 prebuilt binaries
+> and the editor extension VSIX), the Homebrew tap, and crates.io. The
+> `@eddacraft/kindling`, `@eddacraft/kindling-adapter-opencode` and
+> `@eddacraft/kindling-adapter-pocketflow` packages are now `private` source
+> packages; their npm `latest` remains the retired 0.1.2 TypeScript engine and
+> is being deprecated with a notice pointing at the binary install. The
+> `publish.yml` workflow and the per-platform `@eddacraft/kindling-<platform>`
+> binary packages (never published) are removed, and the thin client no longer
+> looks for a platform package when resolving the binary (`KINDLING_BIN`, then
+> `kindling` on `PATH`). This is the first GitHub Release since v0.1.2; the
+> 0.2.0 and 0.3.0 crates.io releases were tagged but never published as GitHub
+> Releases.
 
 ### Breaking
 

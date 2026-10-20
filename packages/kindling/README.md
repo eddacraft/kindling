@@ -2,7 +2,6 @@
 
 Local memory and continuity engine for AI-assisted development.
 
-[![npm version](https://img.shields.io/npm/v/@eddacraft/kindling.svg)](https://www.npmjs.com/package/@eddacraft/kindling)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](../../LICENSE)
 
 **kindling** captures observations (tool calls, diffs, commands, errors) from AI workflows, organizes them into capsules, and makes context retrievable with deterministic, explainable results. All data is stored locally by the kindling daemon (Rust).
@@ -11,11 +10,19 @@ This package is a **thin TypeScript client** for the kindling daemon. It has no 
 
 ## Installation
 
-Install the client from npm:
+> **Not published to npm.** kindling no longer publishes to npm. The versions of
+> `@eddacraft/kindling` on npm are the retired 0.1.x TypeScript engine and are
+> deprecated. Use this package from a clone of the repository, as below.
+
+From a clone of [the repository](https://github.com/eddacraft/kindling) (Node.js 24 and pnpm required):
 
 ```bash
-npm install @eddacraft/kindling
+git clone https://github.com/eddacraft/kindling.git && cd kindling
+pnpm install
+pnpm --filter @eddacraft/kindling run build
 ```
+
+Inside the workspace, depend on it with `"@eddacraft/kindling": "workspace:*"`. Outside it, bundle the built `packages/kindling/dist` into your own tool (the editor extension bundles the thin client this way with esbuild).
 
 The client talks to the Rust `kindling` daemon, which is installed separately:
 
@@ -105,8 +112,9 @@ non-npm consumers. Pin on `fixtures.version` to detect format changes.
 
 ## Adapters
 
-- [`@eddacraft/kindling-adapter-opencode`](https://www.npmjs.com/package/@eddacraft/kindling-adapter-opencode) — OpenCode session integration
-- [`@eddacraft/kindling-adapter-pocketflow`](https://www.npmjs.com/package/@eddacraft/kindling-adapter-pocketflow) — PocketFlow workflow integration
+- [`@eddacraft/kindling-adapter-opencode`](../kindling-adapter-opencode): OpenCode session integration
+- [`@eddacraft/kindling-adapter-pocketflow`](../kindling-adapter-pocketflow): PocketFlow workflow integration
+- [`@eddacraft/kindling-adapter-vscode`](../kindling-adapter-vscode): VS Code, Cursor and Windsurf extension (bundles this client)
 
 ## Documentation
 

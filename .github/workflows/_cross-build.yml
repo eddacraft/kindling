@@ -9,18 +9,9 @@ name: _cross-build
 #
 # Called by:
 #   * release.yml -> downloads the archives and attaches them to the Release.
-#   * publish.yml -> extracts the binaries into the npm platform packages.
-#
-# Each caller triggers its own build run; the Swatinem rust-cache (keyed per
-# target) is shared across runs in the repo, so the second caller is mostly
-# cache hits rather than a full rebuild.
 
 on:
   workflow_call:
-    outputs:
-      version:
-        description: 'The resolved kindling version (same across all targets).'
-        value: ${{ jobs.cross-build.outputs.version }}
 
 permissions:
   contents: read
@@ -38,8 +29,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    outputs:
-      version: ${{ steps.version.outputs.version }}
     strategy:
       fail-fast: false
       matrix:
@@ -210,7 +199,7 @@ jobs:
 
       # ---- Package ----------------------------------------------------------
       # tar.gz for unix-like targets, zip for windows. Plus a .sha256 sidecar
-      # that distribution (install.sh, npm platform packages) verifies.
+      # that distribution (install.sh, the Homebrew formula) verifies.
       - name: Package artefact + checksum
         id: package
         run: |

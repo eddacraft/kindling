@@ -52,8 +52,8 @@ published artefacts, including:
 - Local storage backends, database handling, search indexes, and migrations
 - Adapters for agent tools and development workflows
 - Redaction, truncation, and capture controls for sensitive development data
-- Published npm packages, binaries, scripts, and documentation that could cause
-  unsafe use
+- Published crates, release binaries, the editor extension, scripts, and
+  documentation that could cause unsafe use
 
 kindling captures local development activity, which may include tool calls,
 commands, diffs, errors, and logs. Reports involving accidental capture,
@@ -130,13 +130,13 @@ to prove the redactor catches them. They are ignored via
 ### CodeQL `rust/cleartext-logging`
 
 The query treats `println!` / `assert!` format args as log sinks and does not
-treat our maskers as barriers, so it reports taint *through* redaction.
+treat our maskers as barriers, so it reports taint _through_ redaction.
 
-| Alert | Location | Disposition | Rationale |
-| ----- | -------- | ----------- | --------- |
-| #11, #12 | `crates/kindling/src/hook/filter.rs` (unit test `secret_assignment_is_masked`) | used in tests | Was assert-message interpolation of already-masked `filter_content` output. Test no longer interpolates that string. |
-| #13 | `crates/kindling/tests/capture_mapping.rs` | used in tests | Was failure-message interpolation of mapped fixture content (`$ boom`). Test no longer interpolates it. |
-| #14 | `crates/kindling/src/commands/log.rs` | false positive: redacted before write | CLI echoes `observation.content` after `KindlingService::append_observation`, which always runs `mask_secrets_with_evidence` (in-process and daemon). |
+| Alert    | Location                                                                       | Disposition                           | Rationale                                                                                                                                             |
+| -------- | ------------------------------------------------------------------------------ | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| #11, #12 | `crates/kindling/src/hook/filter.rs` (unit test `secret_assignment_is_masked`) | used in tests                         | Was assert-message interpolation of already-masked `filter_content` output. Test no longer interpolates that string.                                  |
+| #13      | `crates/kindling/tests/capture_mapping.rs`                                     | used in tests                         | Was failure-message interpolation of mapped fixture content (`$ boom`). Test no longer interpolates it.                                               |
+| #14      | `crates/kindling/src/commands/log.rs`                                          | false positive: redacted before write | CLI echoes `observation.content` after `KindlingService::append_observation`, which always runs `mask_secrets_with_evidence` (in-process and daemon). |
 
 A CodeQL model pack at `.github/codeql/extensions/kindling-rust/` marks
 `mask_secrets` / `mask_secrets_with_evidence` as `log-injection` barriers so

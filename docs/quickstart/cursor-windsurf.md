@@ -16,7 +16,7 @@ Marketplace or Open VSX, so you install it with **Install from VSIX**.
   curl -fsSL https://raw.githubusercontent.com/eddacraft/kindling/main/install.sh | sh
   ```
 
-  Other options (Cargo, npm, Homebrew) are listed in the
+  Other options (Cargo, Homebrew, GitHub Release archives) are listed in the
   [quickstart without Claude Code](./without-claude-code.md#install).
 
 - `kindling` must be on the `PATH` that your editor sees. Editors launched from

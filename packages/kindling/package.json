@@ -1,6 +1,7 @@
 {
   "name": "@eddacraft/kindling",
   "version": "0.4.0",
+  "private": true,
   "description": "Thin TypeScript client for the kindling daemon — local memory and continuity engine for AI-assisted development",
   "type": "module",
   "main": "./dist/index.js",
@@ -46,23 +47,17 @@
     "sync-types": "node scripts/sync-types.mjs",
     "sync-fixtures": "node scripts/sync-fixtures.mjs",
     "check:fixtures": "node scripts/sync-fixtures.mjs --check",
-    "platform-packages": "node scripts/build-platform-packages.mjs",
-    "check:platform-packages": "node scripts/build-platform-packages.mjs --check",
     "copy:schema": "node -e \"require('node:fs').mkdirSync('dist/schema',{recursive:true});require('node:fs').copyFileSync('schema/version.json','dist/schema/version.json')\"",
     "build": "tsc --build && pnpm run copy:schema",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "type-check": "tsc --noEmit",
     "lint": "eslint src",
-    "clean": "rm -rf dist",
-    "prepublishOnly": "pnpm run build"
+    "clean": "rm -rf dist"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "typescript": "^5.3.0",
     "vitest": "^3.2.6"
-  },
-  "publishConfig": {
-    "access": "public"
   }
 }

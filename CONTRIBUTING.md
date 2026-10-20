@@ -7,8 +7,9 @@ anything substantial, read [VISION.md](VISION.md) and
 ## Project layout
 
 kindling is **Rust-canonical**. The engine lives in the Rust workspace under
-[`crates/`](crates); the npm packages under [`packages/`](packages) are a thin
-client over the Rust binary plus the adapters. Most contributions land in the
+[`crates/`](crates); the TypeScript packages under [`packages/`](packages) are a
+thin client over the Rust binary plus the adapters (private source packages,
+not published to npm). Most contributions land in the
 crates.
 
 ```
@@ -103,7 +104,7 @@ that has a ts-rs binding, regenerate it (CI fails on binding drift).
 kindling uses a single permanent branch model with short-lived work branches:
 
 - `main` is the default branch, integration branch, and stable release branch.
-  Always releasable to crates.io and npm.
+  Always releasable to crates.io and GitHub Releases.
 - normal feat, fix, docs, and chore branches are created from `main`.
 - hotfix branches are created from `main` or the active `release/*` branch.
 
@@ -225,7 +226,8 @@ but a maintainer owns the design and the final change:
   bindings, and the [retrieval contract](docs/retrieval-contract.md).
 - **Cross-repository changes:** anything that needs coordinated changes in
   another repository or a downstream product.
-- **Releases and publishing** to crates.io, npm, and GitHub Releases.
+- **Releases and publishing** to crates.io and GitHub Releases (kindling does
+  not publish to npm).
 
 ### Examples
 

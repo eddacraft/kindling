@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 kindling is a local memory and continuity engine for AI-assisted development. It captures observations (tool calls, diffs, commands, errors) from AI workflows, organizes them into capsules (bounded units of meaning), and makes context retrievable with deterministic, explainable results. All data is stored locally using embedded SQLite with FTS5.
 
-**kindling is Rust-canonical.** The engine is a Cargo workspace in `crates/`; the binary is `kindling` (published as the `eddacraft-kindling` crate — the bare `kindling` name is taken on crates.io). The npm `@eddacraft/kindling` package is a thin HTTP-over-UDS client for that binary; the older TypeScript implementation packages were removed (they live on only as the already-published, deprecated 0.1.x npm versions).
+**kindling is Rust-canonical.** The engine is a Cargo workspace in `crates/`; the binary is `kindling` (published as the `eddacraft-kindling` crate — the bare `kindling` name is taken on crates.io). The TypeScript `@eddacraft/kindling` package (`packages/kindling`) is a thin HTTP-over-UDS client for that binary. kindling no longer publishes to npm (D-010): it ships as the binary (cargo, Homebrew, install.sh), the crates on crates.io, and GitHub Release assets. The older TypeScript implementation packages were removed; they, and the 0.1.x `@eddacraft/kindling` and adapter versions, live on only as deprecated npm versions.
 
 ## Commands
 
@@ -18,7 +18,7 @@ cargo fmt --all
 cargo clippy --all-targets --all-features -- -D warnings
 cargo test -p kindling-types --features ts-rs   # regenerate + check ts-rs bindings
 
-# --- npm packages (thin client + adapters) ---
+# --- TypeScript packages (thin client + adapters; local dev, not published) ---
 pnpm install
 pnpm run build
 pnpm run test
@@ -42,12 +42,15 @@ kindling-types       → shared domain types (+ optional ts-rs bindings)
 
 Dependency flow: `types ← store ← provider`; `service → types,store,provider`; `server → types,store,service`; `client → types`; the binary → all. Most integrations use `kindling-client` (daemon) or `kindling-service` (embedded). The daemon makes concurrent multi-tool access safe.
 
-### npm packages (`packages/`)
+### TypeScript packages (`packages/`)
+
+All four are `"private": true` and **not published to npm** (D-010). They live on as source: the thin client is bundled into the editor extension VSIX (and later into the OpenCode plugin the binary installs).
 
 ```
 @eddacraft/kindling                    → thin HTTP-over-UDS client for the Rust daemon (no native deps)
 @eddacraft/kindling-adapter-opencode   → OpenCode session integration (over the thin client)
 @eddacraft/kindling-adapter-pocketflow → PocketFlow workflow integration (over the thin client)
+@eddacraft/kindling-adapter-vscode     → VS Code / Cursor / Windsurf extension, shipped as a VSIX on GitHub Releases
 ```
 
 The adapters depend only on `@eddacraft/kindling`. Claude Code integration is built into the `kindling` binary (hooks), not a TS package.
@@ -84,13 +87,13 @@ The adapters depend only on `@eddacraft/kindling`. Claude Code integration is bu
 
 **Store** (`kindling-store` crate): SQLite persistence with FTS5 + WAL. The schema is the cross-language contract in `schema/schema.sql` + `schema/version.json`.
 
-**PocketFlow integration** (`@eddacraft/kindling-adapter-pocketflow`, npm): `KindlingNode`/`KindlingFlow` extend PocketFlow's Node/Flow, auto-create a `pocketflow_node` capsule per node, and record `node_start`/`node_output`/`node_error`/`node_end` — written through the `@eddacraft/kindling` thin client to the daemon.
+**PocketFlow integration** (`@eddacraft/kindling-adapter-pocketflow`, in-repo source): `KindlingNode`/`KindlingFlow` extend PocketFlow's Node/Flow, auto-create a `pocketflow_node` capsule per node, and record `node_start`/`node_output`/`node_error`/`node_end` — written through the `@eddacraft/kindling` thin client to the daemon.
 
 ### Code Patterns
 
 Domain types live in `crates/kindling-types/src/` (`observation.rs`, `capsule.rs`, `retrieval.rs`, `common.rs`). They serialize as camelCase JSON; the optional `ts-rs` feature emits TypeScript bindings under `crates/kindling-types/bindings/` (CI fails on drift), which the thin TS client consumes.
 
-The npm packages are ESM-only (`"type": "module"`) with `.js` extensions in imports.
+The TypeScript packages are ESM-only (`"type": "module"`) with `.js` extensions in imports.
 
 ## Branching Workflow
 
@@ -109,9 +112,10 @@ Release guidance:
 - small releases may tag directly from `main` after release prep lands
 - larger releases should use a short-lived `release/*` branch cut from `main`
 - tagging `vX.Y.Z` on `main` and creating a GitHub Release triggers
-  `.github/workflows/publish.yml` (publishes the npm packages) and
-  `.github/workflows/release.yml` (uploads the prebuilt `kindling` binaries).
-  The Rust crates are published to crates.io separately via `scripts/publish.sh`.
+  `.github/workflows/release.yml` (uploads the prebuilt `kindling` binaries and
+  the VSIX, and opens the Homebrew tap PR). The Rust crates are published to
+  crates.io separately via `scripts/publish.sh`. Nothing is published to npm;
+  `scripts/deprecate.sh` deprecates the retired npm packages.
 
 See the detailed guides for the full policy:
 

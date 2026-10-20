@@ -12,12 +12,12 @@ lands through PRs to `main`. `main` must stay publishable at all times.
 
 ## Branches
 
-| Branch                                 | Purpose                                                                            | Protection                                              |
-| -------------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| `main`                                 | Default integration branch and stable branch for npm releases. Always publishable. | PRs only. Full CI gate.                                 |
-| `release/x.y` or `release/x.y.z`       | Temporary release stabilisation branch cut from `main`.                            | PRs or maintainer-only pushes during release hardening. |
-| `feat/*`, `fix/*`, `docs/*`, `chore/*` | Short-lived work branches created from `main`.                                     | Disposable.                                             |
-| `hotfix/*`                             | Urgent production fix branch created from `main` or the active release branch.     | Disposable.                                             |
+| Branch                                 | Purpose                                                                        | Protection                                              |
+| -------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------- |
+| `main`                                 | Default integration branch and stable branch for releases. Always publishable. | PRs only. Full CI gate.                                 |
+| `release/x.y` or `release/x.y.z`       | Temporary release stabilisation branch cut from `main`.                        | PRs or maintainer-only pushes during release hardening. |
+| `feat/*`, `fix/*`, `docs/*`, `chore/*` | Short-lived work branches created from `main`.                                 | Disposable.                                             |
+| `hotfix/*`                             | Urgent production fix branch created from `main` or the active release branch. | Disposable.                                             |
 
 ## Workflow
 
@@ -48,7 +48,9 @@ main ──branch──► hotfix/* ──PR──► main
    changelog, and version bumps.
 5. Merge `release/*` into `main`, then tag the release.
 6. Tagging `vX.Y.Z` on `main` and creating a GitHub Release triggers
-   `.github/workflows/publish.yml`, which publishes all packages to npm.
+   `.github/workflows/release.yml`, which attaches the binaries and the VSIX to
+   the Release and opens the Homebrew tap PR. The crates are published to
+   crates.io with `scripts/publish.sh`. Nothing is published to npm.
 
 See the [release runbook](release-runbook.md) for the full step-by-step.
 
@@ -90,11 +92,11 @@ See the [release runbook](release-runbook.md) for the full step-by-step.
 - Lint
 - Unit tests (Linux, current LTS Node)
 
-### Publish (`publish.yml`)
+### Release (`release.yml`)
 
-- Triggered by GitHub Releases (tag push on `main`).
-- Re-runs CI as a gate, then publishes all workspace packages with npm
-  provenance.
+- Build-only cross-build check on PRs and pushes that touch the Rust crates.
+- On a published GitHub Release: attaches the 7 binary archives and the VSIX,
+  then opens the Homebrew tap PR.
 
 ## Why this model
 

@@ -1,32 +1,42 @@
 # kindling Release Runbook
 
-Purpose: ship kindling safely and consistently across its two distribution
+Purpose: ship kindling safely and consistently across its distribution
 channels.
 
-kindling is Rust-canonical and ships through two channels:
+kindling is Rust-canonical. A release is a **GitHub Release** plus a
+**crates.io** publish:
 
-1. **crates.io** — the seven Rust crates in `crates/` (the engine). Published
+1. **GitHub Release:** publishing a Release from a `vX.Y.Z` tag on `main`
+   triggers `.github/workflows/release.yml`, which cross-builds the `kindling`
+   binary for all 7 targets, attaches the archives and `.sha256` sidecars,
+   attaches the editor extension VSIX (`kindling-<version>.vsix` plus its
+   `.sha256`), and opens the Homebrew tap PR. The install script
+   (`install.sh`) downloads from these assets.
+2. **crates.io:** the seven Rust crates in `crates/` (the engine). Published
    manually with `scripts/publish.sh` (credential-gated). See
    [crates.io release](#cratesio-release) below.
-2. **npm** — the thin `@eddacraft/kindling` client plus the adapters, published
-   to the `@eddacraft/*` scope. Automated via `.github/workflows/publish.yml`,
-   triggered by GitHub Releases.
+
+> **kindling does not publish to npm (D-010).** The packages under `packages/`
+> are `private`. The `@eddacraft/*` versions on npm are the retired 0.1.x
+> TypeScript engine; deprecate them with `scripts/deprecate.sh` (see
+> [npm deprecation](#npm-deprecation)). No release step touches npm.
 
 ## Release policy
 
-- **Distribution:** crates.io (Rust crates) and the npm `@eddacraft/*` scope
-  (thin client + adapters), both public, npm with provenance.
-- **Trigger:** GitHub Release published from a tag on `main` (drives the npm
-  workflow; the crates.io publish is run by the maintainer).
-- **Workflow source of truth:** `.github/workflows/publish.yml` (npm),
-  `scripts/publish.sh` (crates.io).
+- **Distribution:** GitHub Release assets (binaries, VSIX), the Homebrew tap
+  (`eddacraft/homebrew-tap`, fed from the Release assets), and crates.io.
+- **Trigger:** GitHub Release published from a tag on `main` (drives
+  `release.yml`; the crates.io publish is run by the maintainer).
+- **Workflow source of truth:** `.github/workflows/release.yml` (binaries, VSIX,
+  Homebrew tap PR), `scripts/publish.sh` (crates.io).
 - **Version source of truth:** the Rust workspace version in the root
-  `Cargo.toml` for crates; root `package.json` `version` for npm. The npm
-  publish workflow asserts the release tag matches `package.json`.
+  `Cargo.toml` for the crates and the binary. The VSIX takes its version from
+  `packages/kindling-adapter-vscode/package.json`, and `release.yml` fails if
+  that does not match the release tag.
 
-> The Rust workspace and the npm packages are versioned independently. Keep the
-> crates in lockstep with each other (one workspace version) and the npm
-> packages in lockstep with each other.
+> Keep the crates in lockstep with each other (one workspace version) and keep
+> the root `package.json` and `packages/*/package.json` versions in lockstep
+> with the crates, so the VSIX version matches the tag.
 
 See the [branching strategy](branching-strategy.md) for the branch model that
 this runbook assumes.
@@ -45,12 +55,13 @@ cargo build --release
 cargo test
 scripts/sync-vendored-schema.sh   # CI fails on schema drift
 
-# npm (thin client + adapters)
+# TypeScript (thin client, adapters, editor extension)
 pnpm install --frozen-lockfile
 pnpm run build
 pnpm run type-check
 pnpm run lint
 pnpm run test
+pnpm --filter @eddacraft/kindling-adapter-vscode run package -- --out /tmp/kindling-vsix
 ```
 
 All checks must pass. If any fails, stop and fix on a branch targeting `main`
@@ -58,12 +69,11 @@ before continuing.
 
 Sanity assertions before promoting:
 
-- Root `Cargo.toml` workspace version matches the crates you intend to publish.
-- Root `package.json` version matches the tag you intend to push.
-- All crates share one workspace version; all npm packages share one version
-  (lockstep within each channel).
+- Root `Cargo.toml` workspace version matches the tag you intend to push.
+- `packages/kindling-adapter-vscode/package.json` version matches the same tag
+  (the VSIX is named from it).
 - `CHANGELOG.md` has notes for this release.
-- README install instructions (the install script, `cargo install eddacraft-kindling`, and npm) still work.
+- README install instructions (the install script, `cargo install eddacraft-kindling`, Homebrew) still work.
 
 ## 2. Stabilise the release
 
@@ -104,20 +114,20 @@ gh pr create --base main --head release/x.y.z --title "release: vX.Y.Z" \
 
 Do version bumps on a release-prep branch targeting `main`.
 
-1. Bump root `package.json` version.
-2. Bump every workspace `packages/*/package.json` version to the same value.
-3. Update internal `@eddacraft/kindling-*` dependency ranges to the new
-   version.
-4. Update `CHANGELOG.md` with release notes.
-5. Update README install snippets if any pin a version.
-6. Commit on the release-prep branch:
+1. Bump the workspace version in the root `Cargo.toml` (and the intra-workspace
+   `version = "..."` dependency pins), then refresh `Cargo.lock`.
+2. Bump root `package.json` and every `packages/*/package.json` to the same
+   value (the VSIX version comes from the editor extension's manifest).
+3. Update `CHANGELOG.md` with release notes.
+4. Update README install snippets if any pin a version.
+5. Commit on the release-prep branch:
 
    ```bash
-   git add package.json packages/*/package.json CHANGELOG.md README.md
+   git add Cargo.toml Cargo.lock crates/*/Cargo.toml package.json packages/*/package.json CHANGELOG.md README.md
    git commit -m "chore(release): prepare vX.Y.Z"
    ```
 
-7. Merge the release-prep branch to `main`, or include the bump on the active
+6. Merge the release-prep branch to `main`, or include the bump on the active
    `release/*` branch.
 
 ## 4. Tag and create the GitHub Release
@@ -139,12 +149,15 @@ gh release create vX.Y.Z \
   --target main
 ```
 
-Publishing the GitHub Release triggers `publish.yml`, which:
+Publishing the GitHub Release triggers `release.yml`, which:
 
-1. Re-runs CI as a gate.
-2. Validates the tag matches the root `package.json` version.
-3. Publishes every workspace package with `pnpm publish -r --access public`
-   and npm provenance enabled.
+1. Cross-builds the 7 targets and smoke-tests them (exec on Linux, format check
+   for macOS and Windows).
+2. Attaches every archive and `.sha256` sidecar to the Release.
+3. Packages the VSIX, checks its version matches the tag, and attaches it with
+   its `.sha256`.
+4. Opens a PR in `eddacraft/homebrew-tap` with the regenerated formula
+   (requires the `HOMEBREW_TAP_TOKEN` secret).
 
 Monitor the workflow until it completes:
 
@@ -154,9 +167,12 @@ gh run watch
 
 ## 5. Verify the release
 
-- `npm view @eddacraft/kindling version` returns the new version.
-- `npx @eddacraft/kindling-cli@latest --version` works.
-- The GitHub Release page lists the tag and the publish workflow run is green.
+- The GitHub Release lists the 7 archives, their `.sha256` sidecars, and
+  `kindling-X.Y.Z.vsix` with its `.sha256`.
+- `curl -fsSL https://raw.githubusercontent.com/eddacraft/kindling/main/install.sh | sh`
+  installs the new binary; `kindling --version` matches.
+- The Homebrew tap PR is open; merge it, then `brew install eddacraft/tap/kindling`
+  installs the new version.
 
 ## crates.io release
 
@@ -202,6 +218,22 @@ Verify:
 - `cargo search kindling` (or the crate page) shows the new version.
 - `cargo install eddacraft-kindling` installs the new binary; `kindling --version` matches.
 
+## npm deprecation
+
+kindling no longer publishes to npm, but the retired 0.1.x packages are still
+on the registry. `scripts/deprecate.sh` attaches a deprecation notice that
+points users at the binary install. It needs an npm login with publish rights
+on the `@eddacraft` scope and is run once by the maintainer, not by CI:
+
+```bash
+DRY_RUN=1 scripts/deprecate.sh npm-channel   # preview
+scripts/deprecate.sh npm-channel             # @eddacraft/kindling + OpenCode/PocketFlow adapters
+scripts/deprecate.sh retired-ts              # re-point the PORT-020 notices (optional)
+```
+
+Deprecation is reversible (`npm deprecate '<pkg>@*' ''`) and does not
+unpublish anything.
+
 ## Hotfix flow
 
 If a critical bug is discovered on a published version:
@@ -210,31 +242,32 @@ If a critical bug is discovered on a published version:
    exists).
 2. Land the fix and bump the patch version.
 3. PR `hotfix/* → main`. Merge after CI passes.
-4. Tag `vX.Y.Z+1` on `main`, create the GitHub Release. The publish workflow
-   handles the rest.
+4. Tag `vX.Y.Z+1` on `main`, create the GitHub Release (`release.yml` handles
+   the assets and the tap PR), then run `scripts/publish.sh` for crates.io.
 
-## Dry-run publishing
+## Rehearsing the release build
 
-You can test the publish pipeline without releasing:
+You can run the cross-build without releasing:
 
 ```bash
-gh workflow run publish.yml -f dry-run=true
+gh workflow run release.yml
 ```
 
-This runs `npm pack --dry-run` for every workspace package and skips the
-actual publish step.
+A `workflow_dispatch` run builds all 7 targets as workflow artefacts; it does
+not upload to a Release, package the VSIX or open a tap PR. Package the VSIX
+locally with the preflight command above.
 
 ## Troubleshooting
 
-- **Tag/version mismatch:** the publish workflow refuses to publish when the
-  release tag doesn't match `package.json`. Bump the version on `main`, retag.
-- **CI gate fails:** the publish job re-runs CI before pushing to npm. Fix on a
-  branch targeting `main`, then create a follow-up release.
-- **Partial publish:** if `pnpm publish -r` fails partway through, do not
-  delete the partial publish. Bump the patch version and re-release the full
-  set; npm doesn't allow republishing the same version.
+- **VSIX version mismatch:** `release.yml` fails the `package-vsix` job when
+  `kindling-<tag>.vsix` is not produced. Bump
+  `packages/kindling-adapter-vscode/package.json` on `main` and re-release.
+- **Homebrew tap PR missing:** check the `HOMEBREW_TAP_TOKEN` secret, or run
+  `./scripts/generate-homebrew-formula.sh vX.Y.Z --sync-tap` manually.
+- **Partial crates.io publish:** see the crates.io notes above.
 
 ## Related Docs
 
 - [Branching Strategy](branching-strategy.md)
 - [Worktree Policy](worktree-policy.md)
+- [Distribution channels](../../packaging/README.md)

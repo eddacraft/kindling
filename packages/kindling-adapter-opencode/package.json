@@ -1,6 +1,7 @@
 {
   "name": "@eddacraft/kindling-adapter-opencode",
   "version": "0.4.0",
+  "private": true,
   "description": "OpenCode session adapter for kindling - capture tool calls, commands, and file changes from AI coding sessions",
   "type": "module",
   "main": "./dist/index.js",
@@ -41,8 +42,7 @@
     "test:watch": "vitest",
     "type-check": "tsc --noEmit",
     "lint": "eslint src",
-    "clean": "rm -rf dist",
-    "prepublishOnly": "pnpm run build"
+    "clean": "rm -rf dist"
   },
   "dependencies": {
     "@eddacraft/kindling": "workspace:*"
@@ -51,8 +51,5 @@
     "@types/node": "^24.0.0",
     "typescript": "^5.3.0",
     "vitest": "^3.2.6"
-  },
-  "publishConfig": {
-    "access": "public"
   }
 }

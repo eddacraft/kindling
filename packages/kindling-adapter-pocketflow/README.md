@@ -2,14 +2,25 @@
 
 PocketFlow workflow adapter for kindling - capture node executions with intent and confidence.
 
-[![npm version](https://img.shields.io/npm/v/@eddacraft/kindling-adapter-pocketflow.svg)](https://www.npmjs.com/package/@eddacraft/kindling-adapter-pocketflow)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](../../LICENSE)
 
 ## Installation
 
+> **Not published to npm.** kindling no longer publishes to npm. The versions of
+> `@eddacraft/kindling-adapter-pocketflow` on npm are 0.1.x releases built on the retired
+> TypeScript engine and are deprecated. Use this package from a clone of the repository, as below.
+
+From a clone of [the repository](https://github.com/eddacraft/kindling) (Node.js 24 and pnpm required):
+
 ```bash
-npm install @eddacraft/kindling-adapter-pocketflow
+git clone https://github.com/eddacraft/kindling.git && cd kindling
+pnpm install
+pnpm --filter @eddacraft/kindling-adapter-pocketflow run build
 ```
+
+Inside the workspace, depend on it with `"@eddacraft/kindling-adapter-pocketflow": "workspace:*"`. Outside it, bundle the built `packages/kindling-adapter-pocketflow/dist` into your own tool (the editor extension bundles the thin client this way with esbuild).
+
+It needs the `kindling` binary on `PATH` (or `KINDLING_BIN`); see the [install options](../../README.md#install).
 
 ## Overview
 

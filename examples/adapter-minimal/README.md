@@ -37,12 +37,13 @@ pnpm --filter kindling-adapter-minimal dev
 Expected output includes a health check, capsule id, retrieve candidates, and a
 closed capsule status.
 
-## Run standalone (after publish)
+## Run standalone
 
-If you have copied this example outside the monorepo:
+The thin client is not published to npm. If you have copied this example
+outside the monorepo, build the client in a clone and install it from that path:
 
 ```bash
-npm install @eddacraft/kindling
+npm install <path-to-clone>/packages/kindling
 npx tsc index.ts --module nodenext --moduleResolution nodenext --target es2022
 node index.js
 ```
