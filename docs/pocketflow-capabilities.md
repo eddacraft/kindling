@@ -261,9 +261,10 @@ class StructuredNode extends Node<StructuredStore> {
 
 ## kindling + PocketFlow Integration
 
-PocketFlow is a TypeScript framework, so the kindling integration ships as a
-published TS adapter: `@eddacraft/kindling-adapter-pocketflow` (v0.2.0). The
-adapter depends on the thin `@eddacraft/kindling` npm client, which speaks
+PocketFlow is a TypeScript framework, so the kindling integration is a TS
+adapter: `@eddacraft/kindling-adapter-pocketflow`, an in-repo source package
+(`packages/kindling-adapter-pocketflow`, not published to npm). The adapter
+depends on the thin `@eddacraft/kindling` client, which speaks
 HTTP-over-UDS to the **Rust kindling daemon** — that is where capsules and
 observations are actually persisted. (kindling is Rust-canonical; the adapter no
 longer depends on any TypeScript implementation package such as

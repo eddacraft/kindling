@@ -1,6 +1,7 @@
 {
   "name": "@eddacraft/kindling-adapter-vscode",
   "version": "0.4.0",
+  "private": true,
   "description": "VS Code, Cursor, and Windsurf extension for kindling - capture file saves and editor activity into local memory",
   "type": "module",
   "main": "./dist/extension.js",
@@ -71,8 +72,7 @@
     "test:watch": "vitest",
     "type-check": "tsc --noEmit",
     "lint": "eslint src",
-    "clean": "rm -rf dist",
-    "prepublishOnly": "pnpm run build"
+    "clean": "rm -rf dist"
   },
   "dependencies": {
     "@eddacraft/kindling": "workspace:*"
@@ -84,8 +84,5 @@
     "esbuild": "^0.27.0",
     "typescript": "^5.3.0",
     "vitest": "^3.2.6"
-  },
-  "publishConfig": {
-    "access": "public"
   }
 }

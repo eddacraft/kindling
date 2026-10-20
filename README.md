@@ -5,7 +5,6 @@
 You switch sessions. Your AI starts from zero. kindling remembers what happened: tool calls, file edits, commands, errors, decisions, and pinned findings. Everything stays on your machine in SQLite. Search it later with deterministic, explainable results.
 
 [![crates.io](https://img.shields.io/crates/v/eddacraft-kindling.svg)](https://crates.io/crates/eddacraft-kindling)
-[![npm version](https://img.shields.io/npm/v/@eddacraft/kindling.svg)](https://www.npmjs.com/package/@eddacraft/kindling)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
 **Full guide:** [docs.eddacraft.ai/kindling](https://docs.eddacraft.ai/kindling/overview)
@@ -32,10 +31,10 @@ kindling browse
 | **Plain CLI**                   | Supported | `kindling log`, `search`, `browse`, `demo`                                               |
 | **Claude Code**                 | Supported | Built-in hooks; [plugin](./plugins/kindling-claude-code)                                 |
 | **VS Code / Cursor / Windsurf** | Supported | VSIX: [Cursor and Windsurf quickstart](./docs/quickstart/cursor-windsurf.md)             |
-| **OpenCode**                    | Supported | [`@eddacraft/kindling-adapter-opencode`](./packages/kindling-adapter-opencode)           |
-| **PocketFlow**                  | Supported | [`@eddacraft/kindling-adapter-pocketflow`](./packages/kindling-adapter-pocketflow)       |
+| **OpenCode**                    | Supported | [`kindling-adapter-opencode`](./packages/kindling-adapter-opencode) (from source)        |
+| **PocketFlow**                  | Supported | [`kindling-adapter-pocketflow`](./packages/kindling-adapter-pocketflow) (from source)    |
 | **Rust SDK**                    | Supported | [`kindling-client`](https://crates.io/crates/kindling-client)                            |
-| **Node client**                 | Supported | [`@eddacraft/kindling`](./packages/kindling)                                             |
+| **Node client**                 | Supported | [`packages/kindling`](./packages/kindling) (from source)                                 |
 | **Custom adapter**              | Supported | [Cookbook](./docs/adapters/cookbook.md) · [minimal example](./examples/adapter-minimal/) |
 
 Full matrix: [docs/integrations.md](./docs/integrations.md). No Claude Code? [Quickstart without Claude Code](./docs/quickstart/without-claude-code.md).
@@ -64,7 +63,7 @@ Plugin: [plugins/kindling-claude-code](./plugins/kindling-claude-code)
 | **Installer (recommended)** | `curl -fsSL https://raw.githubusercontent.com/eddacraft/kindling/main/install.sh \| sh` | Prebuilt binary; Linux, macOS, Windows                                                 |
 | **Cargo**                   | `cargo install eddacraft-kindling`                                                      | Crate name is `eddacraft-kindling`; the binary is `kindling`                           |
 | **Homebrew (macOS/Linux)**  | `brew install eddacraft/tap/kindling`                                                   | Same tap as anvil: [eddacraft/homebrew-tap](https://github.com/eddacraft/homebrew-tap) |
-| **npm**                     | `npm install @eddacraft/kindling`                                                       | Thin client; bundles a matching prebuilt binary                                        |
+| **GitHub Release**          | [Releases](https://github.com/eddacraft/kindling/releases)                              | Prebuilt archives with `.sha256` sidecars, plus the editor extension VSIX              |
 
 ```bash
 kindling init          # create the local database
@@ -76,9 +75,11 @@ kindling browse        # open local HTML viewer
 
 Setup guide: [docs.eddacraft.ai/kindling/quickstart/install](https://docs.eddacraft.ai/kindling/quickstart/install)
 
+kindling is not published to npm. The `@eddacraft/kindling` packages on npm are the retired 0.1.x TypeScript engine and are deprecated; install the binary with one of the channels above instead.
+
 ### Node.js client
 
-`@eddacraft/kindling` is a thin TypeScript client over the Rust daemon (HTTP/1 over a Unix domain socket). It auto-spawns `kindling serve` on first use.
+[`packages/kindling`](./packages/kindling) is a thin TypeScript client over the Rust daemon (HTTP/1 over a Unix domain socket). It auto-spawns `kindling serve` on first use. It is not published to npm: it ships bundled inside the editor extension, and you can use it from a clone of this repository (see [Development](#development)).
 
 ### Rust SDK
 

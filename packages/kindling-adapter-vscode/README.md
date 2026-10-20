@@ -2,13 +2,14 @@
 
 VS Code, Cursor, and Windsurf extension for kindling. Captures file saves and editor activity into local memory via the kindling daemon.
 
-[![npm version](https://img.shields.io/npm/v/@eddacraft/kindling-adapter-vscode.svg)](https://www.npmjs.com/package/@eddacraft/kindling-adapter-vscode)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](../../LICENSE)
 
 ## Installation
 
-The extension ships as a VSIX file. It is not listed on the VS Code Marketplace
-or Open VSX. Step-by-step instructions for Cursor and Windsurf are in the
+The extension ships as a VSIX file attached to each
+[GitHub Release](https://github.com/eddacraft/kindling/releases). It is not
+listed on the VS Code Marketplace or Open VSX, and this package is not
+published to npm. Step-by-step instructions for Cursor and Windsurf are in the
 [Cursor and Windsurf quickstart](../../docs/quickstart/cursor-windsurf.md).
 
 ### Prerequisite: the kindling binary

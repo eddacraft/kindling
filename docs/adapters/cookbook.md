@@ -23,9 +23,19 @@ The full runnable example lives at [examples/adapter-minimal](../../examples/ada
 - Node.js >= 24
 - The `kindling` binary on `PATH` (via [install.sh](../../install.sh) or `cargo install eddacraft-kindling`)
 
+- A clone of this repository with the thin client built. The client is not
+  published to npm, so use it from source:
+
 ```bash
-npm install @eddacraft/kindling
+git clone https://github.com/eddacraft/kindling.git && cd kindling
+pnpm install
+pnpm --filter @eddacraft/kindling run build
 ```
+
+Inside the workspace, add `"@eddacraft/kindling": "workspace:*"` to your
+adapter's `package.json`. Outside it, point at the built package
+(`npm install <path-to-clone>/packages/kindling`) or bundle it into your
+adapter with a bundler such as esbuild.
 
 ## Step 1: Create the client
 

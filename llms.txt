@@ -2,7 +2,7 @@
 
 > Local-first memory and continuity for AI-assisted development. Captures observations (tool calls, diffs, commands, errors), organises them into capsules, and retrieves them with deterministic, explainable results. Rust-canonical: a `kindling` CLI/daemon, a daemon-backed Rust SDK, and an embedded in-process service. Local-first, embedded SQLite (FTS5 + WAL), no external services.
 
-kindling is infrastructure — it captures context but does not assert truth. Governance and promotion belong to downstream systems. The engine is the Rust workspace in `crates/`; the npm `@eddacraft/kindling` package is a thin client over the Rust binary (the older TypeScript implementation packages are deprecated, to be removed at 1.0.0). Canonical published docs: https://docs.eddacraft.ai/kindling/overview.
+kindling is infrastructure — it captures context but does not assert truth. Governance and promotion belong to downstream systems. The engine is the Rust workspace in `crates/`; the TypeScript `@eddacraft/kindling` package (`packages/kindling`) is a thin client over the Rust binary. kindling is not published to npm; it ships as the `kindling` binary (cargo install eddacraft-kindling, Homebrew, install.sh), crates on crates.io, and GitHub Release assets. The `@eddacraft/*` versions on npm are the retired TypeScript engine and are deprecated. Canonical published docs: https://docs.eddacraft.ai/kindling/overview.
 
 ## Crates
 
