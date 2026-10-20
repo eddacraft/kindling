@@ -102,7 +102,8 @@ Search returns three tiers: **pins** (always first), **current summary**, then *
 kindling demo                              # load sample memory
 kindling browse                            # open HTML viewer
 kindling log "root cause: cache eviction"
-kindling search "authentication error"
+kindling search "authentication error"     # scoped to the current git repo
+kindling search "authentication error" --all-repos
 kindling stats                             # counts by kind, capsules, pins, activity
 kindling pin observation obs_abc --note "Root cause"
 kindling capsule open --intent "debug leak"

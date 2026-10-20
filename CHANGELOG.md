@@ -16,6 +16,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`kindling search` defaults its repo scope to the current git repository
+  (C3).** Without `--repo`, search filters on the enclosing git working-tree
+  root (`git rev-parse --show-toplevel`), from any subdirectory; outside a git
+  repository no repo filter is applied. A new `--all-repos` flag searches every
+  repository, and an explicit `--repo` always overrides detection. The `log`
+  and `capsule open` verbs default their recorded repo scope to the same root
+  so CLI round trips stay consistent. The applied scope is shown in
+  the text output and in `provenance.scopeIds` in `--json` output. The demo's
+  suggested search now passes `--all-repos`, since demo memory has its own
+  sample repo ID.
+
 ## [0.4.0] - 2026-10-19
 
 Integration-hardening release. Closes out the post-0.3 downstream-integration
