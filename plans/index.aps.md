@@ -55,7 +55,7 @@ See `plans/specs/2026-05-03-rust-canonical-thin-client-design.md` for the curren
 | ----- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | Now   | 05-rust-port                         | Close PORT-020: npm deprecation verified on the registry (2026-10-19); the formal `1.0.0` removal tag and the anvil TS-bridge follow-up remain |
 | Now   | 06-downstream-integration-surface    | KINTEG-013/014 merged; v0.4.0 release prep in review, then publish the GitHub Release (npm + binaries) and crates.io                           |
-| Now   | 08-conversion-surface                | Wave 1: C1/C2/C4 merged, C3 in review (#154); C12 still blocked on publishing the v0.4.0 Release (ISS-003)                                     |
+| Now   | 08-conversion-surface                | Wave 1 (C1–C4) merged; C12 still blocked on publishing the v0.4.0 Release (ISS-003)                                                            |
 | Next  | 09-public-direction-and-contribution | Accept the north star and contribution lanes (draft PR #151), then publish a small curated contributor-opportunity set before automating sync  |
 | Done  | 05-rust-port (implementation)        | Rust engine, daemon, hooks, CLI, distribution scaffolding, thin client, adapters, and anvil KDS integration                                    |
 | Done  | 06-downstream-integration-surface    | KINTEG-001..012 implementation merged; release and registry publication remain lifecycle work                                                  |
