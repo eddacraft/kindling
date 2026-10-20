@@ -44,17 +44,34 @@ including the exact `--db` flag for later commands.
 Search across captured context with full-text retrieval:
 
 ```bash
-kindling search "JWT" --db ~/.kindling/demo/kindling.db
+kindling search "JWT" --all-repos --db ~/.kindling/demo/kindling.db
 ```
 
 Results are ranked deterministically: pins first, then the current session
 summary, then provider hits with provenance explaining why each item matched.
 
-Narrow the scope when you have multiple projects or sessions:
+Inside a git repository, search is scoped to that repository by default: the
+repo filter is the repository root (as reported by
+`git rev-parse --show-toplevel`), so it works from any subdirectory. Outside a
+git repository no repo filter is applied. `kindling log` and
+`kindling capsule open` record the same root as their repo scope, so what you
+log is what you find.
+
+The demo data above belongs to its own sample repository, which is why that
+search passes `--all-repos`.
+
+Override the default when you need to:
 
 ```bash
-kindling search "authentication" --session session-1 --repo ./my-project
+kindling search "authentication" --repo ./my-project   # a specific repo ID
+kindling search "authentication" --all-repos           # every repository
+kindling search "authentication" --session session-1   # narrow by session too
 ```
+
+An explicit `--repo` always wins over auto-detection, and `--repo` and
+`--all-repos` cannot be combined. The repo scope that was applied is printed
+in the text output and recorded in `provenance.scopeIds` in the `--json`
+output.
 
 ## Browse in a local viewer
 
