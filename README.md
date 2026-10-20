@@ -165,6 +165,7 @@ Details: [`docs/architecture.md`](./docs/architecture.md)
 - [Install](https://docs.eddacraft.ai/kindling/quickstart/install)
 - [Core concepts](https://docs.eddacraft.ai/kindling/concepts/capsules)
 - [Use cases](./docs/use-cases.md)
+- [Vision and direction](./VISION.md)
 
 ## Development
 
@@ -181,7 +182,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Contributing
 
-[CONTRIBUTING.md](CONTRIBUTING.md) · [SECURITY.md](SECURITY.md)
+Read [VISION.md](VISION.md) for where kindling is heading, then
+[CONTRIBUTING.md](CONTRIBUTING.md#what-we-accept) for which changes are welcome,
+which need discussion first, and which are not the direction. Security issues:
+[SECURITY.md](SECURITY.md).
 
 ## Licence
 

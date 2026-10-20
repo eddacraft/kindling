@@ -1,6 +1,8 @@
 # Contributing to kindling
 
-Thank you for your interest in contributing to kindling! We welcome contributions from the community.
+Thank you for your interest in contributing to kindling. Before you start on
+anything substantial, read [VISION.md](VISION.md) and
+[What we accept](#what-we-accept) so your work fits the direction.
 
 ## Project layout
 
@@ -26,9 +28,10 @@ kindling/
 └── plans/                  # planning documents (APS)
 ```
 
-> The TypeScript implementation packages (`-core`, `-store-sqlite`,
-> `-store-sqljs`, `-provider-local`, `-server`, `-cli`) are **deprecated** and
-> will be removed at 1.0.0. New feature work targets the Rust crates.
+> The old TypeScript implementation packages (`-core`, `-store-sqlite`,
+> `-store-sqljs`, `-provider-local`, `-server`, `-cli`) have been removed from
+> this repository and survive only as deprecated 0.1.x versions on npm. New
+> feature work targets the Rust crates.
 
 ## Getting Started
 
@@ -119,7 +122,7 @@ See the detailed guides for the full policy:
 
 ## Pull Request Process
 
-1. **Open an issue first** for significant changes to discuss approach
+1. **Check the lane** in [What we accept](#what-we-accept); open an issue first for discuss-first work
 2. **Create a branch from `main`** for normal work and production hotfixes
 3. **Write tests** for new functionality
 4. **Update documentation** if behavior changes
@@ -152,43 +155,119 @@ Prefixes:
 - `test:` - Adding or updating tests
 - `chore:` - Maintenance tasks
 
-## Scope Guardrails
+## What we accept
 
-kindling is infrastructure for local memory and continuity. Contributions should align with this scope.
+kindling's direction is set out in [VISION.md](VISION.md). Every proposal is
+judged against it. To save you wasted effort, work falls into one of three
+lanes. If you are unsure which lane applies, treat it as discuss first.
 
-### In Scope
+### Welcome
 
-- Observation capture and storage
-- Capsule lifecycle management
-- Retrieval (FTS, recency, deterministic ranking)
-- Export/import and portability
-- Adapter integrations (OpenCode, PocketFlow, etc.)
-- CLI tooling for inspection and debugging
-- Performance and reliability improvements
-- Documentation and examples
+Open a pull request directly. An issue first is helpful but not required.
 
-### Out of Scope
+- Fixes for confirmed bugs, with a test that fails before the fix
+- New or better tests, including regression and property tests
+- Documentation that corrects the docs to match shipped behaviour
+- Portability: platforms, shells, filesystems, install paths
+- Benchmarks and measured performance improvements (use
+  [`kindling-bench`](crates/kindling-bench/README.md) and include before and
+  after numbers)
+- Diagnostics: clearer errors, better `kindling status` output, logging that
+  helps users debug their own setup
+- Bringing an existing adapter into line with the documented adapter contract
+  ([cookbook](docs/adapters/cookbook.md))
 
-These belong to downstream systems and will not be accepted:
+### Discuss first
 
-- Governance workflows (review, approval, promotion)
-- MemoryObject lifecycle management
+Open an issue and wait for a maintainer to agree the approach before you write
+the implementation. These changes affect contracts other people depend on.
+
+- Schema changes or anything that alters persisted data
+- Public API changes in the crates, the daemon HTTP API, or the npm client
+- New observation kinds, capsule types, or scope fields
+- Retrieval ranking or result ordering, including optional local semantic or
+  embedding-based providers
+- Retention, redaction, masking, or forget behaviour
+- New adapters or integrations maintained in this repository
+- New CLI commands or substantial changes to inspection UX such as
+  `kindling browse`
+- New dependencies with native code, network access, or a large footprint
+
+### Not the direction
+
+These conflict with the [non-goals](VISION.md#non-goals) and will be declined,
+however well they are built:
+
+- Hosted, cloud, or multi-tenant memory, or remote access to the daemon
+- Governance workflows: review, approval, promotion, or authority over memory
 - Multi-user access control and permissions
-- Cloud / hosted deployment modes (the local daemon is in scope; remote/multi-tenant hosting is not)
-- Semantic/embedding-based retrieval (planned for a later phase)
-- UI components
+- Opaque or model-only ranking that replaces deterministic retrieval
+- A parallel engine outside the Rust crates (clients and adapters stay thin)
+- General agent frameworks, orchestrators, or a general-purpose dashboard
+- Changes whose only purpose is to serve one downstream product's policy
 
-If you're unsure whether something is in scope, open an issue to discuss before investing time.
+A third-party tool that builds on kindling's public APIs is the right home for
+most of these.
 
-### Feature Requests
+### Maintainer-led areas
 
-For net-new functionality, start with a design conversation. Open an issue describing:
+Some work stays maintainer-led even when help is welcome. You can report,
+discuss, and review, and a maintainer may invite you to implement part of it,
+but a maintainer owns the design and the final change:
 
-- The problem you're solving
-- Your proposed approach (optional)
-- Why it belongs in kindling
+- **Security boundaries:** secret masking, socket permissions, path handling,
+  and anything in [SECURITY.md](SECURITY.md) scope. Report vulnerabilities
+  privately as SECURITY.md describes, never in a public issue or PR.
+- **Persistent-data migrations:** changes to `schema/` and the stored format,
+  because mistakes there damage user data that cannot be recovered.
+- **Public contracts:** the schema contract, daemon API, published type
+  bindings, and the [retrieval contract](docs/retrieval-contract.md).
+- **Cross-repository changes:** anything that needs coordinated changes in
+  another repository or a downstream product.
+- **Releases and publishing** to crates.io, npm, and GitHub Releases.
 
-The maintainers will help decide whether it should move forward. Please wait for approval before opening a feature PR.
+### Examples
+
+Each example maps to exactly one lane. Maintainer-led areas are noted where
+they apply on top of the lane.
+
+| Proposal                                                  | Lane              | Note                                                     |
+| --------------------------------------------------------- | ----------------- | -------------------------------------------------------- |
+| `kindling search` crashes on an empty store               | Welcome           |                                                          |
+| Fix a README command that no longer works                 | Welcome           |                                                          |
+| Make the installer work on a new Linux distribution       | Welcome           |                                                          |
+| Add a benchmark profile for large stores                  | Welcome           |                                                          |
+| Add a new output format to `kindling export`              | Discuss first     | Changes a user-facing contract                           |
+| Add a new `test_result` observation kind                  | Discuss first     | Touches types, schema, and bindings                      |
+| Change how recency is weighted in ranking                 | Discuss first     | Changes result ordering                                  |
+| Add an optional local embedding provider                  | Discuss first     | Must keep deterministic retrieval available              |
+| Add an adapter for a new editor or agent                  | Discuss first     | Could live in its own repository                         |
+| Add a column to the observations table                    | Discuss first     | Maintainer-led migration                                 |
+| Tighten secret masking for a new token format             | Discuss first     | Maintainer-led; report privately if secrets already leak |
+| Sync memory to a hosted service                           | Not the direction |                                                          |
+| Add an approval step before an observation is retrievable | Not the direction | Governance belongs downstream                            |
+| Rank results with a remote LLM call                       | Not the direction | Egress and opaque ranking                                |
+| Port the store to TypeScript for a Node-only install      | Not the direction | Parallel engine                                          |
+
+### Writing a proposal
+
+For discuss-first work, open an issue with:
+
+- **Problem:** what goes wrong today, for whom, with a concrete example
+- **Principle:** which part of [VISION.md](VISION.md) the change serves
+- **Proposal:** the behaviour you want, including any change to a public
+  contract, schema, or stored data
+- **Compatibility:** what happens to existing stores, clients, and adapters,
+  and whether a migration is needed
+- **Evidence:** reproduction steps, benchmark numbers, or a prototype branch
+  where relevant
+- **Alternatives:** what else you considered, including doing it outside
+  kindling
+
+A maintainer will agree the approach, ask for changes, or decline with a
+reason. Please wait for that before opening a feature PR. kindling is
+maintained by a small team, so reviews happen as time allows and there is no
+guaranteed response time.
 
 For the repository layout, see [Project layout](#project-layout) above.
 
