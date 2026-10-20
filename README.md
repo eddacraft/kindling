@@ -31,7 +31,7 @@ kindling browse
 | ------------------------------- | --------- | ---------------------------------------------------------------------------------------- |
 | **Plain CLI**                   | Supported | `kindling log`, `search`, `browse`, `demo`                                               |
 | **Claude Code**                 | Supported | Built-in hooks; [plugin](./plugins/kindling-claude-code)                                 |
-| **VS Code / Cursor / Windsurf** | Supported | [`@eddacraft/kindling-adapter-vscode`](./packages/kindling-adapter-vscode)               |
+| **VS Code / Cursor / Windsurf** | Supported | VSIX: [Cursor and Windsurf quickstart](./docs/quickstart/cursor-windsurf.md)             |
 | **OpenCode**                    | Supported | [`@eddacraft/kindling-adapter-opencode`](./packages/kindling-adapter-opencode)           |
 | **PocketFlow**                  | Supported | [`@eddacraft/kindling-adapter-pocketflow`](./packages/kindling-adapter-pocketflow)       |
 | **Rust SDK**                    | Supported | [`kindling-client`](https://crates.io/crates/kindling-client)                            |
@@ -157,6 +157,7 @@ Details: [`docs/architecture.md`](./docs/architecture.md)
 ## Documentation
 
 - [Without Claude Code](./docs/quickstart/without-claude-code.md)
+- [Cursor and Windsurf](./docs/quickstart/cursor-windsurf.md)
 - [Integrations matrix](./docs/integrations.md)
 - [Adapter cookbook](./docs/adapters/cookbook.md)
 - [Install](https://docs.eddacraft.ai/kindling/quickstart/install)

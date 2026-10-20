@@ -7,27 +7,55 @@ VS Code, Cursor, and Windsurf extension for kindling. Captures file saves and ed
 
 ## Installation
 
-### From a VSIX
+The extension ships as a VSIX file. It is not listed on the VS Code Marketplace
+or Open VSX. Step-by-step instructions for Cursor and Windsurf are in the
+[Cursor and Windsurf quickstart](../../docs/quickstart/cursor-windsurf.md).
 
-Build the extension, then install the VSIX in your editor:
+### Prerequisite: the kindling binary
+
+The extension starts the kindling daemon (`kindling serve`) on first use but does
+not ship the binary. Install `kindling` and make sure it is on the `PATH` your
+editor sees, or set `KINDLING_BIN` to the binary's absolute path. See the
+[install options](../../docs/quickstart/without-claude-code.md#install).
+
+### Build the VSIX
+
+From a clone of the repository (Node.js 24 and pnpm required):
 
 ```bash
-cd packages/kindling-adapter-vscode
 pnpm install
-pnpm run build
+pnpm --filter @eddacraft/kindling-adapter-vscode run package
 ```
 
-Package with `vsce` (or your editor's equivalent), then install the resulting `.vsix`:
+This writes `packages/kindling-adapter-vscode/kindling-<version>.vsix`. Pass
+`--out <dir>` after `--` to write it elsewhere:
 
-- **VS Code**: Extensions view, menu, **Install from VSIX**
-- **Cursor**: same flow as VS Code
-- **Windsurf**: same flow as VS Code
+```bash
+pnpm --filter @eddacraft/kindling-adapter-vscode run package -- --out ./out
+```
+
+The `package` script compiles the TypeScript, bundles the extension and the
+`@eddacraft/kindling` client into a single CommonJS file with esbuild, then runs
+`vsce package`. The VSIX has no runtime dependencies beyond the `kindling`
+binary.
+
+If a [GitHub Release](https://github.com/eddacraft/kindling/releases) lists a
+`kindling-<version>.vsix` asset, you can download that instead of building.
+
+### Install the VSIX
+
+In VS Code, Cursor or Windsurf: open the Extensions view, open the `...` menu
+and choose **Install from VSIX...**, then select the file. From a terminal:
+
+```bash
+code --install-extension kindling-<version>.vsix
+cursor --install-extension kindling-<version>.vsix
+```
 
 ### Local development
 
-Reference the folder from your editor's extensions directory, or open this package in an Extension Development Host window.
-
-Ensure the `kindling` daemon binary is available on your `PATH`, or set `KINDLING_BINARY` to point at it. The `@eddacraft/kindling` client auto-spawns `kindling serve` on first use.
+Open this package in an Extension Development Host window, or reference the
+folder from your editor's extensions directory.
 
 ## Overview
 
