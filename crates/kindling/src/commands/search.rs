@@ -2,17 +2,23 @@
 //!
 //! Ports `packages/kindling-cli/src/commands/search.ts`. `--via-daemon` routes
 //! through the daemon client. The `--json` output is the full `RetrieveResult`
-//! (already camelCase via its `Serialize`).
+//! (already camelCase via its `Serialize`); its `provenance.scopeIds` records
+//! the repo scope that was actually applied.
+//!
+//! Without `--repo`, the repo scope defaults to the enclosing git repository
+//! root (see [`crate::commands::resolve_repo`]); `--all-repos` searches every
+//! repository.
 
 use kindling_types::{RetrieveOptions, RetrievedEntity};
 
 use crate::cli::SearchArgs;
-use crate::commands::scope_from;
+use crate::commands::{resolve_repo, scope_from};
 use crate::output::{format_json, format_timestamp, truncate};
 use crate::{build_client, open_service, runtime, CliResult};
 
 pub fn run(args: SearchArgs, via_daemon: bool) -> CliResult {
-    let scope = scope_from(args.session.as_deref(), args.repo.as_deref());
+    let repo = resolve_repo(args.repo.as_deref(), args.all_repos);
+    let scope = scope_from(args.session.as_deref(), repo.as_deref());
     let options = RetrieveOptions {
         query: args.query.clone(),
         scope_ids: scope,
@@ -33,7 +39,11 @@ pub fn run(args: SearchArgs, via_daemon: bool) -> CliResult {
         println!("{}", format_json(&result, true)?);
     } else {
         println!("\nSearch Results for: \"{}\"", args.query);
-        println!("{}\n", "=".repeat(50));
+        println!("{}", "=".repeat(50));
+        match &repo {
+            Some(repo) => println!("Repo: {repo} (use --all-repos to search every repository)\n"),
+            None => println!("Repo: all repositories\n"),
+        }
 
         if !result.pins.is_empty() {
             println!("Pins ({}):", result.pins.len());

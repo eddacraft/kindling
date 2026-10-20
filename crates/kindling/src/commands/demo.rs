@@ -56,7 +56,10 @@ pub fn run(args: DemoArgs) -> CliResult {
     let result = service.import(&bundle, ImportOptions { dry_run: false })?;
 
     let try_next = vec![
-        format!("kindling search \"JWT\" --db {}", shell_quote(&db_path)),
+        format!(
+            "kindling search \"JWT\" --all-repos --db {}",
+            shell_quote(&db_path)
+        ),
         format!("kindling browse --db {}", shell_quote(&db_path)),
         format!("kindling list observations --db {}", shell_quote(&db_path)),
         format!("kindling status --db {}", shell_quote(&db_path)),

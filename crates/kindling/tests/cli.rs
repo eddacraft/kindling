@@ -438,7 +438,9 @@ fn demo_loads_sample_memory_and_search_finds_jwt() {
     assert!(v["success"].as_bool().unwrap_or(false));
     assert!(v["imported"]["observations"].as_u64().unwrap_or(0) >= 5);
 
-    let search = env.run_db(&["search", "JWT", "--json"]);
+    // Demo memory is scoped to its own repoId, so search across all repos
+    // rather than the git repository the test happens to run inside.
+    let search = env.run_db(&["search", "JWT", "--all-repos", "--json"]);
     assert_success(&search);
     let hits = json_stdout(&search);
     assert!(
@@ -593,4 +595,154 @@ fn stats_text_output_has_table_sections() {
     }
     assert!(text.contains("message"));
     assert!(text.contains("Latest"));
+}
+
+// --- C3: workspace auto-detection for the default search repo ---------------
+
+/// Candidate observation contents from a `search --json` result.
+fn candidate_contents(v: &serde_json::Value) -> Vec<String> {
+    v["candidates"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c["entity"]["content"].as_str().unwrap().to_string())
+        .collect()
+}
+
+/// Seed one observation scoped to `repo` and one scoped to another repo, both
+/// matching the query "lantern".
+fn seed_two_repos(env: &CliEnv, repo: &str) {
+    assert_success(&env.run_db(&["log", "lantern here", "--repo", repo]));
+    assert_success(&env.run_db(&["log", "lantern elsewhere", "--repo", "other-repo"]));
+}
+
+#[test]
+fn search_defaults_repo_to_git_root() {
+    let env = CliEnv::new();
+    let root = env.git_repo("proj");
+    let root_str = root.to_string_lossy().into_owned();
+    seed_two_repos(&env, &root_str);
+
+    let out = env.run_db_in(&root, &["search", "lantern", "--json"]);
+    assert_success(&out);
+    let v = json_stdout(&out);
+    assert_eq!(candidate_contents(&v), vec!["lantern here".to_string()]);
+    assert_eq!(v["provenance"]["scopeIds"]["repoId"], json!(root_str));
+}
+
+#[test]
+fn search_defaults_repo_to_git_root_from_nested_dir() {
+    let env = CliEnv::new();
+    let root = env.git_repo("proj");
+    let nested = root.join("src").join("deep");
+    std::fs::create_dir_all(&nested).unwrap();
+    seed_two_repos(&env, &root.to_string_lossy());
+
+    let out = env.run_db_in(&nested, &["search", "lantern", "--json"]);
+    assert_success(&out);
+    assert_eq!(
+        candidate_contents(&json_stdout(&out)),
+        vec!["lantern here".to_string()]
+    );
+}
+
+#[test]
+fn search_explicit_repo_overrides_detection() {
+    let env = CliEnv::new();
+    let root = env.git_repo("proj");
+    seed_two_repos(&env, &root.to_string_lossy());
+
+    let out = env.run_db_in(
+        &root,
+        &["search", "lantern", "--repo", "other-repo", "--json"],
+    );
+    assert_success(&out);
+    let v = json_stdout(&out);
+    assert_eq!(
+        candidate_contents(&v),
+        vec!["lantern elsewhere".to_string()]
+    );
+    assert_eq!(v["provenance"]["scopeIds"]["repoId"], json!("other-repo"));
+}
+
+#[test]
+fn search_all_repos_disables_detection() {
+    let env = CliEnv::new();
+    let root = env.git_repo("proj");
+    seed_two_repos(&env, &root.to_string_lossy());
+
+    let out = env.run_db_in(&root, &["search", "lantern", "--all-repos", "--json"]);
+    assert_success(&out);
+    let v = json_stdout(&out);
+    let mut contents = candidate_contents(&v);
+    contents.sort();
+    assert_eq!(contents, vec!["lantern elsewhere", "lantern here"]);
+    assert!(v["provenance"]["scopeIds"].get("repoId").is_none());
+}
+
+#[test]
+fn search_rejects_repo_with_all_repos() {
+    let env = CliEnv::new();
+    let out = env.run_db(&["search", "x", "--repo", "r", "--all-repos"]);
+    assert!(!out.status.success());
+    assert!(support::stderr(&out).contains("cannot be used with"));
+}
+
+#[test]
+fn search_text_output_names_the_repo_scope() {
+    let env = CliEnv::new();
+    let root = env.git_repo("proj");
+    let out = env.run_db_in(&root, &["search", "lantern"]);
+    assert_success(&out);
+    let text = stdout(&out);
+    assert!(
+        text.contains(&format!("Repo: {}", root.display())),
+        "{text}"
+    );
+    assert!(text.contains("--all-repos"), "{text}");
+}
+
+#[test]
+fn log_defaults_repo_to_git_root_and_search_finds_it() {
+    let env = CliEnv::new();
+    let root = env.git_repo("proj");
+    let nested = root.join("sub");
+    std::fs::create_dir_all(&nested).unwrap();
+
+    let log = env.run_db_in(&nested, &["log", "lantern logged", "--json"]);
+    assert_success(&log);
+    assert_eq!(
+        json_stdout(&log)["scopeIds"]["repoId"],
+        json!(root.to_string_lossy())
+    );
+
+    let out = env.run_db_in(&root, &["search", "lantern", "--json"]);
+    assert_success(&out);
+    assert_eq!(
+        candidate_contents(&json_stdout(&out)),
+        vec!["lantern logged".to_string()]
+    );
+}
+
+#[test]
+fn search_outside_git_applies_no_repo_scope() {
+    let env = CliEnv::new();
+    let plain = env.path("plain");
+    std::fs::create_dir_all(&plain).unwrap();
+    // Skip on hosts where the temp dir itself sits inside a git checkout.
+    let probe = std::process::Command::new("git")
+        .args(["rev-parse", "--is-inside-work-tree"])
+        .current_dir(&plain)
+        .output()
+        .unwrap();
+    if probe.status.success() {
+        return;
+    }
+    seed_two_repos(&env, "some-repo");
+
+    let out = env.run_db_in(&plain, &["search", "lantern", "--json"]);
+    assert_success(&out);
+    let v = json_stdout(&out);
+    assert_eq!(candidate_contents(&v).len(), 2);
+    assert!(v["provenance"]["scopeIds"].get("repoId").is_none());
 }

@@ -25,6 +25,10 @@ kindling status
 kindling stats
 ```
 
+Inside a git repository, `kindling search` is scoped to that repository's
+root by default (from any subdirectory). Pass `--repo <id>` to choose a
+repository explicitly, or `--all-repos` to search everything.
+
 To run the daemon:
 
 ```bash

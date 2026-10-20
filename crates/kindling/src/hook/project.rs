@@ -13,7 +13,6 @@
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 /// Resolve the project root for `cwd`, matching the Node `getProjectRoot`.
 pub fn project_root(cwd: &str) -> String {
@@ -46,21 +45,7 @@ fn project_root_with(cwd: &str, env_root: Option<OsString>) -> String {
 
 /// `git rev-parse --show-toplevel` in `cwd`, trimmed; `None` on any failure.
 fn git_toplevel(cwd: &str) -> Option<String> {
-    let output = Command::new("git")
-        .args(["rev-parse", "--show-toplevel"])
-        .current_dir(cwd)
-        .output()
-        .ok()?;
-    if !output.status.success() {
-        return None;
-    }
-    let root = String::from_utf8(output.stdout).ok()?;
-    let trimmed = root.trim();
-    if trimmed.is_empty() {
-        None
-    } else {
-        Some(trimmed.to_string())
-    }
+    crate::git::repo_root_from(Path::new(cwd))
 }
 
 /// Best-effort equivalent of Node's `path.resolve(cwd)`: an absolute,

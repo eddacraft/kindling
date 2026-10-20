@@ -40,6 +40,34 @@ impl CliEnv {
             .expect("failed to run kindling-cli")
     }
 
+    /// Run with `--db <this env's db>` appended, from working directory `cwd`.
+    pub fn run_db_in(&self, cwd: &Path, args: &[&str]) -> Output {
+        let bin = env!("CARGO_BIN_EXE_kindling");
+        Command::new(bin)
+            .args(args)
+            .arg("--db")
+            .arg(&self.db_path)
+            .current_dir(cwd)
+            .output()
+            .expect("failed to run kindling-cli")
+    }
+
+    /// Create a fresh git repository at `<tempdir>/<name>` and return its
+    /// canonical root (what `git rev-parse --show-toplevel` reports).
+    pub fn git_repo(&self, name: &str) -> PathBuf {
+        let repo = self.path(name);
+        std::fs::create_dir_all(&repo).unwrap();
+        let out = Command::new("git")
+            .args(["init", "-q"])
+            .current_dir(&repo)
+            .env_remove("GIT_DIR")
+            .env_remove("GIT_WORK_TREE")
+            .output()
+            .expect("git is installed");
+        assert!(out.status.success(), "git init failed");
+        std::fs::canonicalize(&repo).unwrap()
+    }
+
     /// Run with `--db <this env's db>` prepended after the subcommand-friendly
     /// position (we just append `--db <path>` to the end — clap accepts global
     /// position-independent flags via `CommonOpts`).
