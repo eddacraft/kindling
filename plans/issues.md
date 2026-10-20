@@ -69,6 +69,22 @@ TypeScript implementation; no prebuilt binaries are attached to any release;
 never updated. The v0.4.0 release prep is written so that publishing its GitHub
 Release closes all of this in one go (runbook section 4).
 
+### ISS-004: Thin-client and adapter tests leak daemons
+
+| Field      | Value                       |
+| ---------- | --------------------------- |
+| Status     | Open                        |
+| Severity   | Low                         |
+| Discovered | C2 (VSIX smoke, 2026-10-21) |
+| Module     | 05-rust-port                |
+
+**Context:** After a local `pnpm run test`, about 30 `kindling serve`
+processes (`--kindling-home /tmp/kindling-{thin,oc,pf,occmd}-*`) were still
+running from the thin-client, opencode and pocketflow suites.
+
+**Impact:** Local test runs pile up daemons and temp directories. Test teardown
+should stop each spawned daemon and remove its temporary home.
+
 ---
 
 ## Questions

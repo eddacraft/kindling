@@ -4,7 +4,7 @@
 | ---- | ------ | ----------- |
 | CONV | @aneki | In Progress |
 
-**Last reviewed:** 2026-10-19 (C12 started; blocked on the v0.4.0 GitHub Release, see ISS-003)
+**Last reviewed:** 2026-10-21 (wave 1: C1, C2, C4 merged, C3 in review as PR #154; C12 still blocked on the v0.4.0 GitHub Release, see ISS-003)
 
 ## Purpose
 
@@ -47,21 +47,21 @@ Execution plan: [../execution/2026-06-22-conversion-surface-delivery.md](../exec
 
 ## Work Items
 
-| ID  | Title                              | Wave | Status      | Branch (suggested)                 |
-| --- | ---------------------------------- | ---- | ----------- | ---------------------------------- |
-| C0  | Merge conversion surface + release | 0    | Merged      | `feat/conversion-surface`          |
-| C12 | Post-release verification          | 0    | In Progress | —                                  |
-| C1  | install.sh demo prompt             | 1    | Draft       | `feat/install-demo-prompt`         |
-| C2  | VSIX + Cursor/Windsurf docs        | 1    | Draft       | `feat/vscode-vsix-and-cursor-docs` |
-| C3  | Workspace auto-detect (search)     | 1    | Draft       | `feat/cli-repo-autodetect`         |
-| C4  | kindling stats                     | 1    | Draft       | `feat/cli-stats`                   |
-| C5  | kindling wrap                      | 2    | Draft       | `feat/cli-wrap`                    |
-| C6  | kindling tui                       | 2    | Draft       | `feat/cli-tui`                     |
-| C7  | Search filters                     | 2    | Draft       | `feat/cli-search-filters`          |
-| C8  | VS Code wrap/tasks docs            | 2    | Draft       | `docs/vscode-wrap-tasks`           |
-| C9  | why-kindling one-pager             | 3    | Draft       | `docs/why-kindling-and-sync`       |
-| C10 | External docs sync script          | 3    | Draft       | `docs/why-kindling-and-sync`       |
-| C11 | Composite GitHub Action            | 4    | Draft       | `feat/kindling-action`             |
+| ID  | Title                              | Wave | Status      | Branch (suggested)                        |
+| --- | ---------------------------------- | ---- | ----------- | ----------------------------------------- |
+| C0  | Merge conversion surface + release | 0    | Merged      | `feat/conversion-surface`                 |
+| C12 | Post-release verification          | 0    | In Progress | —                                         |
+| C1  | install.sh demo prompt             | 1    | Merged      | `feat/install-demo-prompt` (#152)         |
+| C2  | VSIX + Cursor/Windsurf docs        | 1    | Merged      | `feat/vscode-vsix-and-cursor-docs` (#155) |
+| C3  | Workspace auto-detect (search)     | 1    | In Review   | `feat/cli-repo-autodetect` (#154)         |
+| C4  | kindling stats                     | 1    | Merged      | `feat/cli-stats` (#153)                   |
+| C5  | kindling wrap                      | 2    | Draft       | `feat/cli-wrap`                           |
+| C6  | kindling tui                       | 2    | Draft       | `feat/cli-tui`                            |
+| C7  | Search filters                     | 2    | Draft       | `feat/cli-search-filters`                 |
+| C8  | VS Code wrap/tasks docs            | 2    | Draft       | `docs/vscode-wrap-tasks`                  |
+| C9  | why-kindling one-pager             | 3    | Draft       | `docs/why-kindling-and-sync`              |
+| C10 | External docs sync script          | 3    | Draft       | `docs/why-kindling-and-sync`              |
+| C11 | Composite GitHub Action            | 4    | Draft       | `feat/kindling-action`                    |
 
 ### C12 findings (2026-10-19)
 
@@ -81,6 +81,26 @@ Checked against the registries and the GitHub API from the release-prep branch:
   the Homebrew tap PR, `brew install` on macOS/Linux, and the asciinema demo.
 
 Re-run the Task 0.2 checklist once the v0.4.0 GitHub Release is published.
+
+### Wave 1 notes (2026-10-21)
+
+- **C1** (PR #152): `install.sh` offers `kindling demo --reset` after setup. It
+  skips the prompt when no terminal is available and honours
+  `KINDLING_NO_DEMO=1`. A real `curl | sh` run needs a published Rust release
+  (ISS-003).
+- **C2** (PR #155): `pnpm --filter @eddacraft/kindling-adapter-vscode run package`
+  builds `kindling-<version>.vsix`; `release.yml` attaches it on published
+  releases only. Unproven until a real release runs; a manual Cursor/Windsurf
+  install smoke test is still owed.
+- **C3** (PR #154): `search` defaults `repoId` to the git root, `--repo` wins,
+  `--all-repos` widens. Scope extended to `log` and `capsule open` so
+  CLI-logged data is findable. Windows path-separator parity with
+  hook-captured `repoId` is being fixed before merge.
+- **C4** (PR #153): `kindling stats [--json]` via
+  `SqliteKindlingStore::memory_stats` / `KindlingService::stats`. In-process
+  only (no daemon endpoint); reusable by C6.
+- Found while testing: the thin-client and adapter test suites leave
+  `kindling serve` daemons running (ISS-004).
 
 ## Dependencies
 

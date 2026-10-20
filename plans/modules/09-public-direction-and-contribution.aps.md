@@ -110,7 +110,9 @@ invited.
 
 ### PUBDIR-001: Establish the public vision and direction contract
 
-- **Status:** Draft
+- **Status:** In Review — draft PR #151 (`docs/public-direction`) adds
+  `VISION.md` and README pointers; awaiting operator acceptance (Ready
+  Checklist items 1–2).
 - **Intent:** Give users and contributors a durable basis for judging whether
   proposed work moves kindling towards its intended product.
 - **Expected Outcome:** A concise public vision defines the north star, product
@@ -126,7 +128,10 @@ invited.
 
 ### PUBDIR-002: Define contribution acceptance lanes and checkpoints
 
-- **Status:** Draft
+- **Status:** In Review — draft PR #151 replaces the `CONTRIBUTING.md` scope
+  guardrails with the three lanes, maintainer-led areas, and proposal
+  evidence. Open: whether `SECURITY.md` response aims stay alongside the
+  no-guaranteed-response note.
 - **Intent:** Let contributors identify welcome work and avoid investing in
   changes that conflict with kindling's boundaries or require a prior decision.
 - **Expected Outcome:** The contributor guide distinguishes welcome,
