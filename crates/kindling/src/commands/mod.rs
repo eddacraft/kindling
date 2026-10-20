@@ -35,13 +35,13 @@ pub(crate) fn scope_from(session: Option<&str>, repo: Option<&str>) -> ScopeIds 
 /// 1. an explicit `--repo <id>` is used verbatim;
 /// 2. `--all-repos` disables repo scoping entirely;
 /// 3. otherwise the enclosing git working-tree root of the current directory
-///    (see [`crate::git::repo_root_from_cwd`]), or no repo scope when the
+///    (see [`crate::git::workspace_repo_id_from_cwd`]), or no repo scope when the
 ///    current directory is not inside a git working tree.
 ///
 /// Verbs without an `--all-repos` flag pass `false`. Kept separate from any
 /// one command so other verbs (and future search filters) share one rule.
 pub(crate) fn resolve_repo(explicit: Option<&str>, all_repos: bool) -> Option<String> {
-    resolve_repo_with(explicit, all_repos, crate::git::repo_root_from_cwd)
+    resolve_repo_with(explicit, all_repos, crate::git::workspace_repo_id_from_cwd)
 }
 
 /// [`resolve_repo`] with the detector injected, so the precedence rules are

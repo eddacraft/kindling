@@ -44,6 +44,9 @@ fn project_root_with(cwd: &str, env_root: Option<OsString>) -> String {
 }
 
 /// `git rev-parse --show-toplevel` in `cwd`, trimmed; `None` on any failure.
+///
+/// Must stay git's raw output (no separator normalisation): the project root is
+/// hashed into the per-project DB path, so any change would orphan databases.
 fn git_toplevel(cwd: &str) -> Option<String> {
     crate::git::repo_root_from(Path::new(cwd))
 }
