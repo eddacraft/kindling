@@ -13,6 +13,7 @@ set -eu
 #   KINDLING_VERSION      release tag to install (e.g. v0.1.0); default: latest
 #   KINDLING_INSTALL_DIR  install directory; default: ~/.local/bin
 #   KINDLING_REPO         GitHub repo to install from; default: eddacraft/kindling
+#   KINDLING_NO_DEMO      set to 1 to skip the sample memory prompt
 #
 # POSIX sh, shellcheck-clean.
 
@@ -24,6 +25,10 @@ INSTALL_DIR="${KINDLING_INSTALL_DIR:-${HOME}/.local/bin}"
 # even when INSTALL_DIR is not yet on PATH.
 KINDLING_CMD=""
 
+# "yes" once the sample memory is loaded, "skipped" otherwise; tailors the
+# closing hints.
+DEMO_LOADED="skipped"
+
 # --- helpers ---
 
 info()  { printf '\033[1;34m==>\033[0m %s\n' "$1"; }
@@ -31,6 +36,11 @@ warn()  { printf '\033[1;33mwarning:\033[0m %s\n' "$1"; }
 error() { printf '\033[1;31merror:\033[0m %s\n' "$1" >&2; exit 1; }
 
 command_exists() { command -v "$1" >/dev/null 2>&1; }
+
+# True when a controlling terminal can be opened for prompts. Under
+# `curl | sh` stdin is the script, so prompts read from /dev/tty instead; in CI
+# or other headless runs there is no terminal, so prompts are skipped.
+has_tty() { (: </dev/tty) 2>/dev/null; }
 
 # --- platform detection ---
 
@@ -183,6 +193,34 @@ setup_claude_code() {
   esac
 }
 
+offer_demo() {
+  [ -n "$KINDLING_CMD" ] || return 0
+
+  case "${KINDLING_NO_DEMO:-}" in
+    1 | [yY] | [yY][eE][sS] | [tT][rR][uU][eE]) return 0 ;;
+  esac
+
+  # Never block a headless install: without a terminal there is no one to ask.
+  has_tty || return 0
+
+  printf '\n'
+  printf '  Load sample memory to try search? [Y/n] '
+
+  answer="y"
+  read -r answer </dev/tty || answer="y"
+
+  case "$answer" in
+    "" | [yY] | [yY][eE][sS])
+      info "Running kindling demo..."
+      if "$KINDLING_CMD" demo --reset; then
+        DEMO_LOADED="yes"
+      else
+        warn "kindling demo failed; retry later with: kindling demo"
+      fi
+      ;;
+  esac
+}
+
 # --- main ---
 
 main() {
@@ -195,6 +233,7 @@ main() {
   resolve_version
   install_binary
   setup_claude_code
+  offer_demo
 
   printf '\n'
   printf '  \342\234\223 kindling installed successfully!\n'
@@ -203,6 +242,10 @@ main() {
   printf '    kindling status          Show database status\n'
   printf '    kindling log "note"      Capture an observation\n'
   printf '    kindling search "query"  Search your memory\n'
+  printf '    kindling browse          Explore your memory in a browser\n'
+  if [ "$DEMO_LOADED" != "yes" ]; then
+    printf '    kindling demo            Load sample memory to try search\n'
+  fi
   printf '\n'
   printf '  Documentation: https://docs.eddacraft.ai/kindling/overview\n'
   printf '\n'
