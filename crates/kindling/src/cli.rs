@@ -125,7 +125,7 @@ pub struct LogArgs {
     #[arg(long, value_name = "id")]
     pub session: Option<String>,
 
-    /// Repository scope ID.
+    /// Repository scope ID (default: the enclosing git repository root).
     #[arg(long, value_name = "id")]
     pub repo: Option<String>,
 
@@ -159,7 +159,7 @@ pub struct CapsuleOpenArgs {
     #[arg(long, value_name = "id")]
     pub session: Option<String>,
 
-    /// Repository scope ID.
+    /// Repository scope ID (default: the enclosing git repository root).
     #[arg(long, value_name = "id")]
     pub repo: Option<String>,
 
@@ -195,9 +195,13 @@ pub struct SearchArgs {
     #[arg(long, value_name = "id")]
     pub session: Option<String>,
 
-    /// Filter by repository ID.
-    #[arg(long, value_name = "id")]
+    /// Filter by repository ID (default: the enclosing git repository root).
+    #[arg(long, value_name = "id", conflicts_with = "all_repos")]
     pub repo: Option<String>,
+
+    /// Search across all repositories instead of the current git repository.
+    #[arg(long)]
+    pub all_repos: bool,
 
     /// Maximum results to return.
     #[arg(long, value_name = "n", default_value_t = 10)]

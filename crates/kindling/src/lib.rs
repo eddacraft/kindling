@@ -16,6 +16,7 @@
 
 mod cli;
 mod commands;
+mod git;
 pub mod hook;
 mod output;
 

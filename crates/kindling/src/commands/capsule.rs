@@ -8,7 +8,7 @@ use kindling_service::{CloseCapsuleOptions, OpenCapsuleOptions};
 use kindling_types::CapsuleType;
 
 use crate::cli::{CapsuleCloseArgs, CapsuleOpenArgs};
-use crate::commands::scope_from;
+use crate::commands::{resolve_repo, scope_from};
 use crate::output::{format_json, format_timestamp};
 use crate::{build_client, open_service, runtime, CliError, CliResult};
 
@@ -43,7 +43,10 @@ fn status_to_str(status: kindling_types::CapsuleStatus) -> &'static str {
 
 pub fn run_open(args: CapsuleOpenArgs, via_daemon: bool) -> CliResult {
     let kind = parse_type(&args.kind)?;
-    let scope = scope_from(args.session.as_deref(), args.repo.as_deref());
+    // Default the repo scope to the enclosing git root so `search` (which
+    // defaults the same way) finds what this verb records.
+    let repo = resolve_repo(args.repo.as_deref(), false);
+    let scope = scope_from(args.session.as_deref(), repo.as_deref());
 
     let capsule = if via_daemon {
         let client = build_client(args.common.db.as_deref())?;
