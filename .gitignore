@@ -185,3 +185,7 @@ kindling-stress.json
 benchmark-results/
 **/criterion/
 .dev-loop/
+
+# VS Code extension packaging
+*.vsix
+.vsix-staging/

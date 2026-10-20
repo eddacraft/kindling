@@ -4,7 +4,8 @@ name: release
 # (PORT-010). The actual cross-build lives in the reusable `_cross-build.yml`
 # workflow (shared with publish.yml so the npm platform packages build the exact
 # same artifacts). This workflow calls it and, on a published Release, attaches
-# the archives + SHA256 sidecars to the Release.
+# the archives + SHA256 sidecars to the Release. A published Release also gets
+# the editor extension VSIX (`package-vsix`); no other trigger builds it.
 #
 # Triggers:
 #   * release.published   -> build all targets + upload assets to the Release
@@ -81,6 +82,59 @@ jobs:
             dist/*.tar.gz
             dist/*.zip
             dist/*.sha256
+          fail_on_unmatched_files: true
+
+  # ---- Editor extension VSIX ---------------------------------------------
+  # Only runs for a published release. Packages the VS Code / Cursor / Windsurf
+  # extension (packages/kindling-adapter-vscode) as `kindling-<version>.vsix`
+  # and attaches it, with a SHA256 sidecar, to the Release. Nothing is
+  # published to the VS Code Marketplace or Open VSX.
+  package-vsix:
+    name: package and attach VSIX
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Package VSIX
+        run: pnpm --filter @eddacraft/kindling-adapter-vscode run package -- --out "$GITHUB_WORKSPACE/dist-vsix"
+
+      - name: Check VSIX version matches release tag
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          vsix="kindling-${TAG#v}.vsix"
+          if [ ! -f "dist-vsix/$vsix" ]; then
+            echo "::error::expected dist-vsix/$vsix; the extension version does not match tag $TAG"
+            ls -l dist-vsix
+            exit 1
+          fi
+          (cd dist-vsix && sha256sum "$vsix" > "$vsix.sha256")
+          ls -l dist-vsix
+
+      - name: Attach to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist-vsix/*.vsix
+            dist-vsix/*.vsix.sha256
           fail_on_unmatched_files: true
 
   # ---- Homebrew tap PR (eddacraft/homebrew-tap) ---------------------------
