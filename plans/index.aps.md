@@ -1,29 +1,32 @@
 # kindling — Plan Index
 
-| Field   | Value                                                                   |
-| ------- | ----------------------------------------------------------------------- |
-| Status  | In Progress                                                             |
-| Owner   | @aneki                                                                  |
-| Created | 2026-03-14                                                              |
-| Updated | 2026-10-21 (conversion wave 1 merged; PUBDIR-001/002 merged as PR #151) |
+| Field   | Value                                                                                                  |
+| ------- | ------------------------------------------------------------------------------------------------------ |
+| Status  | In Progress                                                                                            |
+| Owner   | @aneki                                                                                                 |
+| Created | 2026-03-14                                                                                             |
+| Updated | 2026-10-21 (D-010: npm publishing stopped; conversion wave 1 merged; PUBDIR-001/002 merged as PR #151) |
 
 ## Problem
 
 kindling's Rust-canonical engine, daemon, hook binary, CLI, client, runtime facade,
 and thin TypeScript client are implemented. Non-Rust consumers reach the daemon
-through `@eddacraft/kindling`; the deprecated TypeScript implementation source has
-been removed. Remaining work is lifecycle closeout for the retired packages,
-post-v0.3 integration changes, and conversion-surface depth.
+through the `@eddacraft/kindling` thin client, which is now an in-repo source
+package bundled into integrations rather than an npm package (D-010); the
+deprecated TypeScript implementation source has been removed. Remaining work is
+lifecycle closeout for the retired npm packages, post-v0.3 integration changes,
+and conversion-surface depth.
 
 ## Success Criteria
 
-- [x] All packages published to npm under `@eddacraft` scope
-- [x] Single statically-linked `kindling` binary distributed via cargo (`cargo install eddacraft-kindling` @ 0.2.0 on crates.io); brew, curl|sh, and npm registry validation remain user-gated
+- [x] ~~All packages published to npm under `@eddacraft` scope~~ (true for 0.1.x) — _superseded by D-010_
+- [x] Single statically-linked `kindling` binary distributed via cargo (`cargo install eddacraft-kindling` @ 0.2.0 on crates.io); brew and curl|sh validation remain user-gated (npm is no longer a channel, D-010)
 - [x] `kindling serve` daemon: auto-spawn on first call, idle shutdown after 30 min default, UDS transport (authenticated TCP fallback on Windows)
 - [x] All 7 Claude Code hook types complete in <10ms warm, <100ms cold
 - [x] anvil emits observations directly via `kindling-client` — no TS bridge (`command.invoked` via `KindlingDaemonSink`, anvil PR #2897; opt-in `ANVIL_KINDLING_SINK=daemon`, default `ndjson` unchanged)
-- [x] `pnpm add @eddacraft/kindling` installs the binary and exposes a typed thin client with no native deps (in-repo: per-platform `optionalDependencies` injected at publish; end-to-end registry validation user-gated)
-- [x] All deprecated TS implementation packages removed from this repo (source dirs deleted; formal `1.0.0` tag + `npm deprecate` remain user-gated)
+- [ ] ~~`pnpm add @eddacraft/kindling` installs the binary and exposes a typed thin client with no native deps~~ — _superseded by D-010_ (never published; the typed thin client exists in-repo and is bundled into the VSIX)
+- [ ] The retired npm packages (`@eddacraft/kindling`, `-adapter-opencode`, `-adapter-pocketflow`) carry a deprecation notice pointing at the binary install (`scripts/deprecate.sh npm-channel`; user-gated)
+- [x] All deprecated TS implementation packages removed from this repo (source dirs deleted; `npm deprecate` verified 2026-10-19; formal `1.0.0` tag remains user-gated)
 - [ ] Public north star, contribution acceptance lanes, curated roadmap, and contributor-ready issue surface are established without making GitHub a second planning authority
 
 ## Constraints
@@ -51,25 +54,25 @@ See `plans/specs/2026-05-03-rust-canonical-thin-client-design.md` for the curren
 
 ## Schedule
 
-| Phase | Modules                              | Target                                                                                                                                         |
-| ----- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| Now   | 05-rust-port                         | Close PORT-020: npm deprecation verified on the registry (2026-10-19); the formal `1.0.0` removal tag and the anvil TS-bridge follow-up remain |
-| Now   | 06-downstream-integration-surface    | KINTEG-013/014 merged; v0.4.0 release prep in review, then publish the GitHub Release (npm + binaries) and crates.io                           |
-| Now   | 08-conversion-surface                | Wave 1 (C1–C4) merged; C12 still blocked on publishing the v0.4.0 Release (ISS-003)                                                            |
-| Next  | 09-public-direction-and-contribution | Vision and lanes merged (#151); next publish the curated roadmap and a small contributor-opportunity set before automating sync                |
-| Done  | 05-rust-port (implementation)        | Rust engine, daemon, hooks, CLI, distribution scaffolding, thin client, adapters, and anvil KDS integration                                    |
-| Done  | 06-downstream-integration-surface    | KINTEG-001..012 implementation merged; release and registry publication remain lifecycle work                                                  |
-| Done  | 07-intent-capture-events             | Intent capture primitive + export shipped (independent of the Rust port; KINTENT-001..006 merged)                                              |
+| Phase | Modules                              | Target                                                                                                                                                                                     |
+| ----- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Now   | 05-rust-port                         | Close PORT-020: retired-package deprecation verified (2026-10-19); remaining: deprecate the thin client and adapters on npm (D-010), the formal `1.0.0` tag, the anvil TS-bridge follow-up |
+| Now   | 06-downstream-integration-surface    | KINTEG-013/014 merged; v0.4.0 release prep in review, then publish the GitHub Release (binaries + VSIX) and crates.io                                                                      |
+| Now   | 08-conversion-surface                | Wave 1 (C1–C4) merged; C12 still blocked on publishing the v0.4.0 Release (ISS-003); C13 (bundled OpenCode plugin) drafted after D-010                                                     |
+| Next  | 09-public-direction-and-contribution | Vision and lanes merged (#151); next publish the curated roadmap and a small contributor-opportunity set before automating sync                                                            |
+| Done  | 05-rust-port (implementation)        | Rust engine, daemon, hooks, CLI, distribution scaffolding, thin client, adapters, and anvil KDS integration                                                                                |
+| Done  | 06-downstream-integration-surface    | KINTEG-001..012 implementation merged; release and registry publication remain lifecycle work                                                                                              |
+| Done  | 07-intent-capture-events             | Intent capture primitive + export shipped (independent of the Rust port; KINTENT-001..006 merged)                                                                                          |
 
 ## Risks
 
-| Risk                                                | Impact | Mitigation                                                                       |
-| --------------------------------------------------- | ------ | -------------------------------------------------------------------------------- |
-| Rust cross-compilation edge cases                   | Medium | `cargo-zigbuild` from a single Linux runner; CI matrix smoke-tests every target  |
-| npm postinstall download fails behind corp proxy    | Medium | Honour `npm_config_proxy` and standard env vars; document offline binary install |
-| Daemon process orphaned / stale PID files pile up   | Medium | PID file with stale-PID cleanup on next spawn; `kindling serve --health` for ops |
-| Cold-spawn latency exceeds 100ms on slow disks      | Low    | Measure on dogfood; spool fallback only if measured as a real problem            |
-| Schema drift between binary and client expectations | Medium | `/v1/health` reports schemaVersion; client checks on first call, fails loud      |
+| Risk                                                 | Impact | Mitigation                                                                       |
+| ---------------------------------------------------- | ------ | -------------------------------------------------------------------------------- |
+| Rust cross-compilation edge cases                    | Medium | `cargo-zigbuild` from a single Linux runner; CI matrix smoke-tests every target  |
+| ~~npm postinstall download fails behind corp proxy~~ | n/a    | Retired: no npm channel (D-010); binaries come from GitHub Releases or cargo     |
+| Daemon process orphaned / stale PID files pile up    | Medium | PID file with stale-PID cleanup on next spawn; `kindling serve --health` for ops |
+| Cold-spawn latency exceeds 100ms on slow disks       | Low    | Measure on dogfood; spool fallback only if measured as a real problem            |
+| Schema drift between binary and client expectations  | Medium | `/v1/health` reports schemaVersion; client checks on first call, fails loud      |
 
 ## Open Questions
 
@@ -87,9 +90,10 @@ See `plans/specs/2026-05-03-rust-canonical-thin-client-design.md` for the curren
 - **D-004:** Supersede modules 02 and 03 with module 05 — _decided 2026-04-15_ — The hybrid phasing no longer models the work correctly. 02 and 03 remain in the repo for historical reference but are marked Superseded in this index.
 - **D-006:** Triage anvil's integration wishlist (2026-06-22) into module 06 rather than scattering it across 05 — _decided 2026-06-22_ — anvil's downstream KDS module sent 10 asks; auditing them against the tree showed several already shipped (client+spool published at 0.1.0, `/v1/health` handshake, export `bundleVersion` + `--dry-run`) and one mis-framed (no `kindling-spool` crate exists — the spool is `kindling-client::spool`). The genuine new work (publish 0.2.0, daemon dedup, structured query API, capability handshake + kind registry, spool/cold-start observability, redaction evidence, fixtures) is grouped as module 06 so the contract anvil consumes evolves as one coherent surface. KINTEG-001 (publish) is user-gated and gates anvil's consumption of the rest.
 - **D-008:** Add `kindling-runtime` as the anvil-first integration facade — _decided 2026-06-24_ — anvil is the primary Rust consumer; requiring a separate `kindling` binary on PATH plus manual `kindling-client` + `spool` + `kindling-server` wiring is the wrong default. A new facade crate composes in-process daemon spawn (pattern already proven in client tests), attach-or-start on the standard socket, and spool-on-by-default at the runtime layer. Does not replace the daemon model or merge the seven crates; CLI/npm adapters stay on the thin client. Tracked as KINTEG-008. See `plans/specs/2026-06-24-kindling-runtime-design.md`.
-- **D-005:** Rust-canonical kindling with thin TS HTTP client over local daemon — _decided 2026-05-03_ — Rust becomes the only implementation. Non-Rust consumers reach kindling via `kindling serve` (long-running per-user daemon) over a Unix domain socket. `@eddacraft/kindling` is repurposed as a thin HTTP client with an npm postinstall that downloads the platform binary. All other TS implementation packages are deprecated and removed after the cutover. Driven by: sole-operator project means no external migration coordination, every realistic TS consumer can hit a localhost daemon, dual-maintain pays a real tax for a use case nobody asked for. See `plans/specs/2026-05-03-rust-canonical-thin-client-design.md`.
+- **D-005:** Rust-canonical kindling with thin TS HTTP client over local daemon — _decided 2026-05-03_ — Rust becomes the only implementation. Non-Rust consumers reach kindling via `kindling serve` (long-running per-user daemon) over a Unix domain socket. `@eddacraft/kindling` is repurposed as a thin HTTP client ~~with an npm postinstall that downloads the platform binary~~ (_npm distribution superseded by D-007, then D-010_). All other TS implementation packages are deprecated and removed after the cutover. Driven by: sole-operator project means no external migration coordination, every realistic TS consumer can hit a localhost daemon, dual-maintain pays a real tax for a use case nobody asked for. See `plans/specs/2026-05-03-rust-canonical-thin-client-design.md`.
 - **D-009:** Architecture for anvil's KDS-004/005 unblockers — a list/enumerate read API (KINTEG-003) and a spool retention cap (KINTEG-009) — _decided 2026-06-26_ — Resolved by a planning council (architect + delivery-lead + adversarial-reviewer). **Read API:** `POST /v1/observations/list` (POST+JSON like every data route), keyset cursor over the stable `(ts ASC, id ASC)` order (the only scheme complete under concurrent appends), half-open `[since, until)` bounds, `kinds` as a list, server-clamped `limit`, redacted excluded by default with a v1 `includeRedacted` flag, **no server-side aggregation** (anvil's `top`/`unused`/`flags`/`principals` are policy — kindling stays mechanism), **no schema bump** (read-only, no DDL; stays v5; old daemon → 404). anvil pins `until = now_ms()` at enumeration start as the snapshot boundary. **Spool cap:** `max_bytes`/`max_age_ms` on `SpoolConfig` (now `#[non_exhaustive]` + builder; client **0.2 → 0.3**), **defaulting to `None`/unbounded** (the council split here — non-None defaults silently trim existing callers on upgrade; 7d/64 MiB are anvil's policy, wired explicitly); add `spooled_at` to `SpoolEntry` for a real age basis; trim the **oldest contiguous prefix only**, **only inside the `flush()` lock**, accepting that trim is intentional bounded retention loss (not infinite retention) — preserving drain order and never dropping an un-drained entry ahead of a kept newer one. Two independent PRs, KINTEG-009 first. See `plans/specs/2026-06-26-kindling-read-api-and-spool-cap-design.md`.
-- **D-007:** npm ships the binary via per-platform `optionalDependencies`, not a postinstall download — _decided 2026-06-22_ — PR #104 (PORT-018). The esbuild/swc model (one `@eddacraft/kindling-<os>-<arch>[-musl]` package per host; the package manager auto-installs only the matching one) avoids postinstall network entirely, works under `--ignore-scripts`, and is lockfile-deterministic. The specifiers are injected at publish time rather than committed, so `pnpm install --frozen-lockfile` stays green before the platform packages exist on the registry. Supersedes the "npm postinstall that downloads the platform binary" mechanism noted in D-005; D-005's Rust-canonical direction is unchanged.
+- **D-007:** ~~npm ships the binary via per-platform `optionalDependencies`, not a postinstall download~~ — _decided 2026-06-22_ — _superseded by D-010_ — PR #104 (PORT-018). The esbuild/swc model (one `@eddacraft/kindling-<os>-<arch>[-musl]` package per host; the package manager auto-installs only the matching one) avoids postinstall network entirely, works under `--ignore-scripts`, and is lockfile-deterministic. The specifiers are injected at publish time rather than committed, so `pnpm install --frozen-lockfile` stays green before the platform packages exist on the registry. Supersedes the "npm postinstall that downloads the platform binary" mechanism noted in D-005; D-005's Rust-canonical direction is unchanged.
+- **D-010:** Stop publishing to npm; distribute via Rust installs, crates.io and GitHub Release assets — _decided 2026-10-21_ — Distribution is `cargo install eddacraft-kindling`, the Homebrew tap, `install.sh`, the crates on crates.io, and GitHub Release assets (the 7 binaries and the VS Code / Cursor / Windsurf VSIX). The four `packages/*` are marked `private` and kept as source: the thin client is bundled into the VSIX and will be bundled into a future OpenCode plugin that the binary installs (CONV C13); the PocketFlow TS adapter stays in-repo. `publish.yml`, the per-platform `@eddacraft/kindling-<platform>` package machinery and the thin client's platform-package lookup are removed. The npm `latest` of `@eddacraft/kindling` and the OpenCode and PocketFlow adapters is still the retired 0.1.x TypeScript engine, so they are deprecated with a notice pointing at the binary install (`scripts/deprecate.sh npm-channel`, user-gated). Rust PocketFlow support is out of scope. Supersedes the npm distribution parts of D-005 and all of D-007; D-005's Rust-canonical direction stands. Operator decision; the `NPM_TOKEN` secret and the `npm` environment are no longer used.
 
 ## Maintenance
 

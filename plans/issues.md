@@ -59,12 +59,14 @@ Example:
 | Module     | 08-conversion-surface |
 
 **Context:** The v0.3.0 tag was pushed and the crates were published to crates.io,
-but no GitHub Release was created, and none exists for 0.2.0 either. Both
-`publish.yml` (npm) and `release.yml` (binaries, Homebrew tap PR) trigger on
-`release: published`, so neither has run for a Rust-canonical version.
+but no GitHub Release was created, and none exists for 0.2.0 either.
+`release.yml` (binaries, VSIX, Homebrew tap PR) triggers on
+`release: published`, so it has not run for a Rust-canonical version. (The npm
+`publish.yml` that also triggered on it was removed by D-010.)
 
 **Impact:** npm `@eddacraft/kindling` `latest` is still the retired 0.1.2
-TypeScript implementation; no prebuilt binaries are attached to any release;
+TypeScript implementation (since D-010 it is deprecated rather than replaced;
+see PORT-020); no prebuilt binaries are attached to any release;
 `install.sh` fails because `releases/latest` is 404; the Homebrew formula was
 never updated. The v0.4.0 release prep is written so that publishing its GitHub
 Release closes all of this in one go (runbook section 4).
