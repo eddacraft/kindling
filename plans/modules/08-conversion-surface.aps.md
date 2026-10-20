@@ -4,7 +4,7 @@
 | ---- | ------ | ----------- |
 | CONV | @aneki | In Progress |
 
-**Last reviewed:** 2026-10-21 (wave 1: C1, C2, C4 merged, C3 in review as PR #154; C12 still blocked on the v0.4.0 GitHub Release, see ISS-003)
+**Last reviewed:** 2026-10-21 (wave 1 C1–C4 merged; C12 still blocked on the v0.4.0 GitHub Release, see ISS-003)
 
 ## Purpose
 
@@ -53,7 +53,7 @@ Execution plan: [../execution/2026-06-22-conversion-surface-delivery.md](../exec
 | C12 | Post-release verification          | 0    | In Progress | —                                         |
 | C1  | install.sh demo prompt             | 1    | Merged      | `feat/install-demo-prompt` (#152)         |
 | C2  | VSIX + Cursor/Windsurf docs        | 1    | Merged      | `feat/vscode-vsix-and-cursor-docs` (#155) |
-| C3  | Workspace auto-detect (search)     | 1    | In Review   | `feat/cli-repo-autodetect` (#154)         |
+| C3  | Workspace auto-detect (search)     | 1    | Merged      | `feat/cli-repo-autodetect` (#154)         |
 | C4  | kindling stats                     | 1    | Merged      | `feat/cli-stats` (#153)                   |
 | C5  | kindling wrap                      | 2    | Draft       | `feat/cli-wrap`                           |
 | C6  | kindling tui                       | 2    | Draft       | `feat/cli-tui`                            |
@@ -94,8 +94,10 @@ Re-run the Task 0.2 checklist once the v0.4.0 GitHub Release is published.
   install smoke test is still owed.
 - **C3** (PR #154): `search` defaults `repoId` to the git root, `--repo` wins,
   `--all-repos` widens. Scope extended to `log` and `capsule open` so
-  CLI-logged data is findable. Windows path-separator parity with
-  hook-captured `repoId` is being fixed before merge.
+  CLI-logged data is findable. On Windows the detected root uses native
+  separators to match hook-captured `repoId`; hook project routing is
+  unchanged. Only the pure separator function is tested on Windows (CI has no
+  Windows run of the `kindling` crate).
 - **C4** (PR #153): `kindling stats [--json]` via
   `SqliteKindlingStore::memory_stats` / `KindlingService::stats`. In-process
   only (no daemon endpoint); reusable by C6.
