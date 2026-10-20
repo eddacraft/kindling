@@ -1,11 +1,12 @@
 # Public Direction and Contribution Surface
 
-| ID     | Owner  | Status |
-| ------ | ------ | ------ |
-| PUBDIR | @aneki | Draft  |
+| ID     | Owner  | Status      |
+| ------ | ------ | ----------- |
+| PUBDIR | @aneki | In Progress |
 
-**Last reviewed:** 2026-07-19 — created ahead of expected external attention to
-make kindling's direction, contribution boundaries, and available work legible
+**Last reviewed:** 2026-10-21 — PUBDIR-001/002 merged (PR #151) after operator
+acceptance. Created 2026-07-19 ahead of expected external attention to make
+kindling's direction, contribution boundaries, and available work legible
 without exposing the internal APS tree as a public task dump.
 
 ## Purpose
@@ -101,8 +102,8 @@ invited.
 
 ## Ready Checklist
 
-- [ ] Operator accepts the proposed north star and contribution lanes.
-- [ ] Initial maintainer-only and external-ready boundaries are agreed.
+- [x] Operator accepts the proposed north star and contribution lanes.
+- [x] Initial maintainer-only and external-ready boundaries are agreed.
 - [ ] Three to five suitable initial public opportunities are selected.
 - [ ] Kindling's APS compatibility floor and upgrade path are verified.
 
@@ -110,9 +111,10 @@ invited.
 
 ### PUBDIR-001: Establish the public vision and direction contract
 
-- **Status:** In Review — draft PR #151 (`docs/public-direction`) adds
-  `VISION.md` and README pointers; awaiting operator acceptance (Ready
-  Checklist items 1–2).
+- **Status:** Merged — PR #151 (merged 2026-10-21) adds `VISION.md`, README
+  pointers, and corrects the `docs/use-cases.md` adapter table. The "time to
+  first recall" measure is kept as an outcome target although `install.sh`
+  depends on the v0.4.0 Release (ISS-003).
 - **Intent:** Give users and contributors a durable basis for judging whether
   proposed work moves kindling towards its intended product.
 - **Expected Outcome:** A concise public vision defines the north star, product
@@ -128,10 +130,11 @@ invited.
 
 ### PUBDIR-002: Define contribution acceptance lanes and checkpoints
 
-- **Status:** In Review — draft PR #151 replaces the `CONTRIBUTING.md` scope
-  guardrails with the three lanes, maintainer-led areas, and proposal
-  evidence. Open: whether `SECURITY.md` response aims stay alongside the
-  no-guaranteed-response note.
+- **Status:** Merged — PR #151 replaces the `CONTRIBUTING.md` scope guardrails
+  with the three lanes, maintainer-led areas, and proposal evidence. States a
+  single maintainer with no guaranteed response time; security reports are the
+  exception and keep `SECURITY.md`'s acknowledgement aims (3 business days,
+  14-day updates; acknowledgement, not resolution).
 - **Intent:** Let contributors identify welcome work and avoid investing in
   changes that conflict with kindling's boundaries or require a prior decision.
 - **Expected Outcome:** The contributor guide distinguishes welcome,
