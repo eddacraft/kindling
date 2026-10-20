@@ -17,6 +17,7 @@ kindling/
 │   ├── kindling/           #   CLI binary + Claude Code hooks (kindling, kindling-hook)
 │   ├── kindling-client/    #   daemon-backed Rust SDK (default for integrations)
 │   ├── kindling-service/   #   in-process orchestration (embedded, zero-IPC)
+│   ├── kindling-runtime/   #   embeddable facade: attach-or-start daemon + spool
 │   ├── kindling-server/    #   daemon runtime (HTTP/1 over UDS)
 │   ├── kindling-store/     #   SQLite persistence (FTS5 + WAL)
 │   ├── kindling-provider/  #   deterministic local retrieval (FTS5 BM25 + recency)
@@ -265,9 +266,10 @@ For discuss-first work, open an issue with:
   kindling
 
 A maintainer will agree the approach, ask for changes, or decline with a
-reason. Please wait for that before opening a feature PR. kindling is
-maintained by a small team, so reviews happen as time allows and there is no
-guaranteed response time.
+reason. Please wait for that before opening a feature PR. kindling has a
+single maintainer, so reviews happen as time allows and there is no
+guaranteed response time. Security reports are the exception: see
+[SECURITY.md](SECURITY.md) for how those are acknowledged.
 
 For the repository layout, see [Project layout](#project-layout) above.
 

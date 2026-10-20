@@ -115,16 +115,18 @@ All data is stored locally using embedded SQLite with FTS5—no cloud dependenci
 
 ## Integration Points
 
-kindling integrates through **adapters**. Each adapter now runs over the thin
-`@eddacraft/kindling` npm client, which speaks HTTP-over-UDS to the Rust
-daemon:
+kindling integrates through **adapters**. The npm adapters run over the thin
+`@eddacraft/kindling` client, which speaks HTTP-over-UDS to the Rust daemon.
+Claude Code integration is built into the `kindling` binary as hooks, with no
+separate package:
 
-| Adapter                                   | Use Case                                             |
-| ----------------------------------------- | ---------------------------------------------------- |
-| `@eddacraft/kindling-adapter-opencode`    | OpenCode session integration (thin client → daemon)  |
-| `@eddacraft/kindling-adapter-pocketflow`  | PocketFlow workflow nodes (thin client → daemon)     |
-| `@eddacraft/kindling-adapter-claude-code` | Claude Code hooks integration (thin client → daemon) |
-| Custom adapters                           | Any AI system with tool calls, commands, or outputs  |
+| Adapter                                  | Use Case                                            |
+| ---------------------------------------- | --------------------------------------------------- |
+| `kindling hook` (Claude Code plugin)     | Claude Code hooks, built into the `kindling` binary |
+| `@eddacraft/kindling-adapter-opencode`   | OpenCode session integration (thin client → daemon) |
+| `@eddacraft/kindling-adapter-pocketflow` | PocketFlow workflow nodes (thin client → daemon)    |
+| `@eddacraft/kindling-adapter-vscode`     | VS Code, Cursor and Windsurf (thin client → daemon) |
+| Custom adapters                          | Any AI system with tool calls, commands, or outputs |
 
 ## Key Concepts
 
