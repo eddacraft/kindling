@@ -55,6 +55,9 @@ pub enum Command {
     /// Show database status and statistics.
     Status(StatusArgs),
 
+    /// Show memory statistics: counts by kind, capsules, pins and activity.
+    Stats(StatsArgs),
+
     /// Search for relevant context in memory.
     Search(SearchArgs),
 
@@ -367,6 +370,12 @@ pub struct BrowseArgs {
     #[arg(long)]
     pub no_open: bool,
 
+    #[command(flatten)]
+    pub common: CommonOpts,
+}
+
+#[derive(Debug, Args)]
+pub struct StatsArgs {
     #[command(flatten)]
     pub common: CommonOpts,
 }

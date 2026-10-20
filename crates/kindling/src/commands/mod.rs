@@ -14,6 +14,7 @@ pub mod pin;
 pub mod search;
 pub mod serve;
 pub mod spool;
+pub mod stats;
 pub mod status;
 
 use kindling_types::ScopeIds;

@@ -34,6 +34,9 @@ pub use export::{
     ExportBundle, ExportBundleOptions, ExportDataset, ExportStats, ImportOptions, ImportResult,
     BUNDLE_VERSION,
 };
+// Statistics types are defined by the store; re-exported so service consumers
+// (CLI `stats`, the planned TUI) need not depend on `kindling-store` directly.
+pub use kindling_store::{CapsuleStats, MemoryStats, ObservationStats, PinStats};
 pub use service::{
     AppendObservationOptions, AppendOutcome, CloseCapsuleOptions, CreatePinOptions,
     KindlingService, OpenCapsuleOptions,

@@ -103,6 +103,7 @@ kindling demo                              # load sample memory
 kindling browse                            # open HTML viewer
 kindling log "root cause: cache eviction"
 kindling search "authentication error"
+kindling stats                             # counts by kind, capsules, pins, activity
 kindling pin observation obs_abc --note "Root cause"
 kindling capsule open --intent "debug leak"
 kindling export ./backup.json
