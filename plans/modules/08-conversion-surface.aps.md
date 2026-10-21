@@ -4,7 +4,7 @@
 | ---- | ------ | ----------- |
 | CONV | @aneki | In Progress |
 
-**Last reviewed:** 2026-10-21 (wave 1 C1–C4 merged; C12 still blocked on the v0.4.0 GitHub Release, see ISS-003; D-010 drops npm, C13 drafted)
+**Last reviewed:** 2026-10-22 (v0.4.0 GitHub Release published, ISS-003 resolved; C12 waits on crates.io 0.4.0 and the tap PR merge)
 
 ## Purpose
 
@@ -86,6 +86,24 @@ Checked against the registries and the GitHub API from the release-prep branch:
   (`NPM_TOKEN` is no longer needed after D-010 and can be removed.)
 
 Re-run the Task 0.2 checklist once the v0.4.0 GitHub Release is published.
+
+### C12 progress (2026-10-22)
+
+- The v0.4.0 GitHub Release was published on 2026-10-21, and
+  `releases/latest` resolves to v0.4.0. All 7 binary archives and
+  `kindling-0.4.0.vsix` are attached, each with a `.sha256` sidecar.
+- `HOMEBREW_TAP_TOKEN` is set, but the `open homebrew-tap PR` job still
+  failed. `generate-homebrew-formula.sh` captured its own log line in the
+  checksum values, and `sed` choked on the URL. Fixed in #160. The v0.4.0
+  formula was generated locally with the fixed script and opened as
+  eddacraft/homebrew-tap#1, which awaits merge.
+- npm deprecation notices are live on `@eddacraft/kindling` (PORT-020).
+- crates.io is still at 0.3.0 because `scripts/publish.sh` has not been run
+  for 0.4.0. It is the next step, since the npm deprecation message points at
+  `cargo install eddacraft-kindling`.
+- Checks still owed after that: `curl … install.sh | sh`, `cargo install`,
+  `brew install` once the tap PR merges, and the Cursor/Windsurf VSIX smoke
+  test.
 
 ### Wave 1 notes (2026-10-21)
 

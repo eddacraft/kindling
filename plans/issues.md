@@ -53,7 +53,7 @@ Example:
 
 | Field      | Value                 |
 | ---------- | --------------------- |
-| Status     | Open                  |
+| Status     | Resolved              |
 | Severity   | High                  |
 | Discovered | C12 (release-prep)    |
 | Module     | 08-conversion-surface |
@@ -70,6 +70,12 @@ see PORT-020); no prebuilt binaries are attached to any release;
 `install.sh` fails because `releases/latest` is 404; the Homebrew formula was
 never updated. The v0.4.0 release prep is written so that publishing its GitHub
 Release closes all of this in one go (runbook section 4).
+
+**Resolution (2026-10-22):** v0.4.0 was published as a GitHub Release on
+2026-10-21. `release.yml` attached the binaries and the VSIX, and
+`releases/latest` now resolves. The Homebrew tap PR job failed on a script bug
+(fixed in #160), so the tap PR was opened by hand (eddacraft/homebrew-tap#1).
+The remaining release work is tracked under C12.
 
 ### ISS-004: Thin-client and adapter tests leak daemons
 
