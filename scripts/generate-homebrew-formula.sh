@@ -72,7 +72,7 @@ info "Release tag: ${TAG} (formula version: ${VERSION})"
 fetch_sha256() {
   local target="$1"
   local sidecar_url="https://github.com/${REPO}/releases/download/${TAG}/kindling-${VERSION}-${target}.tar.gz.sha256"
-  info "Fetching checksum: ${sidecar_url}"
+  info "Fetching checksum: ${sidecar_url}" >&2
   local line
   line="$(curl -fsSL "$sidecar_url")" || error "failed to download ${sidecar_url}"
   # Sidecar format: "<sha256>  kindling-<version>-<target>.tar.gz"
