@@ -4,7 +4,7 @@
 | ---- | ------ | ----------- |
 | CONV | @aneki | In Progress |
 
-**Last reviewed:** 2026-10-22 (v0.4.0 GitHub Release published, ISS-003 resolved; C12 waits on crates.io 0.4.0 and the tap PR merge)
+**Last reviewed:** 2026-10-22 (v0.4.0 on GitHub Releases and crates.io; curl, cargo and brew installs verified; C12 waits on the tap PR merge and the VSIX smoke test; C14 drafted)
 
 ## Purpose
 
@@ -64,6 +64,7 @@ Execution plan: [../execution/2026-06-22-conversion-surface-delivery.md](../exec
 | C10 | External docs sync script           | 3    | Draft       | `docs/why-kindling-and-sync`              |
 | C11 | Composite GitHub Action             | 4    | Draft       | `feat/kindling-action`                    |
 | C13 | OpenCode plugin via `kindling init` | 2    | Draft       | `feat/opencode-plugin`                    |
+| C14 | crates.io trusted publishing        | 3    | Draft       | `ci/crates-trusted-publishing`            |
 
 ### C12 findings (2026-10-19)
 
@@ -97,13 +98,32 @@ Re-run the Task 0.2 checklist once the v0.4.0 GitHub Release is published.
   checksum values, and `sed` choked on the URL. Fixed in #160. The v0.4.0
   formula was generated locally with the fixed script and opened as
   eddacraft/homebrew-tap#1, which awaits merge.
-- npm deprecation notices are live on `@eddacraft/kindling` (PORT-020).
-- crates.io is still at 0.3.0 because `scripts/publish.sh` has not been run
-  for 0.4.0. It is the next step, since the npm deprecation message points at
-  `cargo install eddacraft-kindling`.
-- Checks still owed after that: `curl … install.sh | sh`, `cargo install`,
-  `brew install` once the tap PR merges, and the Cursor/Windsurf VSIX smoke
-  test.
+- npm deprecation notices are live on `@eddacraft/kindling` and the OpenCode
+  and PocketFlow adapters (PORT-020).
+- crates.io: all 7 crates published at 0.4.0 (`scripts/publish.sh`,
+  2026-10-22). They are owned solely by the maintainer's personal crates.io
+  account, as every earlier version was; there is no eddacraft user or team on
+  crates.io. Left as is; see C14.
+- Verified on Linux x86_64 (2026-10-22), each reporting `kindling 0.4.0`:
+  `install.sh` from `main` (resolves `releases/latest`, downloads the
+  `x86_64-unknown-linux-gnu` asset), `cargo install eddacraft-kindling`
+  (compiles the 0.4.0 crate graph from crates.io), and
+  `brew install eddacraft/tap/kindling` from the `kindling-v0.4.0` branch of
+  the tap (formula URL + sha256 for the glibc tarball check out).
+- Still owed: merge eddacraft/homebrew-tap#1 (then `brew install` from the
+  tap's `main`), the Cursor/Windsurf VSIX smoke test, and removing the unused
+  `NPM_TOKEN` secret.
+
+### C14: crates.io trusted publishing (Draft)
+
+Publish the crates from `release.yml` via crates.io Trusted Publishing (OIDC)
+instead of a personal token in `scripts/publish.sh`, and add an eddacraft
+identity as a crate owner. Prerequisite: an eddacraft identity that crates.io
+can recognise, i.e. a GitHub team in the `eddacraft` org (owner syntax
+`github:eddacraft:<team>`) or a dedicated org account. None exists today.
+Yanking existing versions does not change owners or the publisher record, so
+this is purely forward-looking. Also covers `eddacraft-tui` and `aps-cli`,
+which are in the same position.
 
 ### Wave 1 notes (2026-10-21)
 
