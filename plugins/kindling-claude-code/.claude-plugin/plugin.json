@@ -1,6 +1,6 @@
 {
   "name": "kindling",
-  "version": "0.1.0",
+  "version": "0.1.3",
   "description": "Memory continuity for Claude Code — remember what you worked on across sessions",
   "author": {
     "name": "eddacraft",

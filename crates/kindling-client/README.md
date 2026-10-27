@@ -10,7 +10,7 @@ This is the recommended Rust SDK for most integrations. It is a thin async clien
 
 ```toml
 [dependencies]
-kindling-client = "0.2"
+kindling-client = "0.4"
 ```
 
 ### Durable emit (`spool` feature)
@@ -19,7 +19,7 @@ The opt-in `spool` feature adds [`SpooledClient`](https://docs.rs/kindling-clien
 
 ```toml
 [dependencies]
-kindling-client = { version = "0.2", features = ["spool"] }
+kindling-client = { version = "0.4", features = ["spool"] }
 ```
 
 There is **no standalone `kindling-spool` crate**. The spool module ships inside `kindling-client` behind `features = ["spool"]` (off by default). Enable it only when your producer must survive daemon outages.
