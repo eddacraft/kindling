@@ -32,18 +32,17 @@ Homebrew) and use the Node packages from a clone of this repository.
 
 `crates/kindling/tests/integration_matrix.rs` fails when a row here or in the
 README's integrations table is marked Supported without a named test that
-drives it. The named tests run in CI against the built `kindling` binary,
-each against temporary state rather than your real profile. The check finds each test by
-name; it does not prove that the test ran, so CI running those suites is part
-of the guarantee. It also checks that the matrix links resolve and that the
-Claude Code plugin manifests agree with what `kindling init --claude-code`
-prints.
+drives it. The named tests run in CI, through the daemon or in-process as the
+integration does, each against temporary state rather than your real profile.
+The check finds each test by name; it does not prove that the test ran, so CI
+running those suites is part of the guarantee. It also checks that the matrix
+links resolve and that the Claude Code plugin manifests agree with what
+`kindling init --claude-code` prints.
 
-Two install steps are not tested: installing the Claude Code plugin with
-`/plugin install`, and installing the VSIX in a real editor. The release
-workflow checks that the VSIX version matches the tag, but no test installs
-it. The tests drive the same hooks and the same session manager those
-installs wire up.
+No test performs a real install: not `install.sh`, `cargo install`,
+Homebrew, `/plugin install` in Claude Code, or the VSIX in a real editor. The
+release workflow checks that the VSIX version matches the tag. The tests drive
+the same binary, hooks and session manager those installs provide.
 
 ## Status definitions
 
