@@ -183,9 +183,9 @@ fn format_tool_content(hook: &HookInput, tool_name: &str) -> String {
             if let Some(cmd) = input_str(input, "command") {
                 parts.push(format!("$ {cmd}"));
             }
-            if let Some(result_str) =
-                filter_tool_result(tool_name, hook.tool_result.as_ref(), MAX_RESULT_LENGTH)
-            {
+            let bash_text = bash_output_text(hook.result());
+            let result = bash_text.as_ref().or(hook.result());
+            if let Some(result_str) = filter_tool_result(tool_name, result, MAX_RESULT_LENGTH) {
                 // JS pushes only truthy strings; an empty string is falsy and
                 // is skipped.
                 if !result_str.is_empty() {
@@ -276,7 +276,7 @@ fn extract_tool_use_provenance(hook: &HookInput, tool_name: &str) -> Map<String,
                 p.insert("command".to_string(), Value::String(name));
             }
             // exitCode = number from result .exitCode / .exit_code if present.
-            if let Some(code) = extract_exit_code(hook.tool_result.as_ref()) {
+            if let Some(code) = extract_exit_code(hook.result()) {
                 p.insert("exitCode".to_string(), Value::from(code));
             }
         }
@@ -352,6 +352,22 @@ fn utf16_len(s: &str) -> usize {
     s.chars().map(char::len_utf16).sum()
 }
 
+/// Claude Code's Bash `tool_response` is an object carrying `stdout` and
+/// `stderr`. Capture its text (stdout, then stderr when non-empty) instead of
+/// a JSON dump of the object. Any other shape is left for
+/// [`filter_tool_result`] to render as before.
+fn bash_output_text(result: Option<&Value>) -> Option<Value> {
+    let obj = result?.as_object()?;
+    let stdout = obj.get("stdout")?.as_str()?;
+    let stderr = obj.get("stderr").and_then(Value::as_str).unwrap_or("");
+    let text = match (stdout.trim_end().is_empty(), stderr.trim_end().is_empty()) {
+        (_, true) => stdout.trim_end().to_string(),
+        (true, false) => stderr.trim_end().to_string(),
+        (false, false) => format!("{}\n{}", stdout.trim_end(), stderr.trim_end()),
+    };
+    Some(Value::String(text))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -372,6 +388,54 @@ mod tests {
             tool_error: error.map(String::from),
             ..HookInput::default()
         }
+    }
+
+    fn bash_with_response(response: Value) -> HookInput {
+        HookInput {
+            tool_response: Some(response),
+            ..hook_with("Bash", json!({ "command": "make" }), None, None)
+        }
+    }
+
+    #[test]
+    fn bash_tool_response_stdout_is_captured_as_text() {
+        let hook = bash_with_response(json!({ "stdout": "built\n", "stderr": "" }));
+        assert_eq!(map_tool_use(&hook).content, "Tool: Bash\n\n$ make\n\nbuilt");
+    }
+
+    #[test]
+    fn bash_tool_response_stderr_follows_stdout() {
+        let hook = bash_with_response(json!({ "stdout": "built", "stderr": "warning: x\n" }));
+        assert_eq!(
+            map_tool_use(&hook).content,
+            "Tool: Bash\n\n$ make\n\nbuilt\nwarning: x"
+        );
+    }
+
+    #[test]
+    fn bash_tool_response_stderr_only_is_captured() {
+        let hook = bash_with_response(json!({ "stdout": "", "stderr": "fatal: y" }));
+        assert_eq!(
+            map_tool_use(&hook).content,
+            "Tool: Bash\n\n$ make\n\nfatal: y"
+        );
+    }
+
+    #[test]
+    fn tool_result_wins_over_tool_response() {
+        let hook = HookInput {
+            tool_response: Some(json!({ "stdout": "from response" })),
+            ..hook_with(
+                "Bash",
+                json!({ "command": "make" }),
+                Some(json!("from result")),
+                None,
+            )
+        };
+        assert_eq!(
+            map_tool_use(&hook).content,
+            "Tool: Bash\n\n$ make\n\nfrom result"
+        );
     }
 
     #[test]

@@ -87,8 +87,12 @@ pub struct HookInput {
     pub tool_name: Option<String>,
     /// `context.tool_input` — an object of tool arguments.
     pub tool_input: Option<Value>,
-    /// `context.tool_result` — arbitrary JSON (success case).
+    /// `context.tool_result` — arbitrary JSON (success case, legacy key).
     pub tool_result: Option<Value>,
+    /// `context.tool_response` — the success-case result as Claude Code sends
+    /// it in PostToolUse. Read through [`HookInput::result`], which prefers
+    /// `tool_result` when both are present.
+    pub tool_response: Option<Value>,
     /// `context.tool_error` — error string (failure case).
     pub tool_error: Option<String>,
     /// `context.error` — alternate error field read by the failure hook.
@@ -118,6 +122,12 @@ pub struct HookInput {
 /// SessionStart's session-id fallback (`session-<ts>`) differs and is applied in
 /// the dispatcher, not here.
 impl HookInput {
+    /// The tool's success-case result: `tool_result` when present, otherwise
+    /// Claude Code's `tool_response`.
+    pub fn result(&self) -> Option<&Value> {
+        self.tool_result.as_ref().or(self.tool_response.as_ref())
+    }
+
     /// `session_id`, defaulting to `"unknown"`.
     pub fn session_id_or_unknown(&self) -> String {
         match self.session_id.as_deref() {
