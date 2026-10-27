@@ -10,7 +10,7 @@ For most integrations, prefer [`kindling-client`](https://crates.io/crates/kindl
 
 ```toml
 [dependencies]
-kindling-service = "0.2"
+kindling-service = "0.4"
 ```
 
 ## When to use this crate
