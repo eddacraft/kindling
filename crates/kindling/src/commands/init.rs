@@ -1,18 +1,16 @@
-//! `init` — create the database (and optionally note Claude Code setup).
+//! `init` — create the database (and optionally report Claude Code setup).
 //!
 //! Ports `packages/kindling-cli/src/commands/init.ts` for the directory +
-//! database steps. The `--json` shape matches field-for-field:
-//! `{ directory, database, claudeCode }`.
+//! database steps. The `--json` shape keeps `{ directory, database, claudeCode }`.
 //!
-//! Claude Code step (deviation, documented): the TS command copied the **Node**
-//! plugin (`plugins/kindling-claude-code/`) into `~/.claude/plugins/kindling`
-//! and toggled `enabledPlugins` in `~/.claude/settings.json`. That plugin is a
-//! JS hook bundle tied to the TypeScript packages, not the Rust binary, and the
-//! plugin cutover to the Rust hook/daemon is owned by PORT-015. So here
-//! `--claude-code` does NOT copy a plugin; it detects whether `~/.claude/`
-//! exists and returns a not-configured result whose `message` points at
-//! PORT-015. The DB/directory creation is done faithfully. When PORT-015 lands
-//! the plugin cutover, this step can perform the real install.
+//! Claude Code step: the capture hooks ship as a Claude Code plugin
+//! (`plugins/kindling-claude-code/`) published through this repository's
+//! marketplace (`.claude-plugin/marketplace.json`), and its hooks run
+//! `kindling hook <type>`. A plugin is installed from inside Claude Code, so
+//! `--claude-code` does not edit `~/.claude/`. It reports whether Claude Code is
+//! detected, whether the `kindling` binary the hooks call is on `PATH`, and the
+//! exact `/plugin` commands that install the plugin. `configured` therefore
+//! stays `false`: init never claims an install it did not perform.
 
 use std::path::PathBuf;
 
@@ -46,10 +44,26 @@ struct DatabaseResult {
 #[derive(Serialize)]
 struct ClaudeCodeResult {
     configured: bool,
+    /// Whether `~/.claude/` exists.
+    detected: bool,
+    /// Whether a `kindling` executable resolves on `PATH`; the plugin's hooks
+    /// run `kindling hook <type>` and no-op without it.
+    #[serde(rename = "binaryOnPath")]
+    binary_on_path: bool,
     #[serde(rename = "pluginPath")]
     plugin_path: String,
+    /// The Claude Code commands that install the plugin, in order.
+    #[serde(rename = "installCommands")]
+    install_commands: Vec<String>,
     message: String,
 }
+
+/// The commands that add this repository's marketplace and install the plugin
+/// from it. The names match `.claude-plugin/marketplace.json`.
+const PLUGIN_INSTALL_COMMANDS: [&str; 2] = [
+    "/plugin marketplace add eddacraft/kindling",
+    "/plugin install kindling@kindling-plugins",
+];
 
 pub fn run(args: InitArgs) -> CliResult {
     let db_path = resolve_db_path(args.db.as_deref())?;
@@ -107,23 +121,67 @@ pub fn run(args: InitArgs) -> CliResult {
     Ok(())
 }
 
-/// Detect Claude Code but defer the actual plugin install to PORT-015.
+/// Report Claude Code setup: detection, the binary the hooks call, and the
+/// plugin install commands. Never edits Claude Code's own configuration.
 fn configure_claude_code() -> ClaudeCodeResult {
-    let claude_dir = home_dir().map(|h| h.join(".claude"));
-    match claude_dir {
-        Some(dir) if dir.exists() => ClaudeCodeResult {
-            configured: false,
-            plugin_path: String::new(),
-            message: "Claude Code detected, but the Rust plugin cutover is not yet \
-                      available (tracked by PORT-015). No plugin was installed."
-                .to_string(),
-        },
-        _ => ClaudeCodeResult {
-            configured: false,
-            plugin_path: String::new(),
-            message: "Claude Code not detected (~/.claude/ does not exist)".to_string(),
-        },
+    let detected = home_dir()
+        .map(|h| h.join(".claude"))
+        .is_some_and(|dir| dir.is_dir());
+    let binary_on_path = kindling_on_path();
+    let install = PLUGIN_INSTALL_COMMANDS.join(" then ");
+    let message = match (detected, binary_on_path) {
+        (true, true) => format!(
+            "Claude Code detected. Install the kindling plugin from inside Claude Code: {install}"
+        ),
+        (true, false) => format!(
+            "Claude Code detected, but `kindling` is not on PATH, so the plugin's hooks \
+             would no-op. Add the binary to PATH, then install the plugin from inside \
+             Claude Code: {install}"
+        ),
+        (false, _) => format!(
+            "Claude Code not detected (~/.claude/ does not exist). After installing \
+             Claude Code, install the kindling plugin from inside it: {install}"
+        ),
+    };
+    ClaudeCodeResult {
+        configured: false,
+        detected,
+        binary_on_path,
+        plugin_path: String::new(),
+        install_commands: PLUGIN_INSTALL_COMMANDS
+            .iter()
+            .map(|c| c.to_string())
+            .collect(),
+        message,
     }
+}
+
+/// Whether an executable named `kindling` resolves on `PATH`.
+fn kindling_on_path() -> bool {
+    let names: &[&str] = if cfg!(windows) {
+        &["kindling.exe", "kindling.cmd", "kindling"]
+    } else {
+        &["kindling"]
+    };
+    std::env::var_os("PATH")
+        .map(|path| {
+            std::env::split_paths(&path)
+                .any(|dir| names.iter().any(|n| is_executable(&dir.join(n))))
+        })
+        .unwrap_or(false)
+}
+
+#[cfg(unix)]
+fn is_executable(path: &std::path::Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    path.metadata()
+        .map(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
+        .unwrap_or(false)
+}
+
+#[cfg(not(unix))]
+fn is_executable(path: &std::path::Path) -> bool {
+    path.is_file()
 }
 
 fn home_dir() -> Option<PathBuf> {
@@ -156,6 +214,10 @@ fn print_human(output: &InitOutput, claude_code_requested: bool) {
             println!("\nClaude Code Integration");
             println!("-----------------------");
             println!("{}", cc.message);
+            println!("\nIn Claude Code, run:");
+            for command in &cc.install_commands {
+                println!("  {command}");
+            }
         }
     }
 
