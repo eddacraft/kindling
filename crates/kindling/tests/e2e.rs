@@ -423,3 +423,93 @@ async fn warm_hook_latency_is_bounded() {
 
     daemon.join().await;
 }
+
+/// KFIT-002: the PostToolUse payload Claude Code actually sends carries the
+/// tool's output in `tool_response` (not `tool_result`). It must land in the
+/// captured observation instead of being silently dropped.
+#[tokio::test]
+async fn post_tool_use_reads_claude_code_tool_response() {
+    let daemon = Daemon::start().await;
+
+    let ctx = json!({
+        "session_id": SESSION,
+        "transcript_path": "/tmp/kindling-hook-e2e/transcript.jsonl",
+        "cwd": REPO_ROOT,
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Bash",
+        "tool_input": { "command": "cargo test -p parser", "description": "Run parser tests" },
+        "tool_response": {
+            "stdout": "test result: ok. 12 passed; 0 failed",
+            "stderr": "",
+            "interrupted": false,
+            "isImage": false
+        },
+        "tool_use_id": "toolu_01ABC",
+    });
+    let (ok, stdout) = daemon.run_hook("post-tool-use", &ctx.to_string()).await;
+    assert!(ok, "hook should exit 0");
+    assert!(
+        stdout.is_empty(),
+        "capture hook prints nothing, got {stdout:?}"
+    );
+
+    let store = daemon.open_store();
+    let obs = store
+        .query_observations(Some(&repo_scope()), None, None, 50)
+        .expect("query observations");
+    assert_eq!(obs.len(), 1, "exactly one observation should land");
+    let o = &obs[0];
+    assert_eq!(o.kind, ObservationKind::Command);
+    assert_eq!(
+        o.content, "Tool: Bash\n\n$ cargo test -p parser\n\ntest result: ok. 12 passed; 0 failed",
+        "tool_response stdout is captured as text"
+    );
+    assert_eq!(o.provenance["hasError"], json!(false));
+
+    daemon.join().await;
+}
+
+/// KFIT-002: the PostToolUseFailure payload Claude Code sends carries the
+/// failure text in `error`. It lands as a failed tool observation whose
+/// content and provenance record the error.
+#[tokio::test]
+async fn post_tool_use_failure_lands_claude_code_error() {
+    let daemon = Daemon::start().await;
+
+    let ctx = json!({
+        "session_id": SESSION,
+        "transcript_path": "/tmp/kindling-hook-e2e/transcript.jsonl",
+        "cwd": REPO_ROOT,
+        "hook_event_name": "PostToolUseFailure",
+        "tool_name": "Bash",
+        "tool_input": { "command": "cargo build" },
+        "tool_use_id": "toolu_01DEF",
+        "error": "Command failed with exit code 101",
+        "is_interrupt": false,
+    });
+    let (ok, stdout) = daemon
+        .run_hook("post-tool-use-failure", &ctx.to_string())
+        .await;
+    assert!(ok, "hook should exit 0");
+    assert!(
+        stdout.is_empty(),
+        "capture hook prints nothing, got {stdout:?}"
+    );
+
+    let store = daemon.open_store();
+    let obs = store
+        .query_observations(Some(&repo_scope()), None, None, 50)
+        .expect("query observations");
+    assert_eq!(obs.len(), 1, "exactly one observation should land");
+    let o = &obs[0];
+    assert!(
+        o.content
+            .ends_with("Error: Command failed with exit code 101"),
+        "error text is captured, got {:?}",
+        o.content
+    );
+    assert_eq!(o.provenance["hasError"], json!(true));
+    assert_eq!(o.provenance["toolName"], json!("Bash"));
+
+    daemon.join().await;
+}
