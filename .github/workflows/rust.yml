@@ -177,7 +177,7 @@ jobs:
       - run: cargo test -p kindling-client --test tcp
 
   # Exercises the thin TS client (@eddacraft/kindling) AND the live TS adapters
-  # (opencode, pocketflow) against a REAL daemon. Their integration tests skip
+  # (opencode, pocketflow, vscode) against a REAL daemon. Their integration tests skip
   # when target/debug/kindling is absent (e.g. the TS-only `pnpm -r test`); this
   # job builds it so they actually run.
   thin-client:
@@ -205,11 +205,13 @@ jobs:
           pnpm
           --filter @eddacraft/kindling-adapter-opencode
           --filter @eddacraft/kindling-adapter-pocketflow
+          --filter @eddacraft/kindling-adapter-vscode
           run build
       - run: >-
           pnpm
           --filter @eddacraft/kindling-adapter-opencode
           --filter @eddacraft/kindling-adapter-pocketflow
+          --filter @eddacraft/kindling-adapter-vscode
           run test
       # The Claude Code plugin's /memory slash commands shell out to the same
       # kindling binary; exercise them against the built debug binary. The suite
