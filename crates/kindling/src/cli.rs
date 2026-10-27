@@ -42,7 +42,7 @@ pub struct CommonOpts {
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
-    /// Initialize kindling (create database and configure hooks).
+    /// Initialize kindling (create the database; check Claude Code setup).
     Init(InitArgs),
 
     /// Log an observation to memory.
@@ -99,11 +99,11 @@ pub struct InitArgs {
     #[arg(long, value_name = "path")]
     pub db: Option<String>,
 
-    /// Also configure Claude Code integration.
+    /// Also check Claude Code setup and print the plugin install commands.
     #[arg(long)]
     pub claude_code: bool,
 
-    /// Skip database creation (only configure hooks).
+    /// Skip database creation (only check Claude Code setup).
     #[arg(long)]
     pub skip_db: bool,
 

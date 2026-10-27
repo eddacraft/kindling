@@ -83,20 +83,20 @@ describe.skipIf(!HAS_BINARY)('VS Code capture journey (live daemon)', () => {
     const context = await manager.onSessionStart({ sessionId, repoId: projectRoot });
     expect(context.activeCapsuleId).toBeTruthy();
 
-    // A save lands a file_diff observation.
+    // A save lands a file_diff observation. The payload matches what the
+    // extension's onDidSaveTextDocument handler sends: path, repo, timestamp.
     const saved = await manager.onFileSave({
       sessionId,
-      filePath: join(projectRoot, 'src', 'tokenizer.ts'),
-      diff: '+ export function tokenizeMarkdownHeadings(input: string) {}',
-      additions: 1,
-      deletions: 0,
+      filePath: join(projectRoot, 'src', 'markdownHeadingTokenizer.ts'),
+      repoId: projectRoot,
+      timestamp: Date.now(),
     });
     expect(saved.error).toBeUndefined();
     expect(saved.observation?.kind).toBe('file_diff');
 
     // kindling.search: retrieve scoped to the workspace finds the save.
     const result = await client.retrieve({
-      query: 'tokenizeMarkdownHeadings',
+      query: 'markdownHeadingTokenizer',
       scopeIds: { sessionId, repoId: projectRoot },
       maxCandidates: 10,
     });

@@ -173,10 +173,11 @@ setup_claude_code() {
   [ -n "$KINDLING_CMD" ] || return
 
   printf '\n'
-  printf '  Configure Claude Code integration?\n'
-  printf '  This adds kindling hooks to your Claude Code config.\n'
+  printf '  Set up Claude Code integration?\n'
+  printf '  This checks for Claude Code and prints the two /plugin commands\n'
+  printf '  to run inside it. It does not edit your Claude Code config.\n'
   printf '\n'
-  printf '  Enable Claude Code integration? [y/N] '
+  printf '  Check Claude Code setup? [y/N] '
 
   answer="n"
   read -r answer </dev/tty || answer="n"
