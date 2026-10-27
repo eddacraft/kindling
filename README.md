@@ -47,12 +47,21 @@ Full matrix: [docs/integrations.md](./docs/integrations.md). No Claude Code? [Qu
 
 ## Quick start: Claude Code
 
+Install the binary, which the plugin's hooks call:
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/eddacraft/kindling/main/install.sh | sh
-# or: cargo install eddacraft-kindling && kindling init --claude-code
+# or: cargo install eddacraft-kindling
 ```
 
-kindling captures tool calls, file edits, commands, and errors across sessions. Search with `kindling search` or the plugin's `/memory` commands.
+Then, inside Claude Code, add this repository's marketplace and install the plugin:
+
+```text
+/plugin marketplace add eddacraft/kindling
+/plugin install kindling@kindling-plugins
+```
+
+`kindling init --claude-code` checks this setup and prints the same commands. kindling captures tool calls, file edits, commands, and errors across sessions. Search with `kindling search` or the plugin's `/memory` commands.
 
 Plugin: [plugins/kindling-claude-code](./plugins/kindling-claude-code)
 

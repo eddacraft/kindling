@@ -4,6 +4,8 @@
 
 mod support;
 
+use std::path::PathBuf;
+
 use serde_json::json;
 use support::{assert_success, json_stdout, read, stdout, CliEnv};
 
@@ -418,15 +420,91 @@ fn init_creates_database() {
     assert_eq!(v2["database"]["existed"], json!(true));
 }
 
+/// The two commands that install the Claude Code plugin from this
+/// repository's marketplace (`.claude-plugin/marketplace.json`).
+const PLUGIN_INSTALL: [&str; 2] = [
+    "/plugin marketplace add eddacraft/kindling",
+    "/plugin install kindling@kindling-plugins",
+];
+
+/// A fresh profile: an isolated HOME (optionally with `~/.claude/`) and a PATH
+/// directory (optionally holding a stub `kindling` executable).
+fn claude_profile(env: &CliEnv, with_claude_dir: bool, with_binary: bool) -> (PathBuf, PathBuf) {
+    let home = env.path("home");
+    std::fs::create_dir_all(&home).unwrap();
+    if with_claude_dir {
+        std::fs::create_dir_all(home.join(".claude")).unwrap();
+    }
+    let bin_dir = env.path("bin");
+    std::fs::create_dir_all(&bin_dir).unwrap();
+    if with_binary {
+        let stub = bin_dir.join(if cfg!(windows) {
+            "kindling.exe"
+        } else {
+            "kindling"
+        });
+        std::fs::write(&stub, "#!/bin/sh\n").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&stub, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+    }
+    (home, bin_dir)
+}
+
 #[test]
-fn init_claude_code_is_stubbed() {
+fn init_claude_code_reports_plugin_install_when_detected() {
     let env = CliEnv::new();
-    let out = env.run_db(&["init", "--claude-code", "--json"]);
+    let (home, bin_dir) = claude_profile(&env, true, true);
+    let out = env.run_db_with_env(
+        &["init", "--claude-code", "--json"],
+        &[("HOME", &home), ("USERPROFILE", &home), ("PATH", &bin_dir)],
+    );
     assert_success(&out);
-    let v = json_stdout(&out);
-    // The Claude Code step never claims to configure (PORT-015 owns the cutover).
-    assert_eq!(v["claudeCode"]["configured"], json!(false));
-    assert!(v["claudeCode"]["message"].is_string());
+    let cc = &json_stdout(&out)["claudeCode"];
+    // init does not edit Claude Code's settings; the plugin is installed from
+    // inside Claude Code, so `configured` stays false and the commands say how.
+    assert_eq!(cc["configured"], json!(false));
+    assert_eq!(cc["detected"], json!(true));
+    assert_eq!(cc["binaryOnPath"], json!(true));
+    assert_eq!(cc["installCommands"], json!(PLUGIN_INSTALL));
+    let message = cc["message"].as_str().unwrap();
+    assert!(
+        !message.contains("PORT-015"),
+        "no stale cutover note: {message}"
+    );
+}
+
+#[test]
+fn init_claude_code_flags_missing_claude_and_binary() {
+    let env = CliEnv::new();
+    let (home, bin_dir) = claude_profile(&env, false, false);
+    let out = env.run_db_with_env(
+        &["init", "--claude-code", "--json"],
+        &[("HOME", &home), ("USERPROFILE", &home), ("PATH", &bin_dir)],
+    );
+    assert_success(&out);
+    let cc = &json_stdout(&out)["claudeCode"];
+    assert_eq!(cc["configured"], json!(false));
+    assert_eq!(cc["detected"], json!(false));
+    assert_eq!(cc["binaryOnPath"], json!(false));
+    assert_eq!(cc["installCommands"], json!(PLUGIN_INSTALL));
+}
+
+#[test]
+fn init_claude_code_human_output_prints_install_commands() {
+    let env = CliEnv::new();
+    let (home, bin_dir) = claude_profile(&env, true, true);
+    let out = env.run_db_with_env(
+        &["init", "--claude-code"],
+        &[("HOME", &home), ("USERPROFILE", &home), ("PATH", &bin_dir)],
+    );
+    assert_success(&out);
+    let text = stdout(&out);
+    for command in PLUGIN_INSTALL {
+        assert!(text.contains(command), "missing {command:?} in:\n{text}");
+    }
 }
 
 #[test]

@@ -81,6 +81,20 @@ impl CliEnv {
     }
 }
 
+impl CliEnv {
+    /// Like [`CliEnv::run_db`], but with `envs` set on the child (for example
+    /// an isolated `HOME` and `PATH`) so a test never reads the real profile.
+    pub fn run_db_with_env(&self, args: &[&str], envs: &[(&str, &Path)]) -> Output {
+        let bin = env!("CARGO_BIN_EXE_kindling");
+        let mut cmd = Command::new(bin);
+        cmd.args(args).arg("--db").arg(&self.db_path);
+        for (key, value) in envs {
+            cmd.env(key, value);
+        }
+        cmd.output().expect("failed to run kindling-cli")
+    }
+}
+
 /// stdout as a UTF-8 string.
 pub fn stdout(output: &Output) -> String {
     String::from_utf8_lossy(&output.stdout).into_owned()
