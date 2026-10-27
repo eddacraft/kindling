@@ -128,21 +128,23 @@ fn configure_claude_code() -> ClaudeCodeResult {
         .map(|h| h.join(".claude"))
         .is_some_and(|dir| dir.is_dir());
     let binary_on_path = kindling_on_path();
-    let install = PLUGIN_INSTALL_COMMANDS.join(" then ");
+    // The commands themselves travel in `install_commands`; the message only
+    // says what state was found, so human output lists each command once.
     let message = match (detected, binary_on_path) {
-        (true, true) => format!(
-            "Claude Code detected. Install the kindling plugin from inside Claude Code: {install}"
-        ),
-        (true, false) => format!(
+        (true, true) => {
+            "Claude Code detected. Install the kindling plugin from inside Claude Code."
+        }
+        (true, false) => {
             "Claude Code detected, but `kindling` is not on PATH, so the plugin's hooks \
              would no-op. Add the binary to PATH, then install the plugin from inside \
-             Claude Code: {install}"
-        ),
-        (false, _) => format!(
+             Claude Code."
+        }
+        (false, _) => {
             "Claude Code not detected (~/.claude/ does not exist). After installing \
-             Claude Code, install the kindling plugin from inside it: {install}"
-        ),
-    };
+             Claude Code, install the kindling plugin from inside it."
+        }
+    }
+    .to_string();
     ClaudeCodeResult {
         configured: false,
         detected,

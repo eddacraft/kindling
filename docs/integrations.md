@@ -10,23 +10,40 @@ tool-agnostic.
 
 ## Matrix
 
-| Integration                                                   | Status           | Package / entry point                                                                                                          | Notes                                                                                                                                                      |
-| ------------------------------------------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | **Supported**    | Built into the `kindling` binary; [plugin](../plugins/kindling-claude-code/)                                                   | Hooks capture tool calls, edits, commands and errors automatically. Run `kindling init --claude-code` or use the [install script](../install.sh).          |
-| [OpenCode](https://github.com/opencode-ai/opencode)           | **Supported**    | [source](../packages/kindling-adapter-opencode/) (`@eddacraft/kindling-adapter-opencode`, not on npm)                          | Session lifecycle adapter over the thin Node client. Use from source; a bundled plugin installed by the binary is planned.                                 |
-| [PocketFlow](https://github.com/The-Pocket/PocketFlow)        | **Supported**    | [source](../packages/kindling-adapter-pocketflow/) (`@eddacraft/kindling-adapter-pocketflow`, not on npm)                      | Workflow node adapter; one `pocketflow_node` capsule per node. Use from source.                                                                            |
-| VS Code / Cursor / Windsurf                                   | **Supported**    | VSIX on each [GitHub Release](https://github.com/eddacraft/kindling/releases) · [source](../packages/kindling-adapter-vscode/) | Extension captures file saves; commands for search, log, and status. Install from VSIX: [Cursor and Windsurf quickstart](./quickstart/cursor-windsurf.md). |
-| Plain CLI                                                     | **Supported**    | [`eddacraft-kindling`](https://crates.io/crates/eddacraft-kindling) (binary: `kindling`)                                       | Read and write without any SDK. `kindling log`, `kindling search`, `kindling browse`, and more.                                                            |
-| Rust SDK                                                      | **Supported**    | [`kindling-client`](https://crates.io/crates/kindling-client)                                                                  | Daemon-backed client; recommended for Rust integrations. Auto-spawns `kindling serve`.                                                                     |
-| Rust SDK (embedded)                                           | **Supported**    | [`kindling-service`](https://crates.io/crates/kindling-service)                                                                | In-process API when you want a single binary with no IPC. Same operations as the client.                                                                   |
-| Node client                                                   | **Supported**    | [source](../packages/kindling/) (`@eddacraft/kindling`, not on npm)                                                            | Thin TypeScript client over the daemon. Use from source or bundle it; needs the `kindling` binary.                                                         |
-| Any editor or agent (manual)                                  | **Via CLI only** | `kindling` binary                                                                                                              | Log observations and search from the terminal. No automatic capture until you wire an adapter.                                                             |
-| Custom adapter                                                | **Supported**    | [`packages/kindling`](../packages/kindling/) (from source) or [`kindling-client`](https://crates.io/crates/kindling-client)    | Build your own capture layer. Start with the [cookbook](./adapters/cookbook.md) and [minimal example](../examples/adapter-minimal/).                       |
+| Integration                                                   | Status           | Package / entry point                                                                                                          | Notes                                                                                                                                                                                                                                                                                  |
+| ------------------------------------------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | **Supported**    | Built into the `kindling` binary; [plugin](../plugins/kindling-claude-code/)                                                   | Hooks capture tool calls, edits, commands and errors automatically. Install the plugin from inside Claude Code: `/plugin marketplace add eddacraft/kindling`, then `/plugin install kindling@kindling-plugins`. `kindling init --claude-code` checks the setup and prints these steps. |
+| [OpenCode](https://github.com/opencode-ai/opencode)           | **Supported**    | [source](../packages/kindling-adapter-opencode/) (`@eddacraft/kindling-adapter-opencode`, not on npm)                          | Session lifecycle adapter over the thin Node client. Use from source; a bundled plugin installed by the binary is planned.                                                                                                                                                             |
+| [PocketFlow](https://github.com/The-Pocket/PocketFlow)        | **Supported**    | [source](../packages/kindling-adapter-pocketflow/) (`@eddacraft/kindling-adapter-pocketflow`, not on npm)                      | Workflow node adapter; one `pocketflow_node` capsule per node. Use from source.                                                                                                                                                                                                        |
+| VS Code / Cursor / Windsurf                                   | **Supported**    | VSIX on each [GitHub Release](https://github.com/eddacraft/kindling/releases) · [source](../packages/kindling-adapter-vscode/) | Extension captures file saves; commands for search, log, and status. Install from VSIX: [Cursor and Windsurf quickstart](./quickstart/cursor-windsurf.md).                                                                                                                             |
+| Plain CLI                                                     | **Supported**    | [`eddacraft-kindling`](https://crates.io/crates/eddacraft-kindling) (binary: `kindling`)                                       | Read and write without any SDK. `kindling log`, `kindling search`, `kindling browse`, and more.                                                                                                                                                                                        |
+| Rust SDK                                                      | **Supported**    | [`kindling-client`](https://crates.io/crates/kindling-client)                                                                  | Daemon-backed client; recommended for Rust integrations. Auto-spawns `kindling serve`.                                                                                                                                                                                                 |
+| Rust SDK (embedded)                                           | **Supported**    | [`kindling-service`](https://crates.io/crates/kindling-service)                                                                | In-process API when you want a single binary with no IPC. Same operations as the client.                                                                                                                                                                                               |
+| Node client                                                   | **Supported**    | [source](../packages/kindling/) (`@eddacraft/kindling`, not on npm)                                                            | Thin TypeScript client over the daemon. Use from source or bundle it; needs the `kindling` binary.                                                                                                                                                                                     |
+| Any editor or agent (manual)                                  | **Via CLI only** | `kindling` binary                                                                                                              | Log observations and search from the terminal. No automatic capture until you wire an adapter.                                                                                                                                                                                         |
+| Custom adapter                                                | **Supported**    | [`packages/kindling`](../packages/kindling/) (from source) or [`kindling-client`](https://crates.io/crates/kindling-client)    | Build your own capture layer. Start with the [cookbook](./adapters/cookbook.md) and [minimal example](../examples/adapter-minimal/).                                                                                                                                                   |
 
 None of the Node packages are published to npm: the `@eddacraft/*` versions on
 npm are the retired 0.1.x TypeScript engine and are deprecated. Install the
 `kindling` binary (install script, `cargo install eddacraft-kindling` or
 Homebrew) and use the Node packages from a clone of this repository.
+
+### How this matrix is tested
+
+`crates/kindling/tests/integration_matrix.rs` fails when a row here or in the
+README's integrations table is marked Supported without a named test that
+drives it. The named tests run in CI against the built `kindling` binary,
+each against temporary state rather than your real profile. The check finds each test by
+name; it does not prove that the test ran, so CI running those suites is part
+of the guarantee. It also checks that the matrix links resolve and that the
+Claude Code plugin manifests agree with what `kindling init --claude-code`
+prints.
+
+Two install steps are not tested: installing the Claude Code plugin with
+`/plugin install`, and installing the VSIX in a real editor. The release
+workflow checks that the VSIX version matches the tag, but no test installs
+it. The tests drive the same hooks and the same session manager those
+installs wire up.
 
 ## Status definitions
 
@@ -40,7 +57,7 @@ Homebrew) and use the Node packages from a clone of this repository.
 
 ```text
 Need automatic capture from a specific tool?
-  ├─ Claude Code     → kindling init --claude-code (built-in hooks)
+  ├─ Claude Code     → /plugin install kindling@kindling-plugins (hooks call the binary)
   ├─ OpenCode        → packages/kindling-adapter-opencode (from source)
   ├─ PocketFlow      → packages/kindling-adapter-pocketflow (from source)
   ├─ VS Code family  → kindling VSIX from the GitHub Release

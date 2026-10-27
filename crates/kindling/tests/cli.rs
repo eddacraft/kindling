@@ -503,7 +503,11 @@ fn init_claude_code_human_output_prints_install_commands() {
     assert_success(&out);
     let text = stdout(&out);
     for command in PLUGIN_INSTALL {
-        assert!(text.contains(command), "missing {command:?} in:\n{text}");
+        assert_eq!(
+            text.matches(command).count(),
+            1,
+            "{command:?} should be listed exactly once in:\n{text}"
+        );
     }
 }
 
