@@ -29,6 +29,11 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    env:
+      # Matrix values used in `run:` scripts go through env (quoted shell
+      # variables), never through ${{ }} expansion inside the script source.
+      TARGET: ${{ matrix.target }}
+      OS_CLASS: ${{ matrix.os_class }}
     strategy:
       fail-fast: false
       matrix:
@@ -103,7 +108,7 @@ jobs:
           set -euo pipefail
           SDK_TAG="14.5"
           SDK_URL="https://github.com/joseluisq/macosx-sdks/releases/download/${SDK_TAG}/MacOSX${SDK_TAG}.sdk.tar.xz"
-          echo "::notice::Downloading macOS SDK ${SDK_TAG} for ${{ matrix.target }}"
+          echo "::notice::Downloading macOS SDK ${SDK_TAG} for ${TARGET}"
           mkdir -p "${RUNNER_TEMP}/macos-sdk"
           curl -fsSL "$SDK_URL" -o "${RUNNER_TEMP}/MacOSX.sdk.tar.xz"
           tar -xf "${RUNNER_TEMP}/MacOSX.sdk.tar.xz" -C "${RUNNER_TEMP}/macos-sdk"
@@ -118,16 +123,26 @@ jobs:
           set -euo pipefail
           if [ "${GITHUB_EVENT_NAME}" = "release" ]; then
             TAG="${GITHUB_REF#refs/tags/}"
+            # GITHUB_REF is already an env var. Still reject a tag that is not
+            # v-prefixed semver before it names published archives.
+            if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+              echo "::error::release tag must be vMAJOR.MINOR.PATCH (optional prerelease), got: $TAG"
+              exit 1
+            fi
             VERSION="${TAG#v}"
           else
             VERSION="$(cargo metadata --format-version 1 --no-deps \
               | python3 -c "import sys,json; d=json.load(sys.stdin); print(next(p['version'] for p in d['packages'] if p['name']=='eddacraft-kindling'))")"
+            if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+              echo "::error::eddacraft-kindling version is not semver, got: $VERSION"
+              exit 1
+            fi
           fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "Resolved kindling version: ${VERSION}"
 
       - name: Build kindling (cargo-zigbuild)
-        run: cargo zigbuild --release --target ${{ matrix.target }} --bin kindling
+        run: cargo zigbuild --release --target "$TARGET" --bin kindling
 
       # ---- Smoke test -------------------------------------------------------
       # Linux x86_64 targets: execute natively and assert a version line + exit 0.
@@ -135,7 +150,7 @@ jobs:
         if: matrix.exec_smoke == 'native'
         run: |
           set -euo pipefail
-          BIN="target/${{ matrix.target }}/release/kindling"
+          BIN="target/${TARGET}/release/kindling"
           echo "::group::native --version"
           OUT="$("$BIN" --version)"
           echo "$OUT"
@@ -159,8 +174,8 @@ jobs:
         if: matrix.exec_smoke == 'qemu'
         run: |
           set -euo pipefail
-          BIN="target/${{ matrix.target }}/release/kindling"
-          echo "::notice::Running ${{ matrix.target }} under QEMU arm64 emulation"
+          BIN="target/${TARGET}/release/kindling"
+          echo "::notice::Running ${TARGET} under QEMU arm64 emulation"
           docker run --rm --platform linux/arm64 \
             -v "$PWD:/work" -w /work \
             arm64v8/debian:bookworm-slim \
@@ -180,21 +195,21 @@ jobs:
         if: matrix.exec_smoke == 'format'
         run: |
           set -euo pipefail
-          echo "::notice::${{ matrix.target }} cannot be EXECUTED on a Linux runner — \
+          echo "::notice::${TARGET} cannot be EXECUTED on a Linux runner — \
           verifying binary format only. Execution smoke-test for this platform is \
           DEFERRED to a native runner (see PORT-010 notes)."
-          case "${{ matrix.os_class }}" in
-            macos)   BIN="target/${{ matrix.target }}/release/kindling" ;;
-            windows) BIN="target/${{ matrix.target }}/release/kindling.exe" ;;
+          case "${OS_CLASS}" in
+            macos)   BIN="target/${TARGET}/release/kindling" ;;
+            windows) BIN="target/${TARGET}/release/kindling.exe" ;;
           esac
           test -s "$BIN" || { echo "::error::artefact missing or empty: $BIN"; exit 1; }
           DESC="$(file -b "$BIN")"
           echo "file: $DESC"
-          case "${{ matrix.target }}" in
+          case "${TARGET}" in
             x86_64-apple-darwin)  echo "$DESC" | grep -q 'Mach-O .*x86_64' ;;
             aarch64-apple-darwin) echo "$DESC" | grep -q 'Mach-O .*arm64'  ;;
             x86_64-pc-windows-gnu) echo "$DESC" | grep -Eq 'PE32\+ .*x86-64' ;;
-            *) echo "::error::no format assertion for ${{ matrix.target }}"; exit 1 ;;
+            *) echo "::error::no format assertion for ${TARGET}"; exit 1 ;;
           esac || { echo "::error::unexpected binary format: $DESC"; exit 1; }
 
       # ---- Package ----------------------------------------------------------
@@ -202,15 +217,15 @@ jobs:
       # that distribution (install.sh, the Homebrew formula) verifies.
       - name: Package artefact + checksum
         id: package
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          VERSION="${{ steps.version.outputs.version }}"
-          TARGET="${{ matrix.target }}"
           STAGE="${RUNNER_TEMP}/stage"
           OUTDIR="${RUNNER_TEMP}/dist"
           mkdir -p "$STAGE" "$OUTDIR"
 
-          if [ "${{ matrix.os_class }}" = "windows" ]; then
+          if [ "${OS_CLASS}" = "windows" ]; then
             BIN_SRC="target/${TARGET}/release/kindling.exe"
             cp "$BIN_SRC" "$STAGE/kindling.exe"
             ARCHIVE="kindling-${VERSION}-${TARGET}.zip"
