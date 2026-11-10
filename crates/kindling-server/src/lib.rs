@@ -209,10 +209,9 @@ pub async fn serve(config: ServerConfig) -> Result<(), ServerError> {
     match config.transport {
         #[cfg(unix)]
         Transport::Uds => {
+            // Socket cleanup happens inside `serve_on_uds`, and only for the
+            // inode that was bound. The PID guard removes the PID file on drop.
             serve_on_uds(&config, app, state.activity().clone()).await?;
-            // Best-effort socket cleanup; the PID guard removes the PID file on
-            // drop.
-            let _ = remove_socket(&config.socket_path);
         }
         Transport::Tcp => {
             let secret = tcp_secret.expect("TCP transport always has an auth secret");
@@ -248,9 +247,10 @@ async fn serve_on_uds(
     use tokio::net::UnixListener;
 
     // A leftover socket from an unclean shutdown would make bind fail with
-    // EADDRINUSE. Remove it first (the PID lock already guarantees no live
-    // daemon is using it).
-    let _ = remove_socket(&config.socket_path);
+    // EADDRINUSE. Remove it only when the path is already a socket (the PID
+    // lock guarantees no live daemon is using it). A regular file at this
+    // path is left untouched so startup cannot delete user data.
+    let _ = remove_unix_socket(&config.socket_path, None);
     if let Some(parent) = config.socket_path.parent() {
         if !parent.as_os_str().is_empty() {
             std::fs::create_dir_all(parent)?;
@@ -267,10 +267,16 @@ async fn serve_on_uds(
     // Restrict the socket to the owning user (0600) after bind, before serving.
     std::fs::set_permissions(&config.socket_path, std::fs::Permissions::from_mode(0o600))?;
 
+    let bound = unix_socket_identity(&config.socket_path).ok().flatten();
     let idle_timeout = config.idle_timeout;
-    axum::serve(listener, app)
+    let serve_result = axum::serve(listener, app)
         .with_graceful_shutdown(wait_until_idle(activity, idle_timeout))
-        .await?;
+        .await;
+
+    // Unlink only the socket we bound. If the path was replaced after bind
+    // (a regular file, or a different socket), leave the replacement alone.
+    let _ = remove_unix_socket(&config.socket_path, bound);
+    serve_result?;
     Ok(())
 }
 
@@ -312,8 +318,8 @@ async fn serve_on_tcp(
 
     // Best-effort cleanup of both side-channel files; mirrors the UDS socket
     // cleanup.
-    let _ = remove_socket(&config.port_path);
-    let _ = remove_socket(&token_path);
+    let _ = remove_path_if_exists(&config.port_path);
+    let _ = remove_path_if_exists(&token_path);
     serve_result?;
     Ok(())
 }
@@ -332,10 +338,45 @@ fn write_owner_only(path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()>
     Ok(())
 }
 
-fn remove_socket(path: &std::path::Path) -> std::io::Result<()> {
+fn remove_path_if_exists(path: &std::path::Path) -> std::io::Result<()> {
     match std::fs::remove_file(path) {
         Ok(()) => Ok(()),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
         Err(e) => Err(e),
     }
+}
+
+#[cfg(unix)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct BoundSocket {
+    dev: u64,
+    ino: u64,
+}
+
+#[cfg(unix)]
+fn unix_socket_identity(path: &std::path::Path) -> std::io::Result<Option<BoundSocket>> {
+    use std::os::unix::fs::{FileTypeExt, MetadataExt};
+    match std::fs::symlink_metadata(path) {
+        Ok(meta) if meta.file_type().is_socket() => Ok(Some(BoundSocket {
+            dev: meta.dev(),
+            ino: meta.ino(),
+        })),
+        Ok(_) => Ok(None),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(e),
+    }
+}
+
+/// Remove `path` when it is a Unix socket.
+///
+/// When `bound` is `Some`, the inode must match the socket captured after
+/// bind. When `bound` is `None`, any socket is removed (a stale socket before
+/// bind). Regular files, directories, and symlinks are left in place.
+#[cfg(unix)]
+fn remove_unix_socket(path: &std::path::Path, bound: Option<BoundSocket>) -> std::io::Result<()> {
+    match unix_socket_identity(path)? {
+        Some(current) if bound.is_none() || bound == Some(current) => {}
+        Some(_) | None => return Ok(()),
+    }
+    remove_path_if_exists(path)
 }
