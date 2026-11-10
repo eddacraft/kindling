@@ -223,7 +223,11 @@ impl KindlingService {
     /// `importDatabase`: validates structure, short-circuits on `dry_run`, and
     /// otherwise imports every entity in a single transaction with
     /// `INSERT OR IGNORE` semantics (existing ids are skipped, not overwritten).
-    /// Per-row failures are collected into `errors` rather than aborting.
+    /// This is a partial import, not an all-or-nothing restore: successful
+    /// entities commit even when other entities fail. Each capsule and its
+    /// ordered observation links are atomic. Failed entities are collected in
+    /// `errors` and excluded from the counts; fix their dependencies and retry
+    /// the bundle to import them without overwriting successful entities.
     pub fn import(
         &self,
         bundle: &ExportBundle,
@@ -411,6 +415,52 @@ mod tests {
         assert_eq!(again.capsules, 0);
         assert_eq!(again.summaries, 0);
         assert_eq!(again.pins, 0);
+    }
+
+    #[test]
+    fn partial_import_rolls_back_failed_capsule_and_can_retry() {
+        let mut bundle = seeded().export(export_opts()).unwrap();
+        bundle.dataset.capsules[0].observation_ids = vec!["o1".into(), "missing".into()];
+        let dest = KindlingService::open_in_memory().unwrap();
+        let result = dest.import(&bundle, ImportOptions::default()).unwrap();
+        assert_eq!(result.observations, 1);
+        assert_eq!(result.capsules, 0);
+        assert_eq!(result.summaries, 0);
+        assert_eq!(result.pins, 1);
+        assert_eq!(result.errors.len(), 2);
+        let partial = dest.export(export_opts()).unwrap();
+        assert_eq!(partial.dataset.observations.len(), 1);
+        assert!(partial.dataset.capsules.is_empty());
+        assert!(partial.dataset.summaries.is_empty());
+
+        // Repair the missing dependency and retry the same capsule. Existing
+        // successful entities are skipped; the complete ordered links survive.
+        let mut missing = bundle.dataset.observations[0].clone();
+        missing.id = "missing".into();
+        missing.content = "second observation".into();
+        bundle.dataset.observations.push(missing);
+        let retry = dest.import(&bundle, ImportOptions::default()).unwrap();
+        assert_eq!(retry.observations, 1);
+        assert_eq!(retry.capsules, 1);
+        assert_eq!(retry.summaries, 1);
+        assert_eq!(retry.pins, 0);
+        assert!(retry.errors.is_empty());
+        let restored = dest.export(export_opts()).unwrap();
+        assert_eq!(
+            restored.dataset.capsules[0].observation_ids,
+            vec!["o1", "missing"]
+        );
+        let again = dest.import(&bundle, ImportOptions::default()).unwrap();
+        assert_eq!(
+            (
+                again.observations,
+                again.capsules,
+                again.summaries,
+                again.pins
+            ),
+            (0, 0, 0, 0)
+        );
+        assert!(again.errors.is_empty());
     }
 
     #[test]
