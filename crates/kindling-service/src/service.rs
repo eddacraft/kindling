@@ -228,8 +228,8 @@ impl KindlingService {
             return Err(ServiceError::AlreadyClosed(capsule_id.to_string()));
         }
 
-        // Generate + persist the summary before closing, matching TS ordering.
-        if options.generate_summary {
+        // Validate before taking the write transaction. Persist together with close.
+        let summary = if options.generate_summary {
             if let Some(content) = options.summary_content {
                 let summary = validation::validate_summary(
                     SummaryInput {
@@ -243,13 +243,22 @@ impl KindlingService {
                     now,
                 )
                 .map_err(ServiceError::Validation)?;
-                self.store.insert_summary(&summary)?;
+                Some(summary)
+            } else {
+                None
             }
-        }
+        } else {
+            None
+        };
 
         // Close in the store. The summary (if any) is linked via
         // summaries.capsule_id, so no summary_id is threaded here.
-        match self.store.close_capsule(capsule_id, Some(now), None) {
+        match self.store.transaction(|store| {
+            if let Some(summary) = &summary {
+                store.insert_summary(summary)?;
+            }
+            store.close_capsule(capsule_id, Some(now), None)
+        }) {
             Ok(()) => {}
             // Lost a race: someone closed it between our read and this write.
             Err(StoreError::CapsuleNotOpen(_)) => {
@@ -305,38 +314,38 @@ impl KindlingService {
         // is produced by the same pass, so it cannot be bypassed (KINTEG-006).
         let redaction = sanitize_observation_with_evidence(&mut observation);
 
-        let written = self.store.insert_observation(&observation)?;
+        Ok(self.store.transaction(|store| {
+            let written = store.insert_observation(&observation)?;
 
-        // On a dedup hit, the stored row wins: load it fresh and return THAT,
-        // never the incoming (masked) observation. Re-masking or overwriting a
-        // previously stored row must never happen on replay.
-        let (observation, deduplicated) = if written {
-            (observation, false)
-        } else {
-            let existing = self
-                .store
-                .get_observation_by_id(&observation.id)?
-                .ok_or_else(|| {
-                    // INSERT OR IGNORE reported "not written" yet no row exists:
-                    // this is an internal invariant violation, not a dedup hit.
-                    ServiceError::Store(StoreError::ObservationNotFound(observation.id.clone()))
-                })?;
-            (existing, true)
-        };
+            // On a dedup hit, the stored row wins: load it fresh and return THAT,
+            // never the incoming (masked) observation. Re-masking or overwriting a
+            // previously stored row must never happen on replay.
+            let (observation, deduplicated) = if written {
+                (observation, false)
+            } else {
+                let existing = store
+                    .get_observation_by_id(&observation.id)?
+                    .ok_or_else(|| {
+                        // INSERT OR IGNORE reported "not written" yet no row exists:
+                        // this is an internal invariant violation, not a dedup hit.
+                        StoreError::ObservationNotFound(observation.id.clone())
+                    })?;
+                (existing, true)
+            };
 
-        // Attach is idempotent (INSERT OR IGNORE on the link's primary key), so
-        // re-attaching a deduplicated observation to the same capsule is a
-        // safe no-op.
-        if let Some(capsule_id) = options.capsule_id.as_deref() {
-            self.store
-                .attach_observation_to_capsule(capsule_id, &observation.id)?;
-        }
+            // Attach is idempotent (INSERT OR IGNORE on the link's primary key), so
+            // re-attaching a deduplicated observation to the same capsule is a
+            // safe no-op.
+            if let Some(capsule_id) = options.capsule_id.as_deref() {
+                store.attach_observation_to_capsule(capsule_id, &observation.id)?;
+            }
 
-        Ok(AppendOutcome {
-            observation,
-            deduplicated,
-            redaction,
-        })
+            Ok(AppendOutcome {
+                observation,
+                deduplicated,
+                redaction,
+            })
+        })?)
     }
 
     // ===== retrieval =====
