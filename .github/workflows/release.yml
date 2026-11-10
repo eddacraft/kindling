@@ -119,6 +119,14 @@ jobs:
         env:
           TAG: ${{ github.event.release.tag_name }}
         run: |
+          set -euo pipefail
+          # TAG arrives via env, so GitHub does not expand it into this script
+          # before the shell parses it. Reject non-semver tags before they
+          # name the published VSIX.
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+            echo "::error::release tag must be vMAJOR.MINOR.PATCH (optional prerelease), got: $TAG"
+            exit 1
+          fi
           vsix="kindling-${TAG#v}.vsix"
           if [ ! -f "dist-vsix/$vsix" ]; then
             echo "::error::expected dist-vsix/$vsix; the extension version does not match tag $TAG"
@@ -151,7 +159,18 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Generate kindling formula
-        run: ./scripts/generate-homebrew-formula.sh "${{ github.event.release.tag_name }}"
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          # TAG arrives via env and is quoted at the shell boundary. Interpolating
+          # github.event.release.tag_name into this script would let a tag
+          # containing shell metacharacters execute as code.
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+            echo "::error::release tag must be vMAJOR.MINOR.PATCH (optional prerelease), got: $TAG"
+            exit 1
+          fi
+          ./scripts/generate-homebrew-formula.sh "$TAG"
 
       - name: Checkout homebrew-tap
         uses: actions/checkout@v4
