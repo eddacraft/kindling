@@ -6,7 +6,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-const WORKSPACE_VERSION: &str = "0.4.0";
+const WORKSPACE_VERSION: &str = "0.4.1";
 const CRATES: &[&str] = &[
     "kindling-types",
     "kindling-store",
@@ -38,7 +38,7 @@ fn legacy_standalone_spool_crate() -> String {
 }
 
 #[test]
-fn workspace_version_is_040() {
+fn workspace_version_matches_the_release_pin() {
     let root = workspace_root();
     let workspace_toml = read(root.join("Cargo.toml"));
     assert!(

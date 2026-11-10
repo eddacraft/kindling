@@ -3,13 +3,13 @@ resolver = "2"
 members = ["crates/*"]
 
 [workspace.package]
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
 license = "Apache-2.0"
 repository = "https://github.com/eddacraft/kindling"
 homepage = "https://docs.eddacraft.ai/kindling/overview"
 authors = ["aneki <josh@eddacraft.io>"]
-rust-version = "1.85"
+rust-version = "1.89"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

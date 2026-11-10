@@ -17,8 +17,29 @@ eddacraft-kindling`, Homebrew, the install script), the crates on crates.io,
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-11-10
+
+### Security
+
+- **Bundled SQLite follows rusqlite 0.41 (RUSTSEC-2026-0459).**
+  `kindling`, `kindling-store`, and `kindling-provider` depend on `rusqlite`
+  0.41 with the `bundled` feature, which builds `libsqlite3-sys` 0.39
+  (SQLite 3.54.1). The 0.40 line bundled SQLite before 3.54.0. That SQLite can
+  return uninitialized page-cache memory when a process opens a database
+  together with a sibling `-wal` file whose page size differs. The workspace
+  MSRV is 1.89, which is rusqlite 0.41's minimum.
+
 ### Fixed
 
+- **Failed capsule closes and observation attachments roll back (GH-165, GH-204).**
+  A close that fails while storing its summary leaves the capsule without that
+  summary, and a failed attachment removes an observation inserted for that
+  attempt. An observation that already existed stays in place and can be
+  retried.
+- **A failed capsule import rolls back that capsule (GH-203).**
+  When linking observations fails, the import removes the new capsule and its
+  links so a repaired bundle can be imported again. Other entities in the same
+  import still commit.
 - **`validate_db_path` accepts harmless adjacent dots in database paths.**
   Parent-directory rejection now matches `..` as a whole `/` or `\` component
   (`../x`, `a/../b`, `..\\x`, a bare `..`), so names such as `my..db` and
@@ -40,6 +61,9 @@ eddacraft-kindling`, Homebrew, the install script), the crates on crates.io,
 
 ### Changed
 
+- **Public SQLite errors use rusqlite 0.41.**
+  `StoreError::Sqlite`, `ProviderError::Sqlite`, and `CliError::Sqlite` keep
+  their names. Matching those variants yields rusqlite 0.41's `Error`.
 - **`kindling search` defaults its repo scope to the current git repository
   (C3).** Without `--repo`, search filters on the enclosing git working-tree
   root (`git rev-parse --show-toplevel`), from any subdirectory; outside a git
