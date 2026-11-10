@@ -573,3 +573,149 @@ async fn capture_path_redacts_padded_and_unpadded_credentials() {
 
     daemon.join().await;
 }
+
+/// Issue #170: end-to-end tool capture sanitizes secrets, command variable
+/// assignments, and URL credentials/query parameters across both persisted
+/// content and provenance metadata.
+#[tokio::test]
+async fn post_tool_use_sanitizes_command_assignments_urls_and_provenance_end_to_end() {
+    let daemon = Daemon::start().await;
+
+    // 1. Bash command with leading variable assignments followed by executable.
+    let bash_with_cmd = json!({
+        "session_id": SESSION,
+        "cwd": REPO_ROOT,
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Bash",
+        "tool_input": {
+            "command": "API_KEY=abcdef123456789 CUSTOM_SECRET=mysecretval123 cargo test -p parser"
+        },
+        "tool_response": {
+            "stdout": "connected to https://user:pass12345@example.com/api?token=abcdef123456789",
+            "stderr": "",
+            "exitCode": 0
+        }
+    });
+    let (ok, stdout) = daemon
+        .run_hook("post-tool-use", &bash_with_cmd.to_string())
+        .await;
+    assert!(ok);
+    assert!(stdout.is_empty());
+
+    // 2. Bash command containing only variable assignments (no executable to persist).
+    let bash_assign_only = json!({
+        "session_id": SESSION,
+        "cwd": REPO_ROOT,
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Bash",
+        "tool_input": {
+            "command": "ONLY_ASSIGN=onlyassignsecret123"
+        },
+        "tool_response": {
+            "stdout": "ok",
+            "stderr": ""
+        }
+    });
+    let (ok, _) = daemon
+        .run_hook("post-tool-use", &bash_assign_only.to_string())
+        .await;
+    assert!(ok);
+
+    // 3. WebFetch with URL credentials, query string, and fragment.
+    let webfetch = json!({
+        "session_id": SESSION,
+        "cwd": REPO_ROOT,
+        "hook_event_name": "PostToolUse",
+        "tool_name": "WebFetch",
+        "tool_input": {
+            "url": "https://admin:urlpassword123@example.com/v1/Auth?api_key=urlquerysecret123&state=xyz#section"
+        },
+        "tool_result": "fetched body with Bearer bearer_token_value_1234567890"
+    });
+    let (ok, _) = daemon
+        .run_hook("post-tool-use", &webfetch.to_string())
+        .await;
+    assert!(ok);
+
+    // 4. WebSearch + PostToolUseFailure with secret in query and URL in error.
+    let websearch_fail = json!({
+        "session_id": SESSION,
+        "cwd": REPO_ROOT,
+        "hook_event_name": "PostToolUseFailure",
+        "tool_name": "WebSearch",
+        "tool_input": {
+            "query": "password=searchsecret123 https://user:pw@example.com/search?q=privatequery"
+        },
+        "error": "request to https://user:errpw@example.com/callback?code=errcode123 failed with token=errtokensecret123"
+    });
+    let (ok, _) = daemon
+        .run_hook("post-tool-use-failure", &websearch_fail.to_string())
+        .await;
+    assert!(ok);
+
+    let store = daemon.open_store();
+    let obs = store
+        .query_observations(Some(&repo_scope()), None, None, 50)
+        .expect("query observations");
+    assert_eq!(obs.len(), 4);
+
+    // Verify no persisted observation leaks any sensitive substring in content or provenance.
+    let forbidden = [
+        "abcdef123456789",
+        "mysecretval123",
+        "pass12345",
+        "onlyassignsecret123",
+        "urlpassword123",
+        "urlquerysecret123",
+        "bearer_token_value_1234567890",
+        "searchsecret123",
+        "privatequery",
+        "errpw",
+        "errcode123",
+        "errtokensecret123",
+    ];
+    for o in &obs {
+        let prov_str = serde_json::to_string(&o.provenance).unwrap();
+        for needle in forbidden {
+            assert!(!o.content.contains(needle));
+            assert!(!prov_str.contains(needle));
+        }
+    }
+
+    // Check specific provenance fields across the persisted observations.
+    let bash_cmd_obs = obs
+        .iter()
+        .find(|o| o.content.contains("cargo test -p parser"))
+        .expect("bash with executable observation");
+    assert_eq!(bash_cmd_obs.provenance["command"], json!("cargo"));
+
+    let bash_assign_obs = obs
+        .iter()
+        .find(|o| o.content.contains("ONLY_ASSIGN="))
+        .expect("bash assignment-only observation");
+    assert!(bash_assign_obs.provenance.get("command").is_none());
+
+    let webfetch_obs = obs
+        .iter()
+        .find(|o| o.provenance["toolName"] == json!("WebFetch"))
+        .expect("webfetch observation");
+    assert_eq!(
+        webfetch_obs.provenance["url"],
+        json!("https://example.com/v1/Auth")
+    );
+    assert!(webfetch_obs
+        .content
+        .contains("URL: https://example.com/v1/Auth"));
+
+    let websearch_obs = obs
+        .iter()
+        .find(|o| o.provenance["toolName"] == json!("WebSearch"))
+        .expect("websearch failure observation");
+    assert_eq!(websearch_obs.provenance["hasError"], json!(true));
+    assert_eq!(
+        websearch_obs.provenance["query"],
+        json!("password=[REDACTED] https://example.com/search")
+    );
+
+    daemon.join().await;
+}

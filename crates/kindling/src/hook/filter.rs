@@ -55,8 +55,8 @@ fn secret_patterns() -> &'static [Regex] {
     static PATTERNS: OnceLock<Vec<Regex>> = OnceLock::new();
     PATTERNS.get_or_init(|| {
         [
-            // API keys and tokens: key/value assignments.
-            r#"(?i)['"]?(?:api[-_]?key|apikey|token|secret|password|passwd|pwd)['"]?\s*[:=]\s*['"]?[^\s'"]+['"]?"#,
+            // API keys and tokens: key/value assignments (including prefixed/suffixed key names).
+            r#"(?i)['"]?(?:[A-Za-z0-9_-]*(?:api[-_]?key|apikey|token|secret|password|passwd|pwd)[A-Za-z0-9_-]*|(?:private|access|auth|client|signing|encryption|ssh|master)[-_]?key)['"]?\s*[:=]\s*['"]?[^\s'"]+['"]?"#,
             // AWS keys.
             r#"(?:AWS|aws)[-_]?(?:SECRET|secret)[-_]?(?:ACCESS|access)[-_]?(?:KEY|key)\s*[:=]\s*['"]?[A-Za-z0-9/+=]{40}['"]?"#,
             // Generic API tokens — see GenericToken below (lookahead-free).
@@ -70,6 +70,10 @@ fn secret_patterns() -> &'static [Regex] {
             r"sk-ant-[A-Za-z0-9\-_]{90,}",
             // OpenAI API keys.
             r"sk-[A-Za-z0-9]{48,}",
+            // GitHub tokens (PAT, OAuth, app, refresh).
+            r"gh[pousr]_[A-Za-z0-9]{36,}",
+            // AWS access key IDs.
+            r"AKIA[0-9A-Z]{16}",
         ]
         .iter()
         .map(|pattern| Regex::new(pattern).expect("secret pattern compiles"))
@@ -159,16 +163,259 @@ pub fn truncate_content(content: &str, max_length: usize) -> String {
     format!("{prefix}\n\n[Truncated {remaining} characters]")
 }
 
-/// Filter content with all safety rules: mask secrets when detected, then
-/// truncate to `max_length`. Mirrors `filterContent` (with `maskSecrets`
-/// defaulting on).
+/// Filter content with all safety rules: mask secrets when detected, sanitize
+/// URLs carrying credentials/queries/fragments, then truncate to `max_length`.
+/// Mirrors `filterContent` (with `maskSecrets` defaulting on).
 pub fn filter_content(content: &str, max_length: usize) -> String {
-    let filtered = if contains_secrets(content) {
-        mask_secrets(content)
+    let url_clean = sanitize_urls_in_text(content);
+    let filtered = if contains_secrets(&url_clean) {
+        mask_secrets(&url_clean)
     } else {
-        content.to_string()
+        url_clean
     };
     truncate_content(&filtered, max_length)
+}
+
+/// Strip userinfo (`user:pass@`), query strings (`?...`), and fragments
+/// (`#...`) from a URL string, then mask any secrets remaining in the host or
+/// path. Clean URLs (no userinfo, query, or fragment) pass through unchanged.
+pub fn sanitize_url(url: &str) -> String {
+    let stripped = strip_url_sensitive_parts(url);
+    if contains_secrets(&stripped) {
+        mask_secrets(&stripped)
+    } else {
+        stripped
+    }
+}
+
+fn strip_url_sensitive_parts(url: &str) -> String {
+    let without_fragment = url.split('#').next().unwrap_or(url);
+    let without_query = without_fragment
+        .split('?')
+        .next()
+        .unwrap_or(without_fragment);
+
+    if let Some((scheme, rest)) = without_query.split_once("://") {
+        let (authority, path) = match rest.find('/') {
+            Some(idx) => (&rest[..idx], &rest[idx..]),
+            None => (rest, ""),
+        };
+        let host = authority.rsplit('@').next().unwrap_or(authority);
+        if host.is_empty() {
+            return String::new();
+        }
+        format!("{scheme}://{host}{path}")
+    } else if let Some(rest) = without_query.strip_prefix("//") {
+        let (authority, path) = match rest.find('/') {
+            Some(idx) => (&rest[..idx], &rest[idx..]),
+            None => (rest, ""),
+        };
+        let host = authority.rsplit('@').next().unwrap_or(authority);
+        if host.is_empty() {
+            return String::new();
+        }
+        format!("//{host}{path}")
+    } else {
+        let (authority, path) = match without_query.find('/') {
+            Some(idx) => (&without_query[..idx], &without_query[idx..]),
+            None => (without_query, ""),
+        };
+        let host = authority.rsplit('@').next().unwrap_or(authority);
+        format!("{host}{path}")
+    }
+}
+
+fn url_in_text_regex() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| {
+        Regex::new(r#"[a-zA-Z][a-zA-Z0-9+.-]*://[^\s'"<>)\]]+"#).expect("url regex compiles")
+    })
+}
+
+/// Sanitize any `scheme://...` URLs embedded in `text` that carry userinfo,
+/// query parameters, or fragments, while leaving clean URLs untouched.
+pub fn sanitize_urls_in_text(text: &str) -> String {
+    if !text.contains("://") {
+        return text.to_string();
+    }
+    url_in_text_regex()
+        .replace_all(text, |caps: &regex::Captures<'_>| {
+            let raw = &caps[0];
+            let trimmed = raw.trim_end_matches(['.', ',', ';', ':']);
+            let trailing = &raw[trimmed.len()..];
+            let has_sensitive_url_parts = trimmed.contains('?')
+                || trimmed.contains('#')
+                || trimmed
+                    .split_once("://")
+                    .map(|(_, rest)| {
+                        let authority = rest.split('/').next().unwrap_or(rest);
+                        authority.contains('@')
+                    })
+                    .unwrap_or(false);
+            if !has_sensitive_url_parts {
+                return raw.to_string();
+            }
+            let cleaned = strip_url_sensitive_parts(trimmed);
+            format!("{cleaned}{trailing}")
+        })
+        .into_owned()
+}
+
+fn command_assignment_regex() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| {
+        Regex::new(
+            r#"(?:^|(?P<pre>[\s;|&(]))(?P<name>[A-Za-z_][A-Za-z0-9_]*)=(?:"(?:\\.|[^"\\])*"|'[^']*'|[^\s'";|&)]+)+"#,
+        )
+        .expect("command assignment regex compiles")
+    })
+}
+
+/// Redact shell variable assignments (`VAR=value` -> `VAR=[REDACTED]`) in a
+/// command or argument string while preserving variable names and surrounding
+/// tokens. CLI flags (`--flag=value`) start with `-` and are left untouched
+/// unless matched by [`mask_secrets`].
+pub fn sanitize_command_assignments(text: &str) -> String {
+    if !text.contains('=') {
+        return text.to_string();
+    }
+    command_assignment_regex()
+        .replace_all(text, "${pre}${name}=[REDACTED]")
+        .into_owned()
+}
+
+/// Extract the executable/command name from a shell command string, skipping
+/// leading environment variable assignments (`VAR=value`), command separators
+/// (`;`, `&&`, `||`, `|`, `&`), and `env` wrappers. Returns `None` when the
+/// command consists solely of variable assignments or when the remaining token
+/// itself carries a secret or assignment.
+pub fn extract_command_name(command: Option<&str>) -> Option<String> {
+    let command = command?;
+    let tokens = shell_tokens(command.trim());
+    let mut idx = 0;
+
+    while idx < tokens.len() {
+        let tok = tokens[idx].as_str();
+        if is_shell_operator(tok) || is_shell_assignment(tok) {
+            idx += 1;
+            continue;
+        }
+        if tok == "env" {
+            let mut look = idx + 1;
+            let mut saw_env_arg = false;
+            while look < tokens.len() {
+                let next = tokens[look].as_str();
+                if next.starts_with('-') || is_shell_assignment(next) {
+                    saw_env_arg = true;
+                    look += 1;
+                } else {
+                    break;
+                }
+            }
+            if (look < tokens.len() && !is_shell_operator(&tokens[look])) || saw_env_arg {
+                idx = look;
+                continue;
+            }
+        }
+        break;
+    }
+
+    let candidate = tokens.get(idx)?.as_str();
+    if candidate.is_empty()
+        || is_shell_operator(candidate)
+        || is_shell_assignment(candidate)
+        || candidate.contains('=')
+        || contains_secrets(candidate)
+    {
+        return None;
+    }
+
+    let cleaned = sanitize_urls_in_text(candidate);
+    if cleaned.is_empty() || cleaned == "[REDACTED]" || contains_secrets(&cleaned) {
+        return None;
+    }
+    Some(cleaned)
+}
+
+fn is_shell_operator(tok: &str) -> bool {
+    matches!(tok, ";" | "|" | "||" | "&" | "&&")
+}
+
+fn is_shell_assignment(tok: &str) -> bool {
+    let Some((name, _)) = tok.split_once('=') else {
+        return false;
+    };
+    let mut chars = name.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    (first.is_ascii_alphabetic() || first == '_')
+        && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
+fn shell_tokens(input: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+    let mut current = String::new();
+    let mut chars = input.chars().peekable();
+
+    while let Some(&ch) = chars.peek() {
+        if ch.is_whitespace() {
+            if !current.is_empty() {
+                tokens.push(std::mem::take(&mut current));
+            }
+            chars.next();
+            continue;
+        }
+        if matches!(ch, ';' | '|' | '&') {
+            if !current.is_empty() {
+                tokens.push(std::mem::take(&mut current));
+            }
+            let op = chars.next().unwrap();
+            let mut op_str = String::from(op);
+            if matches!(op, '|' | '&') && chars.peek() == Some(&op) {
+                op_str.push(chars.next().unwrap());
+            }
+            tokens.push(op_str);
+            continue;
+        }
+        match ch {
+            '\'' => {
+                current.push(chars.next().unwrap());
+                for c in chars.by_ref() {
+                    current.push(c);
+                    if c == '\'' {
+                        break;
+                    }
+                }
+            }
+            '"' => {
+                current.push(chars.next().unwrap());
+                while let Some(c) = chars.next() {
+                    current.push(c);
+                    if c == '\\' {
+                        if let Some(escaped) = chars.next() {
+                            current.push(escaped);
+                        }
+                    } else if c == '"' {
+                        break;
+                    }
+                }
+            }
+            '\\' => {
+                current.push(chars.next().unwrap());
+                if let Some(escaped) = chars.next() {
+                    current.push(escaped);
+                }
+            }
+            _ => {
+                current.push(chars.next().unwrap());
+            }
+        }
+    }
+    if !current.is_empty() {
+        tokens.push(current);
+    }
+    tokens
 }
 
 /// Whether a tool's result should be captured. Mirrors `shouldCaptureToolResult`.

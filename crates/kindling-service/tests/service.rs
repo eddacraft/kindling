@@ -1108,3 +1108,105 @@ fn stats_counts_without_exposing_redacted_content() {
     assert!(!format!("{stats:?}").contains("secret"));
     assert_eq!(stats, svc.stats_at(2_000).unwrap());
 }
+
+#[test]
+fn append_observation_sanitizes_provenance_and_scope_ids_at_service_boundary() {
+    let svc = service();
+    let mut input = obs_input(
+        "Tool: Bash\n\n$ API_KEY=abcdef123456789 CUSTOM_VAR=supersecretvalue cargo test",
+        ScopeIds {
+            session_id: Some("session-ok".to_string()),
+            repo_id: Some("https://user:pass@example.com/repo?token=abcdef123456789".to_string()),
+            agent_id: Some("agent token=abcdef123456789".to_string()),
+            ..ScopeIds::default()
+        },
+    );
+    input.provenance = serde_json::json!({
+        "toolName": "Bash",
+        "command": "API_KEY=abcdef123456789 CUSTOM_VAR=supersecretvalue cargo test",
+        "url": "https://user:supersecretpass@example.com/api/v1/items?api_key=abcdef123456789&foo=bar#frag",
+        "query": "Bearer abcdefghijklmnopqrstuvwxyz https://admin:pw@example.com/q?secret=1",
+        "apiKey": "raw-unstructured-secret-value",
+        "nested": {
+            "authorization": "raw-header-value",
+            "cmd": "ONLY_ASSIGNMENT=supersecretvalue",
+            "items": [
+                "ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
+                "https://example.com/cb?code=oauthcode123"
+            ]
+        }
+    })
+    .as_object()
+    .cloned();
+
+    let outcome = svc
+        .append_observation(input, AppendObservationOptions::default())
+        .expect("append");
+
+    assert!(outcome.redaction.count > 0);
+    let stored = svc
+        .get_observation(&outcome.observation.id)
+        .expect("get")
+        .expect("present");
+
+    assert!(!stored.content.contains("abcdef123456789"));
+    assert!(!stored.content.contains("supersecretvalue"));
+    assert_eq!(stored.provenance["command"], serde_json::json!("cargo"));
+    assert_eq!(
+        stored.provenance["url"],
+        serde_json::json!("https://example.com/api/v1/items")
+    );
+    let query = stored.provenance["query"].as_str().unwrap();
+    assert!(!query.contains("abcdefghijklmnopqrstuvwxyz"));
+    assert!(!query.contains("admin:pw"));
+    assert!(!query.contains("secret=1"));
+    assert_eq!(stored.provenance["apiKey"], serde_json::json!("[REDACTED]"));
+    assert_eq!(
+        stored.provenance["nested"]["authorization"],
+        serde_json::json!("[REDACTED]")
+    );
+    assert!(stored.provenance["nested"].get("cmd").is_none());
+    assert_eq!(
+        stored.provenance["nested"]["items"][0],
+        serde_json::json!("[REDACTED]")
+    );
+    assert_eq!(
+        stored.provenance["nested"]["items"][1],
+        serde_json::json!("https://example.com/cb")
+    );
+    assert_eq!(
+        stored.scope_ids.repo_id.as_deref(),
+        Some("https://example.com/repo")
+    );
+    assert_eq!(
+        stored.scope_ids.agent_id.as_deref(),
+        Some("agent token=[REDACTED]")
+    );
+}
+
+#[test]
+fn append_observation_omits_assignment_only_command_in_provenance() {
+    let svc = service();
+    let mut input = obs_input(
+        "Tool: Bash\n\n$ EXPORT_SECRET=supersecretvalue",
+        session_scope("prov-cmd"),
+    );
+    input.provenance = serde_json::json!({
+        "toolName": "Bash",
+        "command": "EXPORT_SECRET=supersecretvalue",
+        "hasError": false
+    })
+    .as_object()
+    .cloned();
+
+    let outcome = svc
+        .append_observation(input, AppendObservationOptions::default())
+        .expect("append");
+    let stored = svc
+        .get_observation(&outcome.observation.id)
+        .expect("get")
+        .expect("present");
+    assert!(!stored.content.contains("supersecretvalue"));
+    assert!(stored.provenance.get("command").is_none());
+    assert_eq!(stored.provenance["toolName"], serde_json::json!("Bash"));
+}

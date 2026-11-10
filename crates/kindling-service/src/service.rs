@@ -5,7 +5,7 @@
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::filter::mask_secrets_with_evidence;
+use crate::filter::sanitize_observation_with_evidence;
 use kindling_provider::{retrieve_at, LocalFtsProvider};
 use kindling_store::{MemoryStats, SqliteKindlingStore, StoreError, StoreOptions};
 use kindling_types::{
@@ -298,13 +298,12 @@ impl KindlingService {
             validation::normalize_observation(input, now)
         };
 
-        // Service-boundary secret masking: mask (do NOT truncate — truncation
-        // is a hook-layer concern owned by PORT-009) so no consumer can route
-        // around secret filtering. Applies on both the validated and the
-        // validate:false path. Evidence is produced by the same pass, so it
-        // cannot be bypassed (KINTEG-006).
-        let (masked, redaction) = mask_secrets_with_evidence(&observation.content);
-        observation.content = masked;
+        // Service-boundary secret masking: sanitize content, provenance, and
+        // scope_ids (do NOT truncate — truncation is a hook-layer concern
+        // owned by PORT-009) so no consumer can route around secret filtering.
+        // Applies on both the validated and the validate:false path. Evidence
+        // is produced by the same pass, so it cannot be bypassed (KINTEG-006).
+        let redaction = sanitize_observation_with_evidence(&mut observation);
 
         let written = self.store.insert_observation(&observation)?;
 
