@@ -3,7 +3,8 @@
 #
 # Standing grant from the operator (@aneki), 2026-11-10, for GH issues #166 and
 # #167: rebase merge on green, two parallel writers, three repair passes.
-# The grant is bounded by the targets below and expires 2026-11-12.
+# The grant also covers a force-with-lease push to a feature branch when a
+# rebase needs it. It is bounded by the targets below and expires 2026-11-12.
 # scripts/dev-loop-authority.sh reads this file.
 
 devLoop:
@@ -19,7 +20,7 @@ devLoop:
     issuer: '@aneki'
     issuedAt: 2026-11-10
     expiresAt: 2026-11-12
-    scope: 'GH issues #166 and #167: rebase merge on green'
+    scope: 'GH issues #166 and #167: rebase merge on green; force-with-lease push to a feature branch when a rebase needs it'
     targets: [GH-166, GH-167]
     revokedAt: null
     revokedBy: null
