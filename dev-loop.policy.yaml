@@ -1,0 +1,47 @@
+# dev-loop repository policy for kindling.
+# Semantics: .opencode/skills/dev-loop/references/policy-contract.md
+#
+# Standing grant from the operator (@aneki), 2026-11-10, for GH issues #166 and
+# #167: rebase merge on green, two parallel writers, three repair passes.
+# The grant is bounded by the targets below and expires 2026-11-12.
+# scripts/dev-loop-authority.sh reads this file.
+
+devLoop:
+  integrationBranch: main
+  isolation:
+    provider: worktrunk
+    requireFor: [module, autonomous, parallel]
+  pullRequests:
+    autonomousMerge: true
+    deleteBranchOnMerge: true
+    allowStacks: false
+  standingGrant:
+    issuer: '@aneki'
+    issuedAt: 2026-11-10
+    expiresAt: 2026-11-12
+    scope: 'GH issues #166 and #167: rebase merge on green'
+    targets: [GH-166, GH-167]
+    revokedAt: null
+    revokedBy: null
+    exceptions: [tag, release, admin-merge]
+  checkpoints:
+    design: auto
+    ready: auto
+    merge: auto
+  repair:
+    maxCycles: 3
+    stopOnNoProgress: true
+  execution:
+    wallclockMinutes: 240
+    maxConcurrentWriters: 2
+    maxItemsPerWave: 2
+  verifier:
+    aggregateMinutes: 45
+    commandMinutes: 15
+    staleMinutes: 20
+    maxAttempts: 2
+  budget:
+    unit: repair-cycles
+    limit: 3
+  differential:
+    mode: off
