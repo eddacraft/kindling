@@ -10,6 +10,7 @@ pub mod forget;
 pub mod init;
 pub mod list;
 pub mod log;
+pub mod output_path;
 pub mod pin;
 pub mod search;
 pub mod serve;

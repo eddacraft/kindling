@@ -9,6 +9,7 @@
 //! round-trips through the TS importer. Export metadata mirrors the TS command:
 //! `{ description: "Kindling memory export", exportedAt: <ISO-8601> }`.
 
+use std::io::Write;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
@@ -17,6 +18,7 @@ use kindling_service::{ExportBundleOptions, ImportOptions};
 use kindling_types::ScopeIds;
 
 use crate::cli::{ExportArgs, ImportArgs};
+use crate::commands::output_path::{ensure_not_database, open_output_verified};
 use crate::output::{format_json, iso8601_utc};
 use crate::{open_service, CliError, CliResult};
 
@@ -54,7 +56,7 @@ pub fn run_export(args: ExportArgs, via_daemon: bool) -> CliResult {
         ));
     }
 
-    let (service, _db) = open_service(args.common.db.as_deref())?;
+    let (service, db) = open_service(args.common.db.as_deref())?;
 
     let timestamp = args.timestamp.unwrap_or_else(now_ms);
 
@@ -96,8 +98,10 @@ pub fn run_export(args: ExportArgs, via_daemon: bool) -> CliResult {
         .output
         .clone()
         .unwrap_or_else(|| format!("kindling-export-{timestamp}.json"));
+    ensure_not_database(std::path::Path::new(&output_path), &db)?;
     let json = bundle.to_json(args.pretty)?;
-    std::fs::write(&output_path, json)?;
+    let mut file = open_output_verified(std::path::Path::new(&output_path), &db)?;
+    file.write_all(json.as_bytes())?;
 
     if args.common.json {
         let out = ExportMetaOutput {
