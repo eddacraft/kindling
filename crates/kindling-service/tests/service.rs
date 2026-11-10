@@ -1210,3 +1210,156 @@ fn append_observation_omits_assignment_only_command_in_provenance() {
     assert!(stored.provenance.get("command").is_none());
     assert_eq!(stored.provenance["toolName"], serde_json::json!("Bash"));
 }
+
+#[test]
+fn failed_close_rolls_back_summary_and_can_retry() {
+    let svc = service();
+    let capsule = svc
+        .open_capsule(OpenCapsuleOptions {
+            kind: CapsuleType::Session,
+            intent: "rollback".into(),
+            scope_ids: session_scope("rollback"),
+            id: None,
+        })
+        .unwrap();
+    svc.store().connection().execute_batch("CREATE TRIGGER fail_close BEFORE UPDATE OF status ON capsules BEGIN SELECT RAISE(ABORT, 'injected close failure'); END;").unwrap();
+    let options = || CloseCapsuleOptions {
+        generate_summary: true,
+        summary_content: Some("summary".into()),
+        confidence: None,
+    };
+    assert!(svc.close_capsule_at(&capsule.id, options(), 100).is_err());
+    assert!(svc.get_latest_summary(&capsule.id).unwrap().is_none());
+    let retained = svc.get_capsule(&capsule.id).unwrap().unwrap();
+    assert_eq!(retained.status, CapsuleStatus::Open);
+    assert_eq!(retained.closed_at, None);
+    svc.store()
+        .connection()
+        .execute_batch("DROP TRIGGER fail_close")
+        .unwrap();
+    svc.close_capsule_at(&capsule.id, options(), 200).unwrap();
+    assert_eq!(
+        svc.get_latest_summary(&capsule.id)
+            .unwrap()
+            .unwrap()
+            .created_at,
+        200
+    );
+}
+
+#[test]
+fn failed_attachment_rolls_back_new_observation_but_preserves_dedup() {
+    let svc = service();
+    let input = || {
+        let mut input = obs_input("original", ScopeIds::default());
+        input.id = Some("retry-observation".into());
+        input
+    };
+    let missing = || AppendObservationOptions {
+        capsule_id: Some("missing".into()),
+        ..Default::default()
+    };
+    assert!(svc.append_observation(input(), missing()).is_err());
+    assert!(svc
+        .store()
+        .get_observation_by_id("retry-observation")
+        .unwrap()
+        .is_none());
+    let first = svc.append_observation(input(), Default::default()).unwrap();
+    assert!(!first.deduplicated);
+    let mut replay = input();
+    replay.content = "replacement".into();
+    assert!(svc.append_observation(replay, missing()).is_err());
+    assert_eq!(
+        svc.store()
+            .get_observation_by_id("retry-observation")
+            .unwrap()
+            .unwrap()
+            .content,
+        "original"
+    );
+    let capsule = svc
+        .open_capsule(OpenCapsuleOptions {
+            kind: CapsuleType::Session,
+            intent: "retry".into(),
+            scope_ids: session_scope("retry"),
+            id: None,
+        })
+        .unwrap();
+    for _ in 0..2 {
+        assert!(
+            svc.append_observation(
+                input(),
+                AppendObservationOptions {
+                    capsule_id: Some(capsule.id.clone()),
+                    ..Default::default()
+                }
+            )
+            .unwrap()
+            .deduplicated
+        );
+    }
+    assert_eq!(
+        svc.get_capsule(&capsule.id)
+            .unwrap()
+            .unwrap()
+            .observation_ids,
+        vec!["retry-observation"]
+    );
+}
+
+#[test]
+fn concurrent_closers_persist_only_the_winning_summary() {
+    let path = std::env::temp_dir().join(format!("kindling-close-{}.sqlite", uuid::Uuid::new_v4()));
+    let svc = KindlingService::open(&path).unwrap();
+    let capsule = svc
+        .open_capsule(OpenCapsuleOptions {
+            kind: CapsuleType::Session,
+            intent: "concurrent close".into(),
+            scope_ids: session_scope("concurrent"),
+            id: None,
+        })
+        .unwrap();
+    let barrier = std::sync::Arc::new(std::sync::Barrier::new(2));
+    let writers: Vec<_> = (0..2)
+        .map(|i| {
+            let path = path.clone();
+            let id = capsule.id.clone();
+            let barrier = barrier.clone();
+            std::thread::spawn(move || {
+                let svc = KindlingService::open(&path).unwrap();
+                barrier.wait();
+                svc.close_capsule_at(
+                    &id,
+                    CloseCapsuleOptions {
+                        generate_summary: true,
+                        summary_content: Some(format!("writer {i}")),
+                        confidence: None,
+                    },
+                    100 + i,
+                )
+                .map(|_| i)
+            })
+        })
+        .collect();
+    let winners: Vec<_> = writers
+        .into_iter()
+        .filter_map(|w| w.join().unwrap().ok())
+        .collect();
+    assert_eq!(winners.len(), 1);
+    let count: i64 = svc
+        .store()
+        .connection()
+        .query_row("SELECT COUNT(*) FROM summaries", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(count, 1);
+    assert_eq!(
+        svc.get_latest_summary(&capsule.id)
+            .unwrap()
+            .unwrap()
+            .content,
+        format!("writer {}", winners[0])
+    );
+    drop(svc);
+    std::fs::remove_file(path).unwrap();
+}
