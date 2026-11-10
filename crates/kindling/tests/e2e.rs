@@ -513,3 +513,63 @@ async fn post_tool_use_failure_lands_claude_code_error() {
 
     daemon.join().await;
 }
+
+/// GH-169: padded Basic and Bearer credentials must be wholly redacted on the
+/// capture path. The service masker ignores tokens shorter than 20 characters,
+/// so a hook that keeps the text before a base64 `=` would persist the secret.
+#[tokio::test]
+async fn capture_path_redacts_padded_and_unpadded_credentials() {
+    let daemon = Daemon::start().await;
+    let secret_text = "use Basic abcdefghij== then Bearer abcdefghij== then Bearer abcdefghij then Bearer abcdefghijklmnopqrstuvwxyz";
+    let redacted = "use [REDACTED] then [REDACTED] then [REDACTED] then [REDACTED]";
+
+    let (ok, _) = daemon
+        .run_hook(
+            "user-prompt-submit",
+            &json!({
+                "session_id": SESSION,
+                "cwd": REPO_ROOT,
+                "content": secret_text
+            })
+            .to_string(),
+        )
+        .await;
+    assert!(ok, "user-prompt-submit should exit 0");
+
+    let (ok, _) = daemon
+        .run_hook(
+            "post-tool-use",
+            &json!({
+                "session_id": SESSION,
+                "cwd": REPO_ROOT,
+                "tool_name": "Bash",
+                "tool_input": { "command": "true" },
+                "tool_response": { "stdout": secret_text, "stderr": "" }
+            })
+            .to_string(),
+        )
+        .await;
+    assert!(ok, "post-tool-use should exit 0");
+
+    let store = daemon.open_store();
+    let obs = store
+        .query_observations(Some(&repo_scope()), None, None, 50)
+        .expect("query observations");
+    assert_eq!(obs.len(), 2, "prompt and tool result should both land");
+
+    let prompt = obs
+        .iter()
+        .find(|o| o.kind == ObservationKind::Message)
+        .expect("user prompt observation");
+    assert_eq!(prompt.content, redacted);
+
+    let tool = obs
+        .iter()
+        .find(|o| o.kind == ObservationKind::Command)
+        .expect("bash observation");
+    assert_eq!(tool.content, format!("Tool: Bash\n\n$ true\n\n{redacted}"));
+    assert!(!tool.content.contains("abcdefghij"));
+    assert!(!prompt.content.contains("abcdefghijklmnopqrstuvwxyz"));
+
+    daemon.join().await;
+}

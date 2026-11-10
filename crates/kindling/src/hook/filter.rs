@@ -82,6 +82,10 @@ fn secret_patterns() -> &'static [Regex] {
 /// require (in code) at least one digit AND at least one letter to match the
 /// original `(?=.*[0-9])(?=.*[A-Za-z])` lookaheads.
 const GENERIC_TOKEN_IDX: usize = 2;
+/// Bearer tokens. Base64 padding is `=`, so this match must not be split on `=`.
+const BEARER_TOKEN_IDX: usize = 3;
+/// Basic credentials. Same padding rule as [`BEARER_TOKEN_IDX`].
+const BASIC_AUTH_IDX: usize = 4;
 
 /// Whether a candidate generic-token match has both a digit and a letter, per
 /// the original JS lookaheads.
@@ -108,8 +112,11 @@ pub fn contains_secrets(content: &str) -> bool {
 }
 
 /// Mask secrets in content, mirroring the adapter `maskSecrets` replacement
-/// callback: a match containing `:` or `=` becomes everything before the first
-/// separator plus `=[REDACTED]`; any other match becomes `[REDACTED]`.
+/// callback for key/value assignments: a match containing `:` or `=` becomes
+/// everything before the first separator plus `=[REDACTED]`. Bearer and Basic
+/// matches are replaced wholesale. Their base64 padding contains `=`, and
+/// splitting on that `=` would keep the credential. Every other match becomes
+/// `[REDACTED]`.
 ///
 /// This is a cleartext-logging sanitizer. CodeQL is taught that via
 /// `.github/codeql/extensions/kindling-rust`.
@@ -123,14 +130,21 @@ pub fn mask_secrets(content: &str) -> String {
                     // Not a real match for the lookahead-gated pattern: leave it.
                     return matched.to_string();
                 }
-                match matched.find([':', '=']) {
-                    Some(sep) => format!("{}=[REDACTED]", &matched[..sep]),
-                    None => "[REDACTED]".to_string(),
-                }
+                redact_secret_match(idx, matched)
             })
             .into_owned();
     }
     masked
+}
+
+fn redact_secret_match(pattern_idx: usize, matched: &str) -> String {
+    if pattern_idx == BEARER_TOKEN_IDX || pattern_idx == BASIC_AUTH_IDX {
+        return "[REDACTED]".to_string();
+    }
+    match matched.find([':', '=']) {
+        Some(sep) => format!("{}=[REDACTED]", &matched[..sep]),
+        None => "[REDACTED]".to_string(),
+    }
 }
 
 /// Truncate content to `max_length` UTF-16 code units, appending the adapter
@@ -285,5 +299,23 @@ mod tests {
             !masked.contains("supersecretvalue123"),
             "plaintext secret must not remain"
         );
+    }
+
+    #[test]
+    fn padded_basic_auth_is_fully_masked() {
+        let masked = mask_secrets("Authorization: Basic abcdefghij==");
+        assert_eq!(masked, "Authorization: [REDACTED]");
+    }
+
+    #[test]
+    fn padded_bearer_is_fully_masked() {
+        let masked = mask_secrets("Authorization: Bearer abcdefghij==");
+        assert_eq!(masked, "Authorization: [REDACTED]");
+    }
+
+    #[test]
+    fn unpadded_bearer_is_fully_masked() {
+        let masked = mask_secrets("Authorization: Bearer abcdefghijklmnopqrstuvwxyz");
+        assert_eq!(masked, "Authorization: [REDACTED]");
     }
 }

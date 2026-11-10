@@ -23,6 +23,9 @@ eddacraft-kindling`, Homebrew, the install script), the crates on crates.io,
   Parent-directory rejection now matches `..` as a whole `/` or `\` component
   (`../x`, `a/../b`, `..\\x`, a bare `..`), so names such as `my..db` and
   `archive..old/kindling.db` can be opened.
+- **Hook secret masking redacts padded Basic and Bearer credentials in full (GH-169).**
+  Base64 padding `=` is no longer treated as a key/value separator, which kept
+  the credential and appended `=[REDACTED]`.
 
 ### Changed
 
