@@ -30,6 +30,13 @@ eddacraft-kindling`, Homebrew, the install script), the crates on crates.io,
   Startup removes a leftover Unix socket only, and shutdown unlinks the bound
   socket's inode. A regular file already at that path, or one that replaces
   the socket after bind, is left in place.
+- **Hook tool capture and service ingestion sanitize secrets across content, provenance, and scope metadata (GH-170).**
+  `format_tool_content` and `extract_tool_use_provenance` now filter tool
+  arguments, errors, shell variable assignments, and URL credentials/query
+  parameters; `Bash` provenance skips leading variable assignments (and omits
+  `command` when only assignments or secrets are present); and
+  `append_observation_at` sanitizes `provenance` and `scope_ids` alongside
+  `content`.
 
 ### Changed
 
