@@ -1,6 +1,7 @@
 # Model pack picked up by GitHub code scanning default setup
 # (see `.github/codeql/extensions/` in GitHub's default-setup docs).
-# Teaches rust/cleartext-logging that kindling's secret maskers are sanitizers.
+# Teaches CodeQL that kindling's secret maskers (cleartext-logging) and
+# `validate_db_path` (path-injection) are sanitizers.
 name: eddacraft/kindling-rust
 version: 0.0.1
 library: true

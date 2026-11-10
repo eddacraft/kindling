@@ -91,7 +91,7 @@ fn open_flags(readonly: bool) -> OpenFlags {
 ///
 /// - empty / non-UTF-8 / embedded NUL
 /// - SQLite URI filenames (`file:…`) and special names (`:memory:`, `:temp:`)
-/// - `..` segments — the CodeQL `rust/path-injection` sanitizer guard
+/// - parent-directory segments (`..` as a whole `/` or `\` component)
 ///
 /// Daemon routing already confines per-project DBs: `X-Kindling-Project` is
 /// hashed to a 12-hex component under `kindling_home/projects/<id>/`.
@@ -120,16 +120,24 @@ pub fn validate_db_path(path: &Path) -> StoreResult<PathBuf> {
             reason: "SQLite URI and special filenames are not allowed",
         });
     }
-    // Sanitizer guard recognized by CodeQL rust/path-injection (DotDotCheck).
-    // Reconstruct the PathBuf from this checked string so the sink cannot
-    // observe the pre-check value.
-    if raw.contains("..") {
+    // Reject `..` as a whole path component on both `/` and `\` so names like
+    // `archive..old` stay valid while `../x` / `a\..\b` do not. Reconstruct
+    // the PathBuf from this checked string so the sink cannot observe the
+    // pre-check value.
+    if contains_parent_dir_segment(raw) {
         return Err(StoreError::InvalidDbPath {
             path: raw.to_string(),
             reason: "path must not contain '..' segments",
         });
     }
     Ok(PathBuf::from(raw))
+}
+
+/// True when `raw` has a parent-directory segment: `..` as a whole component
+/// on either `/` or `\`, so Windows-style traversal is rejected on every OS.
+/// Adjacent dots inside a name (`my..db`, `a..b/kindling.db`) are not segments.
+fn contains_parent_dir_segment(raw: &str) -> bool {
+    raw.split(['/', '\\']).any(|component| component == "..")
 }
 
 fn is_sqlite_special_filename(raw: &str) -> bool {
@@ -197,4 +205,36 @@ fn ensure_schema(conn: &Connection, readonly: bool) -> StoreResult<()> {
         conn.execute_batch(MIGRATION_006_SCOPED_KEYSET_INDEXES)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validate_db_path_accepts_harmless_adjacent_dots() {
+        for raw in [
+            "my..db",
+            "a..b/kindling.db",
+            "/tmp/archive..old/kindling.db",
+        ] {
+            assert!(
+                validate_db_path(Path::new(raw)).is_ok(),
+                "expected {raw:?} to be accepted"
+            );
+        }
+    }
+
+    #[test]
+    fn validate_db_path_rejects_parent_directory_segments() {
+        for raw in ["../x", "a/../b", r"..\x", ".."] {
+            assert!(
+                matches!(
+                    validate_db_path(Path::new(raw)),
+                    Err(StoreError::InvalidDbPath { .. })
+                ),
+                "expected {raw:?} to be rejected as a parent-directory segment"
+            );
+        }
+    }
 }
