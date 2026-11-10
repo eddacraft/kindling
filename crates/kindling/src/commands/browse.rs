@@ -12,6 +12,7 @@ use std::process::Command;
 use kindling_service::ExportBundleOptions;
 
 use crate::cli::BrowseArgs;
+use crate::commands::output_path::{ensure_not_database, open_output_verified};
 use crate::{open_service, CliError, CliResult};
 
 pub fn run(args: BrowseArgs) -> CliResult {
@@ -33,6 +34,7 @@ pub fn run(args: BrowseArgs) -> CliResult {
     } else {
         secure_temp_path()
     };
+    ensure_not_database(&output_path, &db_path)?;
 
     if let Some(parent) = output_path.parent() {
         if !parent.as_os_str().is_empty() {
@@ -40,7 +42,8 @@ pub fn run(args: BrowseArgs) -> CliResult {
         }
     }
     if args.output.is_some() {
-        std::fs::write(&output_path, html)?;
+        let mut file = open_output_verified(&output_path, &db_path)?;
+        file.write_all(html.as_bytes())?;
     } else {
         // The default browser file is created owner-only with an unpredictable
         // name and is left in place: the browser reads it after launch, so the
