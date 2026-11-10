@@ -26,6 +26,10 @@ eddacraft-kindling`, Homebrew, the install script), the crates on crates.io,
 - **Hook secret masking redacts padded Basic and Bearer credentials in full (GH-169).**
   Base64 padding `=` is no longer treated as a key/value separator, which kept
   the credential and appended `=[REDACTED]`.
+- **Daemon socket cleanup no longer deletes a regular file at the socket path (GH-168).**
+  Startup removes a leftover Unix socket only, and shutdown unlinks the bound
+  socket's inode. A regular file already at that path, or one that replaces
+  the socket after bind, is left in place.
 
 ### Changed
 
