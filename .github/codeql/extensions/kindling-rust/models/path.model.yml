@@ -1,0 +1,14 @@
+# Barrier for rust/path-injection (sink kind: path-injection).
+#
+# `validate_db_path` rejects parent-directory segments (`..` as a whole `/` or
+# `\` component), NUL, and SQLite URI names, then returns a PathBuf rebuilt
+# from the checked string. CodeQL's built-in DotDotCheck only recognizes
+# `contains("..")` on the whole string, which is too broad (it flags `my..db`).
+#
+# Canonical path follows the crate's internal module layout (not re-exports).
+extensions:
+  - addsTo:
+      pack: codeql/rust-all
+      extensible: barrierModel
+    data:
+      - ["kindling_store::db::validate_db_path", "ReturnValue", "path-injection", "manual"]

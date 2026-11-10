@@ -796,6 +796,17 @@ fn validate_db_path_accepts_ordinary_local_paths() {
 }
 
 #[test]
+fn open_accepts_adjacent_dots_in_path_components() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("archive..old").join("kindling.db");
+    let store = SqliteKindlingStore::open(&path).unwrap();
+    store
+        .insert_observation(&observation("obs-1", "hello", 1000, "sess-1"))
+        .unwrap();
+    assert!(path.exists());
+}
+
+#[test]
 fn per_project_paths_isolate_databases() {
     let dir = tempfile::tempdir().unwrap();
     let home = dir.path();

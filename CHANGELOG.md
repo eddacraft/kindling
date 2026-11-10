@@ -17,6 +17,13 @@ eddacraft-kindling`, Homebrew, the install script), the crates on crates.io,
 
 ## [Unreleased]
 
+### Fixed
+
+- **`validate_db_path` accepts harmless adjacent dots in database paths.**
+  Parent-directory rejection now matches `..` as a whole `/` or `\` component
+  (`../x`, `a/../b`, `..\\x`, a bare `..`), so names such as `my..db` and
+  `archive..old/kindling.db` can be opened.
+
 ### Changed
 
 - **`kindling search` defaults its repo scope to the current git repository
