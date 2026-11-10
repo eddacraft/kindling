@@ -759,8 +759,24 @@ impl SqliteKindlingStore {
 
     /// Insert a capsule if absent (and, when written, its ordered
     /// `capsule_observations` links). Returns whether the capsule row was
-    /// written. Mirrors the TS importer.
+    /// written. The capsule and all links are atomic, including inside the
+    /// importer's outer transaction, so a failed entity can be retried.
     pub fn import_capsule(&self, capsule: &Capsule) -> StoreResult<bool> {
+        self.conn.execute_batch("SAVEPOINT import_capsule")?;
+        match self.import_capsule_inner(capsule) {
+            Ok(inserted) => {
+                self.conn.execute_batch("RELEASE import_capsule")?;
+                Ok(inserted)
+            }
+            Err(error) => {
+                self.conn
+                    .execute_batch("ROLLBACK TO import_capsule; RELEASE import_capsule")?;
+                Err(error)
+            }
+        }
+    }
+
+    fn import_capsule_inner(&self, capsule: &Capsule) -> StoreResult<bool> {
         let changes = self.conn.execute(
             "INSERT OR IGNORE INTO capsules (
                id, type, intent, status, opened_at, closed_at, scope_ids,
