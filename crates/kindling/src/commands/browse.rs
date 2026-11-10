@@ -1,5 +1,11 @@
 //! `browse` — open a local HTML viewer for kindling memory.
 
+use std::collections::hash_map::RandomState;
+use std::fs::OpenOptions;
+use std::hash::{BuildHasher, Hasher};
+use std::io::Write;
+#[cfg(unix)]
+use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -25,7 +31,7 @@ pub fn run(args: BrowseArgs) -> CliResult {
     let output_path = if let Some(path) = &args.output {
         PathBuf::from(path)
     } else {
-        std::env::temp_dir().join(format!("kindling-browse-{}.html", std::process::id()))
+        secure_temp_path()
     };
 
     if let Some(parent) = output_path.parent() {
@@ -33,7 +39,18 @@ pub fn run(args: BrowseArgs) -> CliResult {
             std::fs::create_dir_all(parent)?;
         }
     }
-    std::fs::write(&output_path, html)?;
+    if args.output.is_some() {
+        std::fs::write(&output_path, html)?;
+    } else {
+        // The default browser file is created owner-only with an unpredictable
+        // name and is left in place: the browser reads it after launch, so the
+        // caller owns cleanup. `open(2)`'s mode is umask-masked, so force 0600
+        // with fchmod to keep the permission independent of the umask.
+        let mut file = create_owner_only(&output_path)?;
+        #[cfg(unix)]
+        file.set_permissions(std::fs::Permissions::from_mode(0o600))?;
+        file.write_all(html.as_bytes())?;
+    }
 
     if args.no_open {
         println!("{}", output_path.display());
@@ -46,6 +63,32 @@ pub fn run(args: BrowseArgs) -> CliResult {
     }
 
     Ok(())
+}
+
+/// Create a file at `path` with owner-only permissions, refusing to follow an
+/// existing symlink (`O_CREAT | O_EXCL`).
+fn create_owner_only(path: &Path) -> std::io::Result<std::fs::File> {
+    let mut opts = OpenOptions::new();
+    opts.write(true).create_new(true);
+    #[cfg(unix)]
+    opts.mode(0o600);
+    opts.open(path)
+}
+
+/// An unpredictable temporary path for the browser file.
+///
+/// The name is derived from a randomly seeded hasher, not the process id, so a
+/// local attacker cannot pre-create the path as a symlink.
+fn secure_temp_path() -> PathBuf {
+    let mut hasher = RandomState::new().build_hasher();
+    hasher.write_u128(
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0),
+    );
+    hasher.write_u64(std::process::id() as u64);
+    std::env::temp_dir().join(format!("kindling-browse-{:016x}.html", hasher.finish()))
 }
 
 fn open_in_browser(path: &Path) -> Result<(), CliError> {
@@ -286,7 +329,7 @@ fn render_html(data_json: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::escape_json_for_script_tag;
+    use super::{create_owner_only, escape_json_for_script_tag, secure_temp_path};
 
     #[test]
     fn escape_json_for_script_tag_breaks_script_close_token() {
@@ -294,5 +337,44 @@ mod tests {
         let escaped = escape_json_for_script_tag(raw);
         assert!(!escaped.contains("</script>"));
         assert!(escaped.contains(r#"<\/script>"#));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn create_owner_only_sets_owner_only_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("owner-only.html");
+        let file = create_owner_only(&path).unwrap();
+        drop(file);
+
+        let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn create_owner_only_refuses_to_follow_symlink() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("target.html");
+        std::fs::write(&target, b"victim").unwrap();
+        let link = dir.path().join("link.html");
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+
+        assert!(create_owner_only(&link).is_err());
+        assert_eq!(std::fs::read(&target).unwrap(), b"victim");
+        assert!(std::fs::symlink_metadata(&link)
+            .unwrap()
+            .file_type()
+            .is_symlink());
+    }
+
+    #[test]
+    fn secure_temp_path_is_unpredictable() {
+        let a = secure_temp_path();
+        let b = secure_temp_path();
+        assert_ne!(a, b);
+        assert!(a.starts_with(std::env::temp_dir()));
     }
 }
