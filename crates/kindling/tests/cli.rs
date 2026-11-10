@@ -596,6 +596,24 @@ fn browse_escapes_script_breakout_in_embedded_json() {
 }
 
 #[test]
+fn browse_default_output_is_owner_only() {
+    let env = CliEnv::new();
+    assert_success(&env.run_db(&["demo", "--reset"]));
+
+    let out = env.run_db(&["browse", "--no-open"]);
+    assert_success(&out);
+    let path = stdout(&out).trim().to_string();
+    let metadata = std::fs::metadata(&path).unwrap();
+    assert!(!metadata.file_type().is_symlink());
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        assert_eq!(metadata.permissions().mode() & 0o777, 0o600);
+    }
+}
+
+#[test]
 fn stats_json_on_empty_database_is_zero_filled() {
     let env = CliEnv::new();
     let out = env.run_db(&["stats", "--json"]);
