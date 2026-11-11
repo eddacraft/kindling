@@ -153,6 +153,65 @@ fn hook_subcommand_bad_type_exits_zero_and_logs() {
     );
 }
 
+/// Non-UTF-8 `argv[2]` must not panic in `std::env::args()` before the hook
+/// always-zero handler. Unix-only: Windows `OsString` is WTF-8 and this
+/// byte sequence is not a representable process argument there.
+#[cfg(unix)]
+#[test]
+fn hook_subcommand_non_utf8_type_exits_zero() {
+    use std::ffi::OsStr;
+    use std::os::unix::ffi::OsStrExt;
+
+    let out = Command::new(kindling_bin())
+        .arg("hook")
+        .arg(OsStr::from_bytes(b"\xff"))
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .expect("run kindling hook with non-UTF-8 type");
+    assert!(
+        out.status.success(),
+        "non-UTF-8 hook type must still exit 0, got {:?}",
+        out.status.code()
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("[kindling]") && stderr.contains("error:"),
+        "expected a Node-format error log on stderr, got {stderr:?}"
+    );
+}
+
+/// Non-UTF-8 `argv[0]` (an executable path whose directory is not UTF-8) must
+/// not panic while inspecting the program name. The `kindling-hook` drop-in
+/// still reaches the always-zero handler.
+#[cfg(unix)]
+#[test]
+fn hook_dropin_non_utf8_argv0_exits_zero() {
+    use std::ffi::OsStr;
+    use std::os::unix::ffi::OsStrExt;
+    use std::os::unix::process::CommandExt;
+
+    let out = Command::new(kindling_bin())
+        .arg0(OsStr::from_bytes(b"/\xff/kindling-hook"))
+        .arg("not-a-hook")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .expect("run kindling-hook with non-UTF-8 argv0");
+    assert!(
+        out.status.success(),
+        "non-UTF-8 executable path must still exit 0, got {:?}",
+        out.status.code()
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("[kindling]") && stderr.contains("error:"),
+        "expected a Node-format error log on stderr, got {stderr:?}"
+    );
+}
+
 /// Symlink drop-in: a `kindling-hook` symlink → the umbrella binary behaves as
 /// `kindling hook`, taking the type from argv[1]. Lands the observation.
 #[test]

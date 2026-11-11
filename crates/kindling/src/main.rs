@@ -13,7 +13,11 @@
 //! intercepted before clap; (3) everything else → the clap CLI dispatch.
 //! The hook surface owns its own current-thread Tokio runtime via
 //! [`kindling::hook::run_hook`]; this `main` is a plain `fn main() -> ExitCode`.
+//!
+//! argv is read as OS strings. `std::env::args()` panics on non-UTF-8 bytes,
+//! which would skip the hook's always-zero handler.
 
+use std::ffi::{OsStr, OsString};
 use std::process::ExitCode;
 
 /// The `argv[0]` basename that triggers the hook drop-in behaviour.
@@ -21,12 +25,12 @@ const HOOK_PROG_NAME: &str = "kindling-hook";
 
 fn main() -> ExitCode {
     if invoked_as_hook() {
-        return kindling::hook::run_hook(std::env::args().nth(1));
+        return kindling::hook::run_hook(nth_arg_os(1).map(os_to_string));
     }
 
-    match std::env::args().nth(1).as_deref() {
-        Some("hook") => {
-            let type_arg = std::env::args().nth(2);
+    match nth_arg_os(1).as_deref() {
+        Some(arg) if arg == "hook" => {
+            let type_arg = nth_arg_os(2).map(os_to_string);
             if type_arg.is_none() {
                 eprintln!("{}", hook_usage());
             }
@@ -38,16 +42,26 @@ fn main() -> ExitCode {
 
 /// Whether this process was invoked under the `kindling-hook` program name.
 fn invoked_as_hook() -> bool {
-    let argv0 = std::env::args().next().unwrap_or_default();
-    basename(&argv0) == HOOK_PROG_NAME
+    let argv0 = std::env::args_os().next().unwrap_or_default();
+    basename(&argv0) == OsStr::new(HOOK_PROG_NAME)
 }
 
 /// The trailing path component of `argv0`, without any directory prefix.
-fn basename(argv0: &str) -> &str {
-    std::path::Path::new(argv0)
-        .file_name()
-        .and_then(|s| s.to_str())
-        .unwrap_or(argv0)
+fn basename(argv0: &OsStr) -> &OsStr {
+    std::path::Path::new(argv0).file_name().unwrap_or(argv0)
+}
+
+/// The `n`th process argument as an [`OsString`], without requiring UTF-8.
+fn nth_arg_os(n: usize) -> Option<OsString> {
+    std::env::args_os().nth(n)
+}
+
+/// Lossily convert an OS argument so [`kindling::hook::run_hook`] can parse it.
+/// Invalid UTF-8 becomes the replacement character and is then rejected as an
+/// unknown hook type — still via the always-zero path.
+fn os_to_string(arg: OsString) -> String {
+    arg.into_string()
+        .unwrap_or_else(|arg| arg.to_string_lossy().into_owned())
 }
 
 /// Run the CLI dispatch and map its `i32` exit code onto an [`ExitCode`].
