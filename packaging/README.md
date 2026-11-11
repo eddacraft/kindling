@@ -55,8 +55,11 @@ release (or `KINDLING_VERSION`), downloads the matching archive + `.sha256`,
 **verifies the checksum**, installs `kindling` to `KINDLING_INSTALL_DIR`
 (default `~/.local/bin`), offers to run `kindling init` (with optional Claude
 Code setup), then offers to load sample memory with `kindling demo` (skipped
-without a terminal or when `KINDLING_NO_DEMO=1`). If no prebuilt binary matches the platform it falls back to
-`cargo install eddacraft-kindling`. Linux (x86_64/aarch64, gnu + musl), macOS
+without a terminal or when `KINDLING_NO_DEMO=1`). If the archive download fails and
+cargo is available, it falls back to `cargo install eddacraft-kindling`,
+honouring `KINDLING_VERSION` and refusing a non-default `KINDLING_REPO`;
+setup then invokes the binary under the Cargo install root rather than a
+`kindling` from PATH. Linux (x86_64/aarch64, gnu + musl), macOS
 (x86_64/aarch64), and Windows (x86_64, `.zip`) are covered.
 
 **Credential-gated / infra maintainer steps:**

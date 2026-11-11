@@ -96,14 +96,65 @@ resolve_version() {
 
 # --- install ---
 
-cargo_fallback() {
-  if command_exists cargo; then
-    warn "Falling back to 'cargo install eddacraft-kindling'."
-    cargo install eddacraft-kindling
-    KINDLING_CMD="$BIN_NAME"
+# Directory cargo install writes binaries into: CARGO_INSTALL_ROOT, else
+# CARGO_HOME, else ~/.cargo, each with a /bin suffix.
+cargo_bin_dir() {
+  if [ -n "${CARGO_INSTALL_ROOT:-}" ]; then
+    printf '%s/bin' "$CARGO_INSTALL_ROOT"
+  elif [ -n "${CARGO_HOME:-}" ]; then
+    printf '%s/bin' "$CARGO_HOME"
   else
-    error "No prebuilt binary for ${TARGET}. Install Rust (https://rustup.rs) and run: cargo install eddacraft-kindling"
+    printf '%s/.cargo/bin' "$HOME"
   fi
+}
+
+cargo_kindling_path() {
+  bin_file="$BIN_NAME"
+  case "${TARGET:-}" in
+    *windows*) bin_file="${BIN_NAME}.exe" ;;
+  esac
+  printf '%s/%s' "$(cargo_bin_dir)" "$bin_file"
+}
+
+# crates.io package name (the installed command is still `kindling`).
+CARGO_CRATE="eddacraft-kindling"
+OFFICIAL_REPO="eddacraft/kindling"
+
+cargo_fallback() {
+  # crates.io only publishes the official crate. A non-default KINDLING_REPO
+  # would silently install a different project if we ignored it.
+  if [ "$REPO" != "$OFFICIAL_REPO" ]; then
+    error "No prebuilt binary for ${TARGET}, and cargo fallback only installs ${CARGO_CRATE} from crates.io (KINDLING_REPO=${REPO}). Set KINDLING_REPO=${OFFICIAL_REPO} or install from ${REPO} manually."
+  fi
+
+  if ! command_exists cargo; then
+    if [ -n "${KINDLING_VERSION:-}" ]; then
+      error "No prebuilt binary for ${TARGET}. Install Rust (https://rustup.rs) and run: cargo install ${CARGO_CRATE} --version =${VERSION}"
+    else
+      error "No prebuilt binary for ${TARGET}. Install Rust (https://rustup.rs) and run: cargo install ${CARGO_CRATE}"
+    fi
+  fi
+
+  set -- install
+  if [ -n "${KINDLING_VERSION:-}" ]; then
+    set -- "$@" --version "=${VERSION}"
+  fi
+  set -- "$@" "$CARGO_CRATE"
+
+  warn "Falling back to 'cargo $*'."
+  cargo "$@"
+
+  KINDLING_CMD="$(cargo_kindling_path)"
+  if [ ! -x "$KINDLING_CMD" ]; then
+    error "cargo install completed but ${KINDLING_CMD} is missing or not executable"
+  fi
+  info "Installed ${BIN_NAME} via cargo to ${KINDLING_CMD}"
+
+  cargo_bins="$(cargo_bin_dir)"
+  case ":${PATH}:" in
+    *":${cargo_bins}:"*) ;;
+    *) warn "${cargo_bins} is not on your PATH. Add it: export PATH=\"${cargo_bins}:\$PATH\"" ;;
+  esac
 }
 
 install_binary() {
@@ -252,4 +303,8 @@ main() {
   printf '\n'
 }
 
-main
+# Tests source this file with KINDLING_INSTALL_SOURCED=1 so they can call
+# install_binary without the interactive installer.
+if [ "${KINDLING_INSTALL_SOURCED:-}" != "1" ]; then
+  main
+fi
