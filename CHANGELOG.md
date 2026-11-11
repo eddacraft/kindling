@@ -17,6 +17,15 @@ eddacraft-kindling`, Homebrew, the install script), the crates on crates.io,
 
 ## [Unreleased]
 
+### Fixed
+
+- **Release evidence and publish dry-run no longer report success after failed checks (GH-194).**
+  `capture-release-evidence.sh` records each fmt, clippy, test, and pnpm
+  command's status so a later success cannot mask an earlier failure, and
+  install stderr is kept in the transcript. `publish.sh` dry-run still treats
+  a missing crates.io dependency as expected, and fails on any other cargo
+  error.
+
 ## [0.4.1] - 2026-11-10
 
 ### Security
