@@ -33,6 +33,12 @@ eddacraft-kindling`, Homebrew, the install script), the crates on crates.io,
   valid HTTP header field, now surface as `ClientError::InvalidRequest` instead
   of `ClientError::Http`. The spool treats these as permanent local errors and
   does not buffer them ahead of later entries.
+- **Installer cargo fallback honours a pinned version and the Cargo install path (GH-193).**
+  A failed archive download no longer runs unversioned `cargo install
+  eddacraft-kindling` and then a bare `kindling` from PATH. The fallback
+  passes `--version` when `KINDLING_VERSION` is set, refuses a non-default
+  `KINDLING_REPO`, and invokes the binary cargo installed (including a
+  nonstandard `CARGO_HOME` or `CARGO_INSTALL_ROOT`).
 
 ## [0.4.1] - 2026-11-10
 
