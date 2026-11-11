@@ -614,6 +614,10 @@ fn malformed_queries_return_empty_results() {
         "\"unclosed quote",
         "content:",
         "NOT NOT NOT",
+        // FTS5 column-filter syntax against a column that is not in the index.
+        "missing:term",
+        "col1:foo",
+        "hello missing:term",
     ] {
         let results = search(&store, &options(query, ScopeIds::default()));
         assert!(
@@ -621,4 +625,66 @@ fn malformed_queries_return_empty_results() {
             "query {query:?} should yield no results"
         );
     }
+}
+
+#[test]
+fn genuine_schema_errors_are_not_swallowed() {
+    let store = SqliteKindlingStore::open_in_memory().unwrap();
+    store
+        .insert_observation(&observation(
+            "obs-1",
+            "authentication test",
+            scope(Some("s1"), None),
+            NOW,
+        ))
+        .unwrap();
+
+    // Drop the denormalised column the observations query selects so SQLite
+    // reports `no such column: o.redacted` — the same error class as an
+    // unknown FTS column filter, but a real schema failure.
+    store
+        .connection()
+        .execute_batch(
+            "DROP TRIGGER IF EXISTS observations_fts_insert;
+             DROP TRIGGER IF EXISTS observations_fts_update;
+             DROP TRIGGER IF EXISTS observations_fts_delete;
+             ALTER TABLE observations DROP COLUMN redacted;",
+        )
+        .unwrap();
+
+    let err = LocalFtsProvider::from_store(&store)
+        .search(&options("authentication", ScopeIds::default()), NOW)
+        .expect_err("a missing observations column must surface as a provider error");
+    let msg = err.to_string().to_lowercase();
+    assert!(
+        msg.contains("no such column"),
+        "expected a schema no-such-column error, got {err}"
+    );
+}
+
+#[test]
+fn genuine_backend_errors_are_not_swallowed() {
+    let store = SqliteKindlingStore::open_in_memory().unwrap();
+    store
+        .insert_observation(&observation(
+            "obs-1",
+            "authentication test",
+            scope(Some("s1"), None),
+            NOW,
+        ))
+        .unwrap();
+
+    store
+        .connection()
+        .execute_batch("DROP TABLE observations_fts;")
+        .unwrap();
+
+    let err = LocalFtsProvider::from_store(&store)
+        .search(&options("authentication", ScopeIds::default()), NOW)
+        .expect_err("a missing FTS table must surface as a provider error");
+    let msg = err.to_string().to_lowercase();
+    assert!(
+        msg.contains("no such table"),
+        "expected a backend no-such-table error, got {err}"
+    );
 }
