@@ -4,9 +4,9 @@
 | ------ | ------ | ----------- |
 | KINTEG | @aneki | In Progress |
 
-**Last reviewed:** 2026-10-19 (all KINTEG items Merged. v0.4.0 release prep opened
-covering KINTEG-006/007/010/011/012/013/014; crates.io is at 0.3.0 and the GitHub
-Release that publishes npm + binaries has never run since v0.1.2, see ISS-003.)
+**Last reviewed:** 2026-11-11 (KINTEG-015 drafted at anvil's request (KFIT-005):
+`generic-event@1` plus a keyed direct-retained append for the 0.5.0 minor.
+KINTEG-001..014 merged and shipped through v0.4.1.)
 
 ## Purpose
 
@@ -474,3 +474,56 @@ Verified against the tree on 2026-06-22:
   until profiling proved a filesort. It adds no aggregation endpoint or
   downstream policy. Design:
   `plans/specs/2026-08-03-kindling-scoped-read-index-design.md`.
+
+### KINTEG-015: Publish `generic-event@1` and a keyed direct-retained append in the next minor
+
+- **Intent:** Downstream Rust consumers can store an opaque, versioned event and
+  get proof that it is durably retained, without kindling learning their policy.
+- **Expected Outcome:** The next kindling minor (0.5.0 unless the changelog says
+  otherwise) ships, through `kindling-runtime`:
+  - **`generic-event@1`:** a generic outer envelope that preserves an opaque,
+    size-bounded consumer payload with a consumer-declared schema name and
+    version. kindling validates only the envelope (size, scope, schema
+    identifier), never the payload's meaning. The existing closed
+    `ObservationKind` set and its behaviour are unchanged.
+  - **Keyed direct-retained append:** a path distinct from ordinary spooled
+    append. The caller supplies an opaque correlation key, unique across the
+    owner-local profile. Append atomically reserves the key with the canonical
+    caller scope and payload digest, and returns a receipt only after the row is
+    durable in the retained store. A same-key retry of identical content returns
+    the original receipt without a second row; a different scope or payload
+    under the same key is a conflict.
+  - **Exact lookup by key after restart:** the receipt and lookup return the
+    same event ID, scope and digest.
+  - **Closed failure result:** quota, low disk, unavailable runtime, rejected
+    payload, failed commit and failed lookup. This path never reports spool
+    acceptance as a retained receipt and never falls back to the spool.
+  - **Capability negotiation:** a consumer can tell before writing that the
+    attached daemon supports both features. Releases through 0.4.x answer
+    "unsupported" and are documented as incompatible with this contract.
+  - Ordinary spooled append, replay and existing redaction behaviour are
+    unchanged.
+- **Validation:** `cargo test -p kindling-runtime --all-features` and
+  `cargo clippy -p kindling-runtime --all-features -- -D warnings`, a
+  package-content check and a clean scratch-crate install of the published
+  version. Runtime tests cover a crash after commit but before the receipt, a
+  same-key retry leaving exactly one row, conflicting-key rejection, and a
+  scope/digest mismatch on lookup. Negative tests prove that quota, low disk,
+  outage, failed commit and failed lookup never return a retained receipt or
+  fall back to the spool.
+- **Performance contract:** Inherit the KINTEG-013/014 budgets. The keyed append
+  adds one durable commit and must not regress warm ordinary append p95 below
+  1 ms, or outage append p95 below 5 ms.
+- **Out of scope:** Any anvil-specific schema, event kinds or policy (anvil owns
+  its `anvil.governance.v1` payload inside the envelope); retention or prune
+  semantics beyond today's; cloud or sync.
+- **Requested by:** anvil KFIT-005 (`eddacraft/anvil-001`,
+  `plans/modules/kindling-product-fit.aps.md`), whose Track B (KFIT-007, -009,
+  -010, -011, -013) waits on this release. anvil validates it with a
+  cross-repository fixture that commits one keyed opaque event, restarts the
+  runtime and retrieves the exact row.
+- **Dependencies:** None upstream; coordinate the release with C14 (publishing
+  crates from `release.yml`, module 08) if that lands first.
+- **Repositories:** `eddacraft/kindling`
+- **Confidence:** medium
+- **Status:** Draft
