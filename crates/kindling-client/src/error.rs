@@ -18,6 +18,12 @@ pub enum ClientError {
     #[error("http transport error: {0}")]
     Http(String),
 
+    /// The local HTTP request could not be built. This is a permanent client-side
+    /// validation error (for example an [`crate::PROJECT_HEADER`] value that is
+    /// not a valid HTTP header field), not a connectivity failure.
+    #[error("invalid request: {0}")]
+    InvalidRequest(String),
+
     /// The daemon returned a non-2xx response. The `message` is the daemon's
     /// `{ "error": "<msg>" }` body when present, else the raw body or a status
     /// phrase.

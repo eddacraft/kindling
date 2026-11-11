@@ -17,6 +17,7 @@ use std::time::{Duration, Instant};
 use http_body_util::BodyExt;
 use hyper::body::Bytes;
 use hyper::client::conn::http1;
+use hyper::header::HeaderValue;
 use hyper::Request;
 use hyper::StatusCode;
 use hyper_util::rt::TokioIo;
@@ -49,6 +50,9 @@ pub(crate) async fn request(
     cfg: &ClientConfig,
     req: OutgoingRequest<'_>,
 ) -> Result<RawResponse, ClientError> {
+    // Reject permanently invalid local headers before connect/spawn so a
+    // malformed request is never mistaken for an outage (and never spooled).
+    validate_outgoing(&req)?;
     match cfg.transport {
         #[cfg(unix)]
         Transport::Uds => {
@@ -90,6 +94,23 @@ pub(crate) async fn request(
 /// daemon's `token_path_for` so both agree without a shared config field.
 fn token_path_for(port_path: &std::path::Path) -> std::path::PathBuf {
     port_path.with_file_name("kindling.token")
+}
+
+/// Fail loud on request fields that can never become a valid HTTP/1 exchange.
+///
+/// Today that is the project-root header: control characters such as a newline
+/// are illegal in HTTP header values. Catching them here distinguishes a
+/// permanent local validation error from a later transport failure.
+fn validate_outgoing(req: &OutgoingRequest<'_>) -> Result<(), ClientError> {
+    if let Some(project) = req.project {
+        if HeaderValue::try_from(project).is_err() {
+            return Err(ClientError::InvalidRequest(format!(
+                "invalid {} header value",
+                crate::PROJECT_HEADER
+            )));
+        }
+    }
+    Ok(())
 }
 
 /// Send one HTTP/1 request over an established byte stream and collect the
@@ -134,7 +155,7 @@ where
     }
     let req = builder
         .body(body)
-        .map_err(|e| ClientError::Http(format!("building request: {e}")))?;
+        .map_err(|e| ClientError::InvalidRequest(format!("building request: {e}")))?;
 
     let resp = sender
         .send_request(req)
