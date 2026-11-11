@@ -4,12 +4,15 @@
 //! request we ensure the daemon is reachable: if the rendezvous (a UDS path on
 //! Unix, a published TCP port on Windows/TCP) is missing or a connect is
 //! refused, we invoke the spawner ONCE and poll until a connection succeeds or
-//! the connect budget elapses.
+//! the connect budget elapses. The budget covers the initial connect, spawn,
+//! and retry sleeps; each connect attempt and poll sleep is capped by the
+//! remaining time.
 //!
 //! The HTTP/1 exchange itself ([`send_http`]) is transport-agnostic: it wraps
 //! any tokio `AsyncRead + AsyncWrite` in [`TokioIo`], so the UDS and TCP paths
 //! share it verbatim. The transport is selected per [`ClientConfig::transport`].
 
+use std::future::Future;
 use std::io;
 use std::path::Path;
 use std::time::{Duration, Instant};
@@ -154,10 +157,12 @@ where
 
 /// Ensure the daemon is reachable over UDS, auto-spawning once if needed.
 ///
-/// 1. Try to connect. On success, return the stream.
+/// 1. Try to connect, bounded by `connect_timeout`. On success, return the
+///    stream.
 /// 2. If the socket is missing OR the connect is refused/not-found, invoke the
-///    spawner ONCE, then poll-connect every `poll_interval` until success or
-///    the `connect_timeout` budget elapses.
+///    spawner ONCE (still inside the same budget), then poll-connect every
+///    `poll_interval` until success or the remaining budget elapses. Each
+///    connect and sleep is capped by the time left.
 /// 3. If still failing, return [`ClientError::Unavailable`].
 #[cfg(unix)]
 async fn ensure_connected(
@@ -167,46 +172,72 @@ async fn ensure_connected(
     poll_interval: Duration,
     spawn_log_path: Option<&Path>,
 ) -> Result<UnixStream, ClientError> {
+    let deadline = Instant::now() + connect_timeout;
+    let timeout_target = format!("daemon socket {}", socket_path.display());
+
     // Fast path: daemon already up.
-    match UnixStream::connect(socket_path).await {
-        Ok(stream) => return Ok(stream),
-        Err(e) if is_absent(&e) => { /* fall through to spawn + poll */ }
-        Err(e) => {
+    match within_budget(deadline, UnixStream::connect(socket_path)).await {
+        Ok(Ok(stream)) => return Ok(stream),
+        Ok(Err(e)) if is_absent(&e) => { /* fall through to spawn + poll */ }
+        Ok(Err(e)) => {
             return Err(ClientError::Unavailable(format!(
                 "connecting to {}: {e}",
                 socket_path.display()
             )));
         }
+        Err(BudgetExhausted) => {
+            return timeout_unavailable(
+                &timeout_target,
+                connect_timeout,
+                "connect timed out",
+                spawn_log_path,
+            );
+        }
     }
 
-    // Spawn exactly once, then poll within the budget.
+    // Spawn exactly once, then poll within the remaining budget.
     if let Err(e) = spawner.spawn() {
         let msg = format!("failed to spawn kindling daemon: {e}");
         log_spawn_failure(spawn_log_path, &msg);
         return Err(ClientError::Unavailable(msg));
     }
 
-    let deadline = Instant::now() + connect_timeout;
+    if remaining_budget(deadline).is_none() {
+        return timeout_unavailable(
+            &timeout_target,
+            connect_timeout,
+            "spawn exhausted the connect budget",
+            spawn_log_path,
+        );
+    }
+
+    let mut last_err = String::from("not yet reachable");
     loop {
-        let last_err = match UnixStream::connect(socket_path).await {
-            Ok(stream) => return Ok(stream),
-            Err(e) if is_absent(&e) => e.to_string(),
-            Err(e) => {
+        match within_budget(deadline, UnixStream::connect(socket_path)).await {
+            Ok(Ok(stream)) => return Ok(stream),
+            Ok(Err(e)) if is_absent(&e) => last_err = e.to_string(),
+            Ok(Err(e)) => {
                 let msg = format!("connecting to {} after spawn: {e}", socket_path.display());
                 log_spawn_failure(spawn_log_path, &msg);
                 return Err(ClientError::Unavailable(msg));
             }
-        };
-        if Instant::now() >= deadline {
-            let msg = format!(
-                "daemon socket {} did not become reachable within {:?} after spawn ({last_err})",
-                socket_path.display(),
-                connect_timeout
-            );
-            log_spawn_failure(spawn_log_path, &msg);
-            return Err(ClientError::Unavailable(msg));
+            Err(BudgetExhausted) => {
+                return timeout_unavailable(
+                    &timeout_target,
+                    connect_timeout,
+                    &last_err,
+                    spawn_log_path,
+                );
+            }
         }
-        tokio::time::sleep(poll_interval).await;
+        if let Err(BudgetExhausted) = sleep_poll_interval(deadline, poll_interval).await {
+            return timeout_unavailable(
+                &timeout_target,
+                connect_timeout,
+                &last_err,
+                spawn_log_path,
+            );
+        }
     }
 }
 
@@ -217,11 +248,13 @@ async fn ensure_connected(
 /// port and publishes it to `port_path`. So discovery is two-step — read the
 /// port file, then connect to `127.0.0.1:<port>`.
 ///
-/// 1. Read the port file and try to connect. On success, return the stream.
+/// 1. Read the port file and try to connect, bounded by `connect_timeout`. On
+///    success, return the stream.
 /// 2. If the port file is missing/unparseable OR the connect is refused, invoke
-///    the spawner ONCE, then poll (re-reading the port file each iteration, as
-///    the daemon writes it only after binding) until success or the
-///    `connect_timeout` budget elapses.
+///    the spawner ONCE (still inside the same budget), then poll (re-reading
+///    the port file each iteration, as the daemon writes it only after binding)
+///    until success or the remaining budget elapses. Each connect and sleep is
+///    capped by the time left.
 /// 3. If still failing, return [`ClientError::Unavailable`].
 async fn ensure_connected_tcp(
     port_path: &Path,
@@ -230,50 +263,82 @@ async fn ensure_connected_tcp(
     poll_interval: Duration,
     spawn_log_path: Option<&Path>,
 ) -> Result<TcpStream, ClientError> {
+    let deadline = Instant::now() + connect_timeout;
+    let timeout_target = format!("daemon TCP port (via {})", port_path.display());
+
     // Fast path: port file present and daemon already up.
     if let Some(port) = read_port(port_path) {
-        match TcpStream::connect(("127.0.0.1", port)).await {
-            Ok(stream) => return Ok(stream),
-            Err(e) if is_absent(&e) => { /* stale port file; spawn + poll */ }
-            Err(e) => {
+        match within_budget(deadline, TcpStream::connect(("127.0.0.1", port))).await {
+            Ok(Ok(stream)) => return Ok(stream),
+            Ok(Err(e)) if is_absent(&e) => { /* stale port file; spawn + poll */ }
+            Ok(Err(e)) => {
                 return Err(ClientError::Unavailable(format!(
                     "connecting to 127.0.0.1:{port}: {e}"
                 )));
             }
+            Err(BudgetExhausted) => {
+                return timeout_unavailable(
+                    &timeout_target,
+                    connect_timeout,
+                    "connect timed out",
+                    spawn_log_path,
+                );
+            }
         }
     }
 
-    // Spawn exactly once, then poll within the budget.
+    // Spawn exactly once, then poll within the remaining budget.
     if let Err(e) = spawner.spawn() {
         let msg = format!("failed to spawn kindling daemon: {e}");
         log_spawn_failure(spawn_log_path, &msg);
         return Err(ClientError::Unavailable(msg));
     }
 
-    let deadline = Instant::now() + connect_timeout;
+    if remaining_budget(deadline).is_none() {
+        return timeout_unavailable(
+            &timeout_target,
+            connect_timeout,
+            "spawn exhausted the connect budget",
+            spawn_log_path,
+        );
+    }
+
+    let mut last_err = format!("port file {} not yet present", port_path.display());
     loop {
-        let last_err = match read_port(port_path) {
-            Some(port) => match TcpStream::connect(("127.0.0.1", port)).await {
-                Ok(stream) => return Ok(stream),
-                Err(e) if is_absent(&e) => format!("connecting to 127.0.0.1:{port}: {e}"),
-                Err(e) => {
-                    let msg = format!("connecting to 127.0.0.1:{port} after spawn: {e}");
-                    log_spawn_failure(spawn_log_path, &msg);
-                    return Err(ClientError::Unavailable(msg));
+        match read_port(port_path) {
+            Some(port) => {
+                match within_budget(deadline, TcpStream::connect(("127.0.0.1", port))).await {
+                    Ok(Ok(stream)) => return Ok(stream),
+                    Ok(Err(e)) if is_absent(&e) => {
+                        last_err = format!("connecting to 127.0.0.1:{port}: {e}");
+                    }
+                    Ok(Err(e)) => {
+                        let msg = format!("connecting to 127.0.0.1:{port} after spawn: {e}");
+                        log_spawn_failure(spawn_log_path, &msg);
+                        return Err(ClientError::Unavailable(msg));
+                    }
+                    Err(BudgetExhausted) => {
+                        return timeout_unavailable(
+                            &timeout_target,
+                            connect_timeout,
+                            &last_err,
+                            spawn_log_path,
+                        );
+                    }
                 }
-            },
-            None => format!("port file {} not yet present", port_path.display()),
-        };
-        if Instant::now() >= deadline {
-            let msg = format!(
-                "daemon TCP port (via {}) did not become reachable within {:?} after spawn ({last_err})",
-                port_path.display(),
-                connect_timeout
-            );
-            log_spawn_failure(spawn_log_path, &msg);
-            return Err(ClientError::Unavailable(msg));
+            }
+            None => {
+                last_err = format!("port file {} not yet present", port_path.display());
+            }
         }
-        tokio::time::sleep(poll_interval).await;
+        if let Err(BudgetExhausted) = sleep_poll_interval(deadline, poll_interval).await {
+            return timeout_unavailable(
+                &timeout_target,
+                connect_timeout,
+                &last_err,
+                spawn_log_path,
+            );
+        }
     }
 }
 
@@ -281,6 +346,55 @@ fn log_spawn_failure(spawn_log_path: Option<&Path>, detail: &str) {
     if let Some(path) = spawn_log_path {
         append_spawn_log(path, detail);
     }
+}
+
+fn timeout_unavailable<T>(
+    what: &str,
+    connect_timeout: Duration,
+    last_err: &str,
+    spawn_log_path: Option<&Path>,
+) -> Result<T, ClientError> {
+    let msg = format!("{what} did not become reachable within {connect_timeout:?} ({last_err})");
+    log_spawn_failure(spawn_log_path, &msg);
+    Err(ClientError::Unavailable(msg))
+}
+
+/// Marker returned when the connect budget has no time left.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct BudgetExhausted;
+
+fn remaining_budget(deadline: Instant) -> Option<Duration> {
+    let remaining = deadline.saturating_duration_since(Instant::now());
+    if remaining.is_zero() {
+        None
+    } else {
+        Some(remaining)
+    }
+}
+
+/// Run `fut`, aborting it once `deadline` is reached.
+async fn within_budget<T>(
+    deadline: Instant,
+    fut: impl Future<Output = T>,
+) -> Result<T, BudgetExhausted> {
+    let Some(remaining) = remaining_budget(deadline) else {
+        return Err(BudgetExhausted);
+    };
+    tokio::time::timeout(remaining, fut)
+        .await
+        .map_err(|_| BudgetExhausted)
+}
+
+/// Sleep `poll_interval`, or whatever is left in the budget, whichever is shorter.
+async fn sleep_poll_interval(
+    deadline: Instant,
+    poll_interval: Duration,
+) -> Result<(), BudgetExhausted> {
+    let Some(remaining) = remaining_budget(deadline) else {
+        return Err(BudgetExhausted);
+    };
+    tokio::time::sleep(remaining.min(poll_interval)).await;
+    Ok(())
 }
 
 /// Read and parse the daemon's published TCP port. Returns `None` when the file
@@ -299,4 +413,57 @@ fn is_absent(e: &io::Error) -> bool {
         e.kind(),
         io::ErrorKind::NotFound | io::ErrorKind::ConnectionRefused
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn remaining_budget_is_none_once_deadline_passes() {
+        let deadline = Instant::now() + Duration::from_millis(1);
+        std::thread::sleep(Duration::from_millis(5));
+        assert_eq!(remaining_budget(deadline), None);
+    }
+
+    #[tokio::test]
+    async fn slow_attempt_is_capped_by_remaining_budget() {
+        let deadline = Instant::now() + Duration::from_millis(40);
+        let start = Instant::now();
+        let result = within_budget(deadline, tokio::time::sleep(Duration::from_secs(5))).await;
+        let elapsed = start.elapsed();
+        assert_eq!(result, Err(BudgetExhausted));
+        assert!(
+            elapsed < Duration::from_millis(250),
+            "slow attempt overran the budget: {elapsed:?}"
+        );
+        assert!(
+            elapsed >= Duration::from_millis(20),
+            "slow attempt returned too quickly: {elapsed:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn poll_sleep_does_not_exceed_remaining_budget() {
+        let deadline = Instant::now() + Duration::from_millis(30);
+        let start = Instant::now();
+        sleep_poll_interval(deadline, Duration::from_secs(2))
+            .await
+            .expect("sleep within remaining budget");
+        let elapsed = start.elapsed();
+        assert!(
+            elapsed < Duration::from_millis(250),
+            "poll sleep used the full interval past the deadline: {elapsed:?}"
+        );
+        assert_eq!(remaining_budget(deadline), None);
+    }
+
+    #[tokio::test]
+    async fn exhausted_budget_skips_poll_sleep() {
+        let deadline = Instant::now();
+        let start = Instant::now();
+        let result = sleep_poll_interval(deadline, Duration::from_secs(2)).await;
+        assert_eq!(result, Err(BudgetExhausted));
+        assert!(start.elapsed() < Duration::from_millis(50));
+    }
 }
