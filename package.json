@@ -36,12 +36,14 @@
     "test": "pnpm -r run test",
     "lint": "pnpm -r run lint",
     "type-check": "pnpm -r run type-check",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
     "clean": "pnpm -r run clean && rm -rf node_modules",
     "prepare": "husky"
   },
   "lint-staged": {
-    "*.ts": [
-      "eslint --fix",
+    "*.{ts,js,mjs,cjs}": [
+      "oxlint --fix",
       "oxfmt"
     ],
     "*.{json,md,yml,yaml}": [
@@ -49,14 +51,12 @@
     ]
   },
   "devDependencies": {
-    "@eslint/js": "^9.0.0",
     "@types/node": "^24.0.0",
-    "eslint": "^9.0.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
     "oxfmt": "^0.45.0",
+    "oxlint": "^1.93.0",
     "typescript": "^5.3.0",
-    "typescript-eslint": "^8.0.0",
     "vitest": "^3.2.6"
   },
   "pnpm": {

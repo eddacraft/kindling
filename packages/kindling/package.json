@@ -52,7 +52,7 @@
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "type-check": "tsc --noEmit",
-    "lint": "eslint src",
+    "lint": "oxlint .",
     "clean": "rm -rf dist"
   },
   "devDependencies": {

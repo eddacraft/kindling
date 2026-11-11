@@ -26,10 +26,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   capture = new WorkspaceCapture({
     sessionId,
     intent: 'VS Code editor session',
-    createKindling: (projectRoot) =>
-      new Kindling({
-        ...(projectRoot ? { projectRoot } : {}),
-      }),
+    createKindling: (projectRoot) => new Kindling(projectRoot ? { projectRoot } : {}),
   });
 
   const firstRoot = workspaceFolderPaths()[0];

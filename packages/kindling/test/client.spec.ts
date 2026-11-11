@@ -210,7 +210,7 @@ describe('@eddacraft/kindling package — no native modules', () => {
       dependencies?: Record<string, string>;
       devDependencies?: Record<string, string>;
     };
-    const deps = { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) };
+    const deps = { ...pkg.dependencies, ...pkg.devDependencies };
     const native = ['better-sqlite3', 'sqlite3', 'node-gyp', 'bindings', 'sql.js'];
     for (const name of native) {
       expect(deps[name], `${name} must not be a dependency`).toBeUndefined();

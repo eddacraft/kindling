@@ -179,16 +179,17 @@ export class SessionManager {
       ? filterContent(signals.summaryContent, INGESTION_FILTER_OPTIONS)
       : undefined;
 
-    const closed = await this.kindling.closeCapsule(context.activeCapsuleId, {
-      ...(summaryContent
+    const closed = await this.kindling.closeCapsule(
+      context.activeCapsuleId,
+      summaryContent
         ? {
             // The daemon only persists a summary when generateSummary is set.
             generateSummary: true,
             summaryContent,
             confidence: signals?.summaryConfidence ?? 0.8,
           }
-        : {}),
-    });
+        : {},
+    );
 
     this.activeSessions.delete(sessionId);
 

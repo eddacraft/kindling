@@ -10,6 +10,7 @@
     "directory": "plugins/kindling-claude-code"
   },
   "scripts": {
+    "lint": "oxlint .",
     "test": "node --test test/*.test.js"
   }
 }
