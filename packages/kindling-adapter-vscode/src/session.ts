@@ -4,7 +4,7 @@
  * Manages the lifecycle of session capsules through the daemon-backed
  * {@link Kindling} thin client:
  * - onSessionStart: opens a session capsule via the client
- * - onFileSave: appends a file_diff observation
+ * - onFileSave: appends a file_diff observation (optionally starting the session)
  * - onTerminalCommand: appends a command observation (optional stub)
  * - onSessionEnd: closes the capsule (with an optional summary) via the client
  */
@@ -41,6 +41,12 @@ export interface FileSaveEvent {
   diff?: string;
   additions?: number;
   deletions?: number;
+  /**
+   * When true, start a session if none is active. Used by the save handler so
+   * capture can recover after activation failed to reach the daemon. One start
+   * attempt per save; later saves retry if this attempt still fails.
+   */
+  ensureSession?: boolean;
 }
 
 /**
@@ -153,13 +159,32 @@ export class EditorSessionManager {
 
   /**
    * Record a file save as a file_diff observation.
+   *
+   * When {@link FileSaveEvent.ensureSession} is set and no session is tracked,
+   * this starts one (the bounded recovery path after a failed activation start)
+   * and then records the save. A failed start returns an error for this save
+   * without throwing; the next save may try again.
    */
   async onFileSave(event: FileSaveEvent): Promise<EditorEventResult> {
-    const context = this.activeSessions.get(event.sessionId);
+    let context = this.activeSessions.get(event.sessionId);
     if (!context) {
-      return {
-        error: `No active session found for sessionId: ${event.sessionId}`,
-      };
+      if (!event.ensureSession) {
+        return {
+          error: `No active session found for sessionId: ${event.sessionId}`,
+        };
+      }
+
+      try {
+        context = await this.onSessionStart({
+          sessionId: event.sessionId,
+          repoId: event.repoId,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return {
+          error: `No active session found for sessionId: ${event.sessionId}: ${message}`,
+        };
+      }
     }
 
     const content = formatFileSaveContent(event);

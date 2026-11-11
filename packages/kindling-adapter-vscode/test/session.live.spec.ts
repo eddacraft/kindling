@@ -196,4 +196,30 @@ describe.skipIf(!HAS_BINARY)('VS Code capture journey (live daemon)', () => {
     expect(await clientA.getOpenCapsule('vscode-multi-root')).toBeNull();
     expect(await clientB.getOpenCapsule('vscode-multi-root')).toBeNull();
   });
+
+  it('records a save after a failed activation start once the daemon is reachable', async () => {
+    const { client, projectRoot } = freshProfile();
+    const manager = new EditorSessionManager(client);
+    const sessionId = 'vscode-save-recovery';
+
+    // Activation tried to open a session and the daemon was unreachable, so
+    // nothing is tracked. A later save with ensureSession (what the extension
+    // save handler now sends) must start the session and record the file.
+    expect(manager.isSessionActive(sessionId)).toBe(false);
+
+    const saved = await manager.onFileSave({
+      sessionId,
+      filePath: join(projectRoot, 'src', 'recovered.ts'),
+      repoId: projectRoot,
+      timestamp: Date.now(),
+      ensureSession: true,
+    });
+
+    expect(saved.error).toBeUndefined();
+    expect(saved.observation?.kind).toBe('file_diff');
+    expect(manager.isSessionActive(sessionId)).toBe(true);
+
+    const closed = await manager.onSessionEnd(sessionId, { reason: 'window closed' });
+    expect(closed.status).toBe('closed');
+  });
 });

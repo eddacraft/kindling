@@ -127,6 +127,7 @@ export class WorkspaceCapture {
       filePath,
       repoId,
       timestamp,
+      ensureSession: true,
     });
   }
 
