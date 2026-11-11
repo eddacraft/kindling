@@ -122,6 +122,100 @@ test('projectRoot rejects a sibling path sharing a string prefix', () => {
   }
 });
 
+function gitEnv() {
+  const env = { ...process.env };
+  delete env.GIT_DIR;
+  delete env.GIT_WORK_TREE;
+  return env;
+}
+
+function git(cwd, args) {
+  execFileSync(
+    'git',
+    [
+      '-c',
+      'user.name=kindling',
+      '-c',
+      'user.email=k@example.com',
+      '-c',
+      'commit.gpgsign=false',
+      '-c',
+      'init.defaultBranch=main',
+      ...args,
+    ],
+    { cwd, env: gitEnv(), stdio: 'pipe' },
+  );
+}
+
+function initRepo(parent, name) {
+  const repo = join(parent, name);
+  mkdirSync(repo, { recursive: true });
+  git(repo, ['init', '-q']);
+  return repo;
+}
+
+function isolatedToplevel(cwd) {
+  return execFileSync('git', ['rev-parse', '--show-toplevel'], {
+    cwd,
+    encoding: 'utf-8',
+    env: gitEnv(),
+  }).replace(/\r?\n$/, '');
+}
+
+function withEnv(vars, fn) {
+  const saved = {};
+  for (const key of Object.keys(vars)) {
+    saved[key] = process.env[key];
+    if (vars[key] === undefined) delete process.env[key];
+    else process.env[key] = vars[key];
+  }
+  try {
+    return fn();
+  } finally {
+    for (const key of Object.keys(vars)) {
+      if (saved[key] === undefined) delete process.env[key];
+      else process.env[key] = saved[key];
+    }
+  }
+}
+
+test('projectRoot ignores GIT_WORK_TREE pointing at another checkout', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'kindling-git-'));
+  const repoA = initRepo(dir, 'a');
+  const repoB = initRepo(dir, 'b');
+  withEnv({ GIT_WORK_TREE: repoB }, () => {
+    assert.equal(projectRoot(repoA), isolatedToplevel(repoA));
+  });
+});
+
+test('projectRoot linked worktree reports its own root even with Git overrides', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'kindling-wt-'));
+  const repo = initRepo(dir, 'repo');
+  git(repo, ['commit', '-q', '--allow-empty', '-m', 'init']);
+  const wt = join(dir, 'wt');
+  git(repo, ['worktree', 'add', '-q', '-b', 'side', wt]);
+  const nested = join(wt, 'sub');
+  mkdirSync(nested);
+  const other = initRepo(dir, 'other');
+  withEnv({ GIT_DIR: join(other, '.git'), GIT_WORK_TREE: other }, () => {
+    const expected = isolatedToplevel(wt);
+    assert.equal(projectRoot(wt), expected);
+    assert.equal(projectRoot(nested), expected);
+    assert.notEqual(expected, isolatedToplevel(repo));
+  });
+});
+
+test('projectRoot preserves trailing whitespace in a repository path', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'kindling-ws-'));
+  const repo = join(dir, 'repo ');
+  mkdirSync(repo);
+  if (repo.trimEnd() === repo) return;
+  git(repo, ['init', '-q']);
+  const root = projectRoot(repo);
+  assert.equal(root, isolatedToplevel(repo));
+  assert.notEqual(root, root.trim());
+});
+
 test('memory-search finds seeded content', { skip }, () => {
   const { db, env } = freshEnv();
   seed(db, 'implemented oauth token refresh in the auth module');

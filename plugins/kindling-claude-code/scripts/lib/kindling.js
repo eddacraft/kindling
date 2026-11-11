@@ -45,14 +45,39 @@ function projectRoot(cwd) {
     }
   }
   try {
-    return execFileSync('git', ['rev-parse', '--show-toplevel'], {
-      cwd,
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim();
+    const top = stripTrailingGitNewline(
+      execFileSync('git', ['rev-parse', '--show-toplevel'], {
+        cwd,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: gitDiscoveryEnv(),
+      }),
+    );
+    return top.length > 0 ? top : resolve(cwd);
   } catch {
     return resolve(cwd);
   }
+}
+
+/**
+ * Child env for repository discovery: inherit everything except Git variables
+ * that redirect `rev-parse` at a different checkout than `cwd`.
+ */
+function gitDiscoveryEnv() {
+  const env = { ...process.env };
+  delete env.GIT_DIR;
+  delete env.GIT_WORK_TREE;
+  return env;
+}
+
+/**
+ * Strip the single trailing newline Git appends to `--show-toplevel`.
+ * Unlike `String.prototype.trim`, this leaves spaces and tabs in the path.
+ */
+function stripTrailingGitNewline(s) {
+  if (s.endsWith('\r\n')) return s.slice(0, -2);
+  if (s.endsWith('\n') || s.endsWith('\r')) return s.slice(0, -1);
+  return s;
 }
 
 /**
