@@ -5,7 +5,8 @@
 //!
 //! 1. If `KINDLING_REPO_ROOT` is set AND the resolved cwd is that root or a
 //!    path beneath it (component-wise, after normalising the override), use it.
-//! 2. Otherwise `git rev-parse --show-toplevel` run in `cwd`, trimmed.
+//! 2. Otherwise `git rev-parse --show-toplevel` run in `cwd` (Git repo
+//!    overrides isolated; only the trailing newline stripped).
 //! 3. Otherwise the canonicalized `cwd`.
 //!
 //! The resolved root becomes `ClientConfig.project_root`, so the daemon routes
@@ -56,7 +57,7 @@ fn cwd_is_under_root(resolved_cwd: &str, env_root: &str) -> bool {
     Path::new(resolved_cwd).starts_with(&root)
 }
 
-/// `git rev-parse --show-toplevel` in `cwd`, trimmed; `None` on any failure.
+/// `git rev-parse --show-toplevel` in `cwd`; `None` on any failure.
 ///
 /// Must stay git's raw output (no separator normalisation): the project root is
 /// hashed into the per-project DB path, so any change would orphan databases.

@@ -76,7 +76,9 @@ export function defaultSocketPath(): string {
  *
  *   1. `KINDLING_REPO_ROOT` if set AND the resolved cwd is that root or a
  *      path beneath it (component-wise, after normalising the override).
- *   2. `git rev-parse --show-toplevel` run in `cwd`, trimmed.
+ *   2. `git rev-parse --show-toplevel` run in `cwd`, with `GIT_DIR` /
+ *      `GIT_WORK_TREE` cleared so a parent checkout cannot leak in, and with
+ *      only the trailing newline stripped so path characters are preserved.
  *   3. The resolved `cwd`.
  */
 export function resolveProjectRoot(cwd: string = process.cwd()): string {
@@ -88,11 +90,14 @@ export function resolveProjectRoot(cwd: string = process.cwd()): string {
   }
 
   try {
-    const top = execFileSync('git', ['rev-parse', '--show-toplevel'], {
-      cwd,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    }).trim();
+    const top = stripTrailingGitNewline(
+      execFileSync('git', ['rev-parse', '--show-toplevel'], {
+        cwd,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+        env: gitDiscoveryEnv(),
+      }),
+    );
     if (top.length > 0) {
       return top;
     }
@@ -116,6 +121,27 @@ function cwdIsUnderRoot(cwdResolved: string, rootResolved: string): boolean {
   }
   const prefix = rootResolved.endsWith(sep) ? rootResolved : rootResolved + sep;
   return cwdResolved.startsWith(prefix);
+}
+
+/**
+ * Child env for repository discovery: inherit everything except Git variables
+ * that redirect `rev-parse` at a different checkout than `cwd`.
+ */
+function gitDiscoveryEnv(): NodeJS.ProcessEnv {
+  const env = { ...process.env };
+  delete env.GIT_DIR;
+  delete env.GIT_WORK_TREE;
+  return env;
+}
+
+/**
+ * Strip the single trailing newline Git appends to `--show-toplevel`.
+ * Unlike `String.prototype.trim`, this leaves spaces and tabs in the path.
+ */
+function stripTrailingGitNewline(s: string): string {
+  if (s.endsWith('\r\n')) return s.slice(0, -2);
+  if (s.endsWith('\n') || s.endsWith('\r')) return s.slice(0, -1);
+  return s;
 }
 
 /** Options for constructing a {@link Kindling} client. */
