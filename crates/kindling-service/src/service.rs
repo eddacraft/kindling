@@ -434,8 +434,22 @@ impl KindlingService {
     }
 
     /// [`Self::pin`] with an explicit clock for deterministic tests.
+    ///
+    /// `now` and `ttl_ms` are unrestricted `i64`s; their sum uses checked
+    /// arithmetic so overflow is a validation error rather than a panic or wrap.
     pub fn pin_at(&self, options: CreatePinOptions, now: Timestamp) -> ServiceResult<Pin> {
-        let expires_at = options.ttl_ms.map(|ttl| now + ttl);
+        let expires_at = options
+            .ttl_ms
+            .map(|ttl| {
+                now.checked_add(ttl).ok_or_else(|| {
+                    ServiceError::Validation(vec![ValidationError {
+                        field: "ttlMs".to_string(),
+                        message: "ttlMs overflows when added to now".to_string(),
+                        value: Some(serde_json::Value::from(ttl)),
+                    }])
+                })
+            })
+            .transpose()?;
         let pin = validation::validate_pin(
             PinInput {
                 id: None,

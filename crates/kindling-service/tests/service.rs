@@ -673,6 +673,58 @@ fn pin_has_prefix_and_ttl_expiry() {
 }
 
 #[test]
+fn pin_ttl_positive_overflow_is_validation_error() {
+    let svc = service();
+    let err = svc
+        .pin_at(
+            CreatePinOptions {
+                target_type: PinTargetType::Observation,
+                target_id: "obs-overflow-pos".to_string(),
+                note: None,
+                ttl_ms: Some(1),
+                scope_ids: Some(session_scope("overflow-pos")),
+            },
+            i64::MAX,
+        )
+        .expect_err("positive overflow rejected");
+    match err {
+        ServiceError::Validation(errors) => {
+            assert!(
+                errors.iter().any(|e| e.field == "ttlMs"),
+                "expected ttlMs overflow, got {errors:?}"
+            );
+        }
+        other => panic!("expected Validation, got {other:?}"),
+    }
+}
+
+#[test]
+fn pin_ttl_negative_overflow_is_validation_error() {
+    let svc = service();
+    let err = svc
+        .pin_at(
+            CreatePinOptions {
+                target_type: PinTargetType::Observation,
+                target_id: "obs-overflow-neg".to_string(),
+                note: None,
+                ttl_ms: Some(-1),
+                scope_ids: Some(session_scope("overflow-neg")),
+            },
+            i64::MIN,
+        )
+        .expect_err("negative overflow rejected");
+    match err {
+        ServiceError::Validation(errors) => {
+            assert!(
+                errors.iter().any(|e| e.field == "ttlMs"),
+                "expected ttlMs overflow, got {errors:?}"
+            );
+        }
+        other => panic!("expected Validation, got {other:?}"),
+    }
+}
+
+#[test]
 fn pin_without_ttl_never_expires() {
     let svc = service();
     let scope = session_scope("p2");
