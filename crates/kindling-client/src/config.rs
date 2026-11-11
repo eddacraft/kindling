@@ -2,7 +2,7 @@
 
 use std::io;
 use std::path::PathBuf;
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, ExitStatus, Stdio};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -111,10 +111,11 @@ pub enum Transport {
 /// (not-yet-built) binary on `PATH`.
 #[derive(Clone, Default)]
 pub enum Spawner {
-    /// Production path: `kindling serve --daemonize`, detached (not awaited).
-    /// The `kindling` binary is PORT-013; until it exists this path simply
-    /// surfaces a clean spawn error, which the connect logic maps to
-    /// [`ClientError::Unavailable`](crate::ClientError::Unavailable).
+    /// Production path: `kindling serve --daemonize`. The launcher is reaped
+    /// in the background so an immediate exit cannot linger as a zombie in a
+    /// long-lived Unix host; the daemon itself is not awaited on the connect
+    /// path. A missing binary surfaces as a spawn error, which the connect
+    /// logic maps to [`ClientError::Unavailable`](crate::ClientError::Unavailable).
     #[default]
     Command,
     /// Test/custom path: invoke this closure to start the daemon.
@@ -133,30 +134,60 @@ impl Spawner {
     /// Run the spawn action once.
     pub(crate) fn spawn(&self) -> io::Result<()> {
         match self {
-            Spawner::Command => {
-                let mut cmd = Command::new("kindling");
-                cmd.args(["serve", "--daemonize"])
-                    // Detach the daemon's stdio from ours. Without this the
-                    // long-lived daemon inherits the spawner's stdout — fatal
-                    // for a Claude Code hook, whose stdout must carry only the
-                    // hook's JSON response. Null also lets the spawner exit
-                    // without the pipe keeping the daemon's fds open.
-                    .stdin(Stdio::null())
-                    .stdout(Stdio::null())
-                    .stderr(Stdio::null());
-                // Put the daemon in its own process group so a signal sent to
-                // the spawner's group (e.g. Ctrl-C in an interactive shell, or
-                // the shell reaping a hook) does not also kill the daemon.
-                #[cfg(unix)]
-                {
-                    use std::os::unix::process::CommandExt;
-                    cmd.process_group(0);
-                }
-                cmd.spawn()?;
-                Ok(())
-            }
+            Spawner::Command => spawn_kindling_command(),
             Spawner::Custom(f) => f(),
         }
+    }
+}
+
+/// `kindling serve --daemonize` with stdio detached and, on Unix, its own
+/// process group. The returned child is adopted so a failed launcher is
+/// reaped instead of being dropped.
+fn spawn_kindling_command() -> io::Result<()> {
+    let mut cmd = Command::new("kindling");
+    cmd.args(["serve", "--daemonize"])
+        // Detach the daemon's stdio from ours. Without this the
+        // long-lived daemon inherits the spawner's stdout — fatal
+        // for a Claude Code hook, whose stdout must carry only the
+        // hook's JSON response. Null also lets the spawner exit
+        // without the pipe keeping the daemon's fds open.
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    // Put the daemon in its own process group so a signal sent to
+    // the spawner's group (e.g. Ctrl-C in an interactive shell, or
+    // the shell reaping a hook) does not also kill the daemon.
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        cmd.process_group(0);
+    }
+    adopt_child(cmd.spawn()?)
+}
+
+/// Reap `child` if it has already exited; otherwise wait for it on a
+/// background thread so a later exit cannot linger as a zombie.
+fn adopt_child(mut child: Child) -> io::Result<()> {
+    match child.try_wait()? {
+        Some(status) => child_status_result(status),
+        None => {
+            std::thread::Builder::new()
+                .name("kindling-spawn-reaper".to_string())
+                .spawn(move || {
+                    let _ = child.wait();
+                })?;
+            Ok(())
+        }
+    }
+}
+
+fn child_status_result(status: ExitStatus) -> io::Result<()> {
+    if status.success() {
+        Ok(())
+    } else {
+        Err(io::Error::other(format!(
+            "kindling serve --daemonize exited immediately ({status})"
+        )))
     }
 }
 
@@ -313,5 +344,99 @@ mod tests {
     fn expected_schema_version_parses_to_six() {
         // schema/version.json currently pins version 6.
         assert_eq!(EXPECTED_SCHEMA_VERSION, 6);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn already_exited_failed_launcher_is_an_error() {
+        let mut child = Command::new("false").spawn().expect("spawn false");
+        let status = child.wait().expect("wait for false");
+        assert!(!status.success());
+        let err = adopt_child(child).expect_err("failed launcher must surface");
+        assert!(
+            err.to_string().contains("exited immediately"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn already_exited_successful_launcher_is_ok() {
+        let mut child = Command::new("true").spawn().expect("spawn true");
+        let status = child.wait().expect("wait for true");
+        assert!(status.success());
+        adopt_child(child).expect("successful launcher is already reaped");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn failed_launcher_is_reaped() {
+        let child = Command::new("sh")
+            .args(["-c", "exit 7"])
+            .spawn()
+            .expect("spawn exiting shell");
+        let pid = child.id();
+        let _ = adopt_child(child);
+        assert_reaped(pid);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn live_child_is_not_killed_and_is_reaped_after_exit() {
+        let child = Command::new("sh")
+            .args(["-c", "exec sleep 60"])
+            .spawn()
+            .expect("spawn sleep");
+        let pid = child.id();
+        adopt_child(child).expect("live child is adopted");
+
+        // The daemon path must not wait() in the foreground; the process stays up.
+        std::thread::sleep(Duration::from_millis(50));
+        let state = process_state(pid);
+        assert!(
+            state.as_deref().is_some_and(|s| !s.starts_with('Z')),
+            "live child should still be running, got {state:?}"
+        );
+
+        let _ = Command::new("kill").args(["-9", &pid.to_string()]).status();
+        assert_reaped(pid);
+    }
+
+    #[cfg(unix)]
+    fn process_state(pid: u32) -> Option<String> {
+        let output = Command::new("ps")
+            .args(["-o", "state=", "-p", &pid.to_string()])
+            .output()
+            .ok()?;
+        if !output.status.success() {
+            return None;
+        }
+        let state = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if state.is_empty() {
+            None
+        } else {
+            Some(state)
+        }
+    }
+
+    #[cfg(unix)]
+    fn assert_reaped(pid: u32) {
+        for _ in 0..100 {
+            match process_state(pid) {
+                None => return,
+                Some(state) if state.starts_with('Z') => {
+                    std::thread::sleep(Duration::from_millis(10));
+                }
+                Some(_) => {
+                    // Still running (or exiting); give the reaper a moment.
+                    std::thread::sleep(Duration::from_millis(10));
+                }
+            }
+        }
+        let leftover = process_state(pid);
+        assert!(
+            leftover.is_none(),
+            "pid {pid} was not reaped; ps state={leftover:?}"
+        );
     }
 }
