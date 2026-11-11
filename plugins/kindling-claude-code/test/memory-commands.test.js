@@ -130,6 +130,39 @@ test('memory-search finds seeded content', { skip }, () => {
   const out = runScript('memory-search.js', ['oauth', 'token'], env);
   assert.match(out, /Search Results/);
   assert.match(out, /oauth token refresh/);
+
+  // Search must print the observation id so /memory forget can consume it.
+  const obs = cliJson(db, ['list', 'observations']);
+  const target = obs.find((o) => o.content.includes('oauth token refresh'));
+  assert.ok(target, 'seeded oauth observation should exist');
+  assert.match(out, new RegExp('\\[' + target.id + '\\]'));
+  assert.match(out, /Use \/memory forget/);
+});
+
+test('memory-search ids can be passed to memory-forget', { skip }, () => {
+  const { db, env } = freshEnv();
+  seed(db, 'sensitive observation mentioning secretword');
+  seed(db, 'unrelated observation');
+
+  const searchOut = runScript('memory-search.js', ['secretword'], env);
+  assert.match(searchOut, /secretword/);
+
+  const idMatch = searchOut.match(
+    /\[([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\]/i,
+  );
+  assert.ok(idMatch, 'search output should include an observation id');
+  const id = idMatch[1];
+
+  const listed = cliJson(db, ['list', 'observations']);
+  const target = listed.find((o) => o.content.includes('secretword'));
+  assert.equal(id, target.id, 'printed id should be the matching observation');
+
+  const forgetOut = runScript('memory-forget.js', [id], env);
+  assert.match(forgetOut, /Redacted observation:/);
+
+  const after = runScript('memory-search.js', ['secretword'], env);
+  assert.doesNotMatch(after, /Search Results/);
+  assert.doesNotMatch(after, /sensitive observation mentioning secretword/);
 });
 
 test('memory-status reports counts and db path', { skip }, () => {

@@ -10,4 +10,4 @@ Run this command to search:
 node "${CLAUDE_PLUGIN_ROOT}/scripts/memory-search.js" "$ARGUMENTS"
 ```
 
-Show the results to the user in a readable format.
+Show the results to the user in a readable format. Each result includes the observation ID; pass that ID to `/memory forget` to redact it.
