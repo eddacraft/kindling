@@ -185,4 +185,4 @@ benchmark-results/
 
 # VS Code extension packaging
 *.vsix
-.vsix-staging/
+.vsix-staging*
