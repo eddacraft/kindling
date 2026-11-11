@@ -58,17 +58,15 @@ pub fn map_capture(hook_type: HookType, input: &HookInput) -> Option<Observation
             Some(mapping::map_tool_use(&input))
         }
         HookType::UserPromptSubmit => {
+            // Prefer `content` over `prompt`, skipping blank (empty or
+            // whitespace-only) candidates so a whitespace `content` does not
+            // hide a real prompt.
             let content = input
                 .content
                 .as_deref()
-                .filter(|s| !s.is_empty())
-                .or(input.prompt.as_deref())
-                .unwrap_or("");
-            if content.trim().is_empty() {
-                None
-            } else {
-                Some(mapping::map_user_prompt(input, content))
-            }
+                .filter(|s| !s.trim().is_empty())
+                .or_else(|| input.prompt.as_deref().filter(|s| !s.trim().is_empty()));
+            content.map(|content| mapping::map_user_prompt(input, content))
         }
         HookType::SubagentStop => Some(mapping::map_subagent_stop(input)),
         HookType::SessionStart | HookType::PreCompact | HookType::Stop => None,

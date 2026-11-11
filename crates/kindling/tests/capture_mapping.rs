@@ -68,6 +68,19 @@ fn empty_user_prompt_maps_to_nothing() {
 }
 
 #[test]
+fn whitespace_content_falls_back_to_prompt() {
+    let input = HookInput {
+        session_id: Some("s1".to_string()),
+        cwd: "/repo".to_string(),
+        content: Some("   ".to_string()),
+        prompt: Some("Please refactor the parser.".to_string()),
+        ..HookInput::default()
+    };
+    let obs = map_capture(HookType::UserPromptSubmit, &input).expect("observation");
+    assert_eq!(obs.content, "Please refactor the parser.");
+}
+
+#[test]
 fn failure_hook_defaults_missing_error() {
     // post-tool-use-failure with no tool_error/error → "Unknown error".
     let input = HookInput {
