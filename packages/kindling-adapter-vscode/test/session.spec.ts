@@ -132,6 +132,72 @@ describe('EditorSessionManager (mocked Kindling)', () => {
       expect(context.observationCount).toBe(1);
       expect(kindling.openCapsule).not.toHaveBeenCalled();
     });
+
+    it('shares an in-flight start so concurrent callers reuse one capsule', async () => {
+      let releaseLookup: (value: Capsule | null) => void = () => {};
+      vi.mocked(kindling.getOpenCapsule).mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            releaseLookup = resolve;
+          }),
+      );
+
+      const first = manager.onSessionStart({ sessionId: 's1', intent: 'Fix bug' });
+      const second = manager.onSessionStart({ sessionId: 's1', intent: 'Other' });
+
+      expect(kindling.getOpenCapsule).toHaveBeenCalledTimes(1);
+
+      releaseLookup(null);
+
+      const [a, b] = await Promise.all([first, second]);
+      expect(a).toBe(b);
+      expect(a.activeCapsuleId).toBe(b.activeCapsuleId);
+      expect(kindling.getOpenCapsule).toHaveBeenCalledTimes(1);
+      expect(kindling.openCapsule).toHaveBeenCalledOnce();
+      expect(kindling.openCapsule).toHaveBeenCalledWith(
+        expect.objectContaining({ intent: 'Fix bug' }),
+      );
+    });
+
+    it('lets concurrent starts for different sessions proceed independently', async () => {
+      const lookups: Array<(value: Capsule | null) => void> = [];
+      vi.mocked(kindling.getOpenCapsule).mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            lookups.push(resolve);
+          }),
+      );
+
+      const first = manager.onSessionStart({ sessionId: 's1' });
+      const second = manager.onSessionStart({ sessionId: 's2' });
+
+      expect(kindling.getOpenCapsule).toHaveBeenCalledTimes(2);
+
+      for (const release of lookups) {
+        release(null);
+      }
+
+      const [a, b] = await Promise.all([first, second]);
+      expect(a.sessionId).toBe('s1');
+      expect(b.sessionId).toBe('s2');
+      expect(a.activeCapsuleId).not.toBe(b.activeCapsuleId);
+      expect(kindling.openCapsule).toHaveBeenCalledTimes(2);
+    });
+
+    it('clears a failed in-flight start so a later call can retry', async () => {
+      vi.mocked(kindling.getOpenCapsule).mockRejectedValueOnce(new Error('daemon down'));
+
+      const first = manager.onSessionStart({ sessionId: 's1' });
+      const second = manager.onSessionStart({ sessionId: 's1' });
+
+      await expect(first).rejects.toThrow('daemon down');
+      await expect(second).rejects.toThrow('daemon down');
+      expect(kindling.getOpenCapsule).toHaveBeenCalledTimes(1);
+
+      const retried = await manager.onSessionStart({ sessionId: 's1' });
+      expect(retried.activeCapsuleId).toBeTruthy();
+      expect(kindling.openCapsule).toHaveBeenCalledOnce();
+    });
   });
 
   describe('onFileSave', () => {

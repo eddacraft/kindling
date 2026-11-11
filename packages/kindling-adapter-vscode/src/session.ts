@@ -83,6 +83,7 @@ export interface EditorEventResult {
  */
 export class EditorSessionManager {
   private activeSessions: Map<string, EditorSessionContext> = new Map();
+  private pendingStarts: Map<string, Promise<EditorSessionContext>> = new Map();
 
   constructor(private kindling: Kindling) {}
 
@@ -90,17 +91,33 @@ export class EditorSessionManager {
    * Start a new editor session.
    *
    * Opens a capsule for the session. If this manager already tracks the
-   * session, returns the existing context. Otherwise it asks the daemon whether
-   * an open capsule already exists for the session (crash recovery) before
-   * opening a fresh one.
+   * session, returns the existing context. Concurrent starts for the same
+   * session share the in-flight work so only one daemon lookup or capsule
+   * open runs. Otherwise it asks the daemon whether an open capsule already
+   * exists for the session (crash recovery) before opening a fresh one.
    */
   async onSessionStart(options: EditorSessionStartOptions): Promise<EditorSessionContext> {
-    const { sessionId, intent = 'Editor session', repoId } = options;
+    const { sessionId } = options;
 
     const existing = this.activeSessions.get(sessionId);
     if (existing) {
       return existing;
     }
+
+    const pending = this.pendingStarts.get(sessionId);
+    if (pending) {
+      return pending;
+    }
+
+    const start = this.startSession(options).finally(() => {
+      this.pendingStarts.delete(sessionId);
+    });
+    this.pendingStarts.set(sessionId, start);
+    return start;
+  }
+
+  private async startSession(options: EditorSessionStartOptions): Promise<EditorSessionContext> {
+    const { sessionId, intent = 'Editor session', repoId } = options;
 
     const existingCapsule = await this.kindling.getOpenCapsule(sessionId);
     if (existingCapsule) {
