@@ -99,6 +99,27 @@ pub struct Activity {
     start: Instant,
 }
 
+/// Cancellation-safe request scope: [`Activity::enter`] on construct,
+/// [`Activity::leave`] on drop — including when the handler future is
+/// cancelled rather than run to completion.
+#[must_use = "the guard leaves on drop; not binding it marks the request finished immediately"]
+pub(crate) struct RequestGuard {
+    activity: Arc<Activity>,
+}
+
+impl RequestGuard {
+    pub(crate) fn new(activity: Arc<Activity>) -> Self {
+        activity.enter();
+        Self { activity }
+    }
+}
+
+impl Drop for RequestGuard {
+    fn drop(&mut self) {
+        self.activity.leave();
+    }
+}
+
 impl Activity {
     fn new() -> Self {
         Self {
@@ -118,10 +139,24 @@ impl Activity {
         self.last_active_ms.store(self.now_ms(), Ordering::SeqCst);
     }
 
-    /// Mark the end of a request: drop in-flight and touch last-active.
+    /// Mark the end of a request: touch last-active, then drop in-flight.
+    ///
+    /// Last-activity is published before the count drops so a concurrent
+    /// [`is_idle_for`] cannot observe zero in-flight requests against the
+    /// timestamp from [`enter`]. A long request would otherwise look idle the
+    /// moment it finished.
     pub fn leave(&self) {
-        self.in_flight.fetch_sub(1, Ordering::SeqCst);
+        self.publish_leave(None);
+    }
+
+    /// Shared leave transition. `interleaved` runs after last-activity is
+    /// stored and before in-flight drops, so tests can observe that window.
+    fn publish_leave(&self, interleaved: Option<&dyn Fn(&Self)>) {
         self.last_active_ms.store(self.now_ms(), Ordering::SeqCst);
+        if let Some(observe) = interleaved {
+            observe(self);
+        }
+        self.in_flight.fetch_sub(1, Ordering::SeqCst);
     }
 
     /// Whether the daemon has been idle (no in-flight, no recent activity) for
@@ -156,5 +191,73 @@ mod tests {
         assert!(!a.is_idle_for(Duration::from_millis(0)));
         a.leave();
         assert!(a.is_idle_for(Duration::from_millis(0)));
+    }
+
+    #[test]
+    fn leave_does_not_report_idle_between_touch_and_decrement() {
+        let a = Activity::new();
+        a.enter();
+        // Age the enter() timestamp past the idle threshold so a decrement
+        // that ran first would look idle against a stale clock.
+        std::thread::sleep(Duration::from_millis(40));
+        a.publish_leave(Some(&|a| {
+            assert!(
+                !a.is_idle_for(Duration::from_millis(20)),
+                "last-activity must be published before in-flight drops"
+            );
+        }));
+        assert!(
+            !a.is_idle_for(Duration::from_millis(20)),
+            "a just-finished request must not look idle"
+        );
+        assert!(a.is_idle_for(Duration::from_millis(0)));
+    }
+
+    #[test]
+    fn decrementing_before_touch_can_look_idle_against_a_stale_timestamp() {
+        let a = Activity::new();
+        a.enter();
+        std::thread::sleep(Duration::from_millis(40));
+        // The unsafe order: drop in-flight first, leaving last-activity at
+        // enter(). This is the window `publish_leave` must not expose.
+        a.in_flight.fetch_sub(1, Ordering::SeqCst);
+        assert!(
+            a.is_idle_for(Duration::from_millis(20)),
+            "stale last-activity plus zero in-flight is the leave() race"
+        );
+    }
+
+    #[tokio::test]
+    async fn cancelled_request_guard_releases_activity() {
+        let activity = Arc::new(Activity::new());
+        let entered = Arc::new(tokio::sync::Notify::new());
+        let guard_activity = Arc::clone(&activity);
+        let entered_signal = Arc::clone(&entered);
+        let handle = tokio::spawn(async move {
+            let _request = RequestGuard::new(guard_activity);
+            entered_signal.notify_one();
+            std::future::pending::<()>().await
+        });
+        entered.notified().await;
+        assert!(
+            !activity.is_idle_for(Duration::from_millis(0)),
+            "an in-flight request must keep the tracker busy"
+        );
+        handle.abort();
+        let _ = handle.await;
+        assert!(
+            activity.is_idle_for(Duration::from_millis(0)),
+            "cancelling the request future must still call leave"
+        );
+    }
+
+    #[test]
+    fn request_guard_leave_on_drop() {
+        let activity = Arc::new(Activity::new());
+        {
+            let _request = RequestGuard::new(Arc::clone(&activity));
+            assert!(!activity.is_idle_for(Duration::from_millis(0)));
+        }
+        assert!(activity.is_idle_for(Duration::from_millis(0)));
     }
 }

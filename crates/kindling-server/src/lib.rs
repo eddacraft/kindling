@@ -148,10 +148,8 @@ pub fn build_router(state: AppState, tcp_secret: Option<Arc<str>>) -> Router {
             move |req, next: axum::middleware::Next| {
                 let activity = Arc::clone(&activity);
                 async move {
-                    activity.enter();
-                    let response = next.run(req).await;
-                    activity.leave();
-                    response
+                    let _request = state::RequestGuard::new(activity);
+                    next.run(req).await
                 }
             },
         ))
