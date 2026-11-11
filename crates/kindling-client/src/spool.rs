@@ -50,10 +50,11 @@
 //!   ([`AppendOutcome::Spooled`]).
 //! - [`ClientError::Api`](crate::ClientError::Api),
 //!   [`ClientError::SchemaMismatch`](crate::ClientError::SchemaMismatch),
-//!   [`ClientError::Decode`](crate::ClientError::Decode), and
-//!   [`ClientError::Io`](crate::ClientError::Io) → propagate
-//!   ([`SpoolError::Client`]). The daemon *responded*; a rejected observation
-//!   must never be spooled or it would loop forever on every flush.
+//!   [`ClientError::Decode`](crate::ClientError::Decode),
+//!   [`ClientError::Io`](crate::ClientError::Io), and
+//!   [`ClientError::InvalidRequest`](crate::ClientError::InvalidRequest) →
+//!   propagate ([`SpoolError::Client`]). A rejected or locally invalid
+//!   observation must never be spooled or it would loop forever on every flush.
 //!
 //! # Concurrency
 //!
@@ -250,8 +251,8 @@ pub enum SpoolError {
     #[error("spool serde error: {0}")]
     Serde(#[from] serde_json::Error),
 
-    /// The daemon responded with a non-connectivity error that must not be
-    /// spooled (`Api`, `SchemaMismatch`, `Decode`, `Io`).
+    /// A non-connectivity client error that must not be spooled (`Api`,
+    /// `SchemaMismatch`, `Decode`, `Io`, `InvalidRequest`).
     #[error("client error: {0}")]
     Client(#[from] ClientError),
 }

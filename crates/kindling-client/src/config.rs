@@ -182,7 +182,8 @@ pub struct ClientConfig {
     pub port_path: PathBuf,
     /// Project root string, sent as the `X-Kindling-Project` header on every
     /// data endpoint. The daemon hashes it to route to a per-project DB.
-    /// Defaults to the current working directory.
+    /// Defaults to the current working directory. Values that are not valid
+    /// HTTP header fields return [`crate::ClientError::InvalidRequest`].
     pub project_root: String,
     /// Schema version the client requires the daemon to report from
     /// `/v1/health`. Defaults to [`EXPECTED_SCHEMA_VERSION`].

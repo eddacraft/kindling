@@ -899,3 +899,25 @@ async fn list_observations_rejects_malformed_cursor() {
         other => panic!("expected a 400 Api error, got {other:?}"),
     }
 }
+
+/// A project-root containing a newline cannot be sent as `X-Kindling-Project`.
+/// That is a permanent local request error, not an HTTP transport failure.
+#[tokio::test]
+async fn invalid_project_header_is_invalid_request() {
+    let daemon = TestDaemon::start().await;
+    let client = daemon.client("/tmp/kindling-client-test/project\nwith-newline");
+
+    let err = client
+        .append_observation(message_input("must not send"), None, None)
+        .await
+        .expect_err("invalid header must fail locally");
+    match err {
+        ClientError::InvalidRequest(msg) => {
+            assert!(
+                msg.contains("x-kindling-project"),
+                "expected header name in the error, got {msg:?}"
+            );
+        }
+        other => panic!("expected InvalidRequest, got {other:?}"),
+    }
+}

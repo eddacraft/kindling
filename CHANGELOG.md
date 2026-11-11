@@ -28,6 +28,11 @@ eddacraft-kindling`, Homebrew, the install script), the crates on crates.io,
 - **Hook and client project-root override rejects sibling directory prefixes (GH-173).**
   `KINDLING_REPO_ROOT` is normalised and compared as path components, so a cwd
   such as `/work/repo-copy` is no longer treated as inside `/work/repo`.
+- **Invalid project-root headers are not spooled as outages (GH-181).**
+  Request builder failures, such as an `X-Kindling-Project` value that is not a
+  valid HTTP header field, now surface as `ClientError::InvalidRequest` instead
+  of `ClientError::Http`. The spool treats these as permanent local errors and
+  does not buffer them ahead of later entries.
 
 ## [0.4.1] - 2026-11-10
 

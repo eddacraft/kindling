@@ -387,6 +387,89 @@ async fn api_error_propagates_not_spooled() {
     assert_eq!(spooled.pending_count().unwrap(), 0);
 }
 
+/// A project-root that is not a valid HTTP header value is a permanent local
+/// request error. It must propagate on append and must not be acknowledged as
+/// spooled (which would sit unreplayable ahead of later entries).
+#[tokio::test]
+async fn invalid_project_header_on_append_is_not_spooled() {
+    let daemon = TestDaemon::start().await;
+    let (_dir, spool_path) = spool_tempdir();
+    let invalid_project = "/tmp/kindling-spool-test/project\nwith-newline";
+    let spooled = SpooledClient::new(daemon.client(invalid_project), spool_path.clone());
+
+    let err = spooled
+        .append_observation(message_input("must not spool"), None, None)
+        .await
+        .expect_err("invalid header must propagate, not spool");
+    match err {
+        SpoolError::Client(ClientError::InvalidRequest(msg)) => {
+            assert!(
+                msg.contains("x-kindling-project"),
+                "expected header name in the error, got {msg:?}"
+            );
+        }
+        other => panic!("expected Client(InvalidRequest), got {other:?}"),
+    }
+
+    assert!(
+        !spool_path.exists(),
+        "invalid local request must NOT be spooled"
+    );
+    assert_eq!(spooled.pending_count().unwrap(), 0);
+}
+
+/// Replay through a client with an invalid project-root header must not look
+/// like an outage: flush propagates `InvalidRequest` and keeps the remainder,
+/// including later entries that were never reached.
+#[tokio::test]
+async fn invalid_project_header_on_replay_propagates() {
+    let dir = tempfile::tempdir().unwrap();
+    let socket = dir.path().join("nope.sock");
+    let (_spool_dir, spool_path) = spool_tempdir();
+
+    let down = SpooledClient::new(down_client(socket, PROJECT), spool_path.clone());
+    down.append_observation(message_input("replay first"), None, None)
+        .await
+        .unwrap();
+    down.append_observation(message_input("replay second"), None, None)
+        .await
+        .unwrap();
+    drop(down);
+    assert_eq!(
+        std::fs::read_to_string(&spool_path)
+            .unwrap()
+            .lines()
+            .filter(|l| !l.is_empty())
+            .count(),
+        2
+    );
+
+    let daemon = TestDaemon::start().await;
+    let invalid_project = "/tmp/kindling-spool-test/project\nwith-newline";
+    let bad = SpooledClient::new(daemon.client(invalid_project), spool_path.clone());
+
+    let err = bad
+        .flush()
+        .await
+        .expect_err("invalid header on replay must propagate");
+    match err {
+        SpoolError::Client(ClientError::InvalidRequest(_)) => {}
+        other => panic!("expected Client(InvalidRequest), got {other:?}"),
+    }
+
+    assert_eq!(
+        bad.pending_count().unwrap(),
+        2,
+        "remainder must stay buffered"
+    );
+    let kept = std::fs::read_to_string(&spool_path).unwrap();
+    assert_eq!(
+        kept.lines().filter(|l| !l.is_empty()).count(),
+        2,
+        "later entries must remain behind the failed one"
+    );
+}
+
 /// 6. Torn trailing line: a hand-written spool whose last line is truncated
 /// JSON replays the good entries and does not fail on the torn tail.
 #[tokio::test]
