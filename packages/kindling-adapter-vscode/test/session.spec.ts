@@ -224,6 +224,83 @@ describe('EditorSessionManager (mocked Kindling)', () => {
       });
 
       expect(result.error).toContain('No active session found');
+      expect(kindling.openCapsule).not.toHaveBeenCalled();
+      expect(kindling.appendObservation).not.toHaveBeenCalled();
+    });
+
+    it('starts a session on save when ensureSession is set and none is active', async () => {
+      const result = await manager.onFileSave({
+        sessionId: 's1',
+        filePath: '/repo/src/index.ts',
+        repoId: '/repo',
+        ensureSession: true,
+      });
+
+      expect(result.error).toBeUndefined();
+      expect(result.observation).toBeDefined();
+      expect(manager.isSessionActive('s1')).toBe(true);
+      expect(kindling.openCapsule).toHaveBeenCalledOnce();
+      expect(kindling.appendObservation).toHaveBeenCalledOnce();
+    });
+
+    it('recovers and records a save after an initial session start failure', async () => {
+      vi.mocked(kindling.getOpenCapsule).mockRejectedValueOnce(new Error('daemon unavailable'));
+
+      await expect(manager.onSessionStart({ sessionId: 's1', repoId: '/repo' })).rejects.toThrow(
+        'daemon unavailable',
+      );
+      expect(manager.isSessionActive('s1')).toBe(false);
+
+      const result = await manager.onFileSave({
+        sessionId: 's1',
+        filePath: '/repo/src/index.ts',
+        repoId: '/repo',
+        ensureSession: true,
+      });
+
+      expect(result.error).toBeUndefined();
+      expect(result.observation?.kind).toBe('file_diff');
+      expect(manager.isSessionActive('s1')).toBe(true);
+      expect(kindling.openCapsule).toHaveBeenCalledOnce();
+      expect(kindling.appendObservation).toHaveBeenCalledOnce();
+    });
+
+    it('returns an error when ensureSession is set but start still fails', async () => {
+      vi.mocked(kindling.getOpenCapsule).mockRejectedValue(new Error('daemon unavailable'));
+
+      const result = await manager.onFileSave({
+        sessionId: 's1',
+        filePath: '/repo/src/index.ts',
+        ensureSession: true,
+      });
+
+      expect(result.observation).toBeUndefined();
+      expect(result.error).toContain('No active session found');
+      expect(result.error).toContain('daemon unavailable');
+      expect(manager.isSessionActive('s1')).toBe(false);
+      expect(kindling.openCapsule).not.toHaveBeenCalled();
+      expect(kindling.appendObservation).not.toHaveBeenCalled();
+    });
+
+    it('does not start a second session on a later save after recovery', async () => {
+      vi.mocked(kindling.getOpenCapsule).mockRejectedValueOnce(new Error('daemon unavailable'));
+      await expect(manager.onSessionStart({ sessionId: 's1' })).rejects.toThrow(
+        'daemon unavailable',
+      );
+
+      await manager.onFileSave({
+        sessionId: 's1',
+        filePath: '/repo/src/a.ts',
+        ensureSession: true,
+      });
+      await manager.onFileSave({
+        sessionId: 's1',
+        filePath: '/repo/src/b.ts',
+        ensureSession: true,
+      });
+
+      expect(kindling.openCapsule).toHaveBeenCalledOnce();
+      expect(kindling.appendObservation).toHaveBeenCalledTimes(2);
     });
   });
 
