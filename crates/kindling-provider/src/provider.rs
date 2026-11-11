@@ -394,12 +394,46 @@ fn exclude_id_filter(prefix: &str, exclude_ids: &[Id]) -> String {
 /// True for FTS5 query-syntax errors, which are swallowed into empty results
 /// (malformed user queries are not provider failures). Mirrors
 /// `isFtsSyntaxError` in the TS provider.
+///
+/// FTS5 column filters such as `missing:term` surface as SQLite
+/// `no such column: missing` with a bare identifier. Provider SQL always
+/// qualifies columns (`o.redacted`, `f.rank`, …), so those schema errors
+/// still propagate. The FTS `content` column is also treated as schema: it
+/// is the only indexed column, so `no such column: content` means the index
+/// itself is broken, not that the user typed a bad filter.
 fn is_fts_syntax_error(err: &rusqlite::Error) -> bool {
-    let msg = err.to_string().to_lowercase();
+    is_fts_syntax_error_message(&err.to_string())
+}
+
+fn is_fts_syntax_error_message(message: &str) -> bool {
+    let msg = message.to_lowercase();
     msg.contains("fts5")
         || msg.contains("fts syntax")
         || msg.contains("unterminated string")
         || msg.contains("unknown special query")
+        || is_fts_unknown_column_error(&msg)
+}
+
+/// FTS5 reports an unknown column filter as `no such column: <name>`.
+/// Qualified names and the FTS `content` column are backend/schema failures.
+fn is_fts_unknown_column_error(msg: &str) -> bool {
+    const PREFIX: &str = "no such column: ";
+    let Some(idx) = msg.find(PREFIX) else {
+        return false;
+    };
+    let column = msg[idx + PREFIX.len()..]
+        .split_whitespace()
+        .next()
+        .unwrap_or("");
+    !column.is_empty() && !is_schema_column(column)
+}
+
+fn is_schema_column(column: &str) -> bool {
+    column == "content"
+        || matches!(
+            column.split_once('.').map(|(alias, _)| alias),
+            Some("o" | "s" | "c" | "f")
+        )
 }
 
 fn parse_observation_kind(value: &str) -> ProviderResult<ObservationKind> {
@@ -409,4 +443,56 @@ fn parse_observation_kind(value: &str) -> ProviderResult<ObservationKind> {
             value: value.to_string(),
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_fts_syntax_error_message;
+
+    #[test]
+    fn unknown_fts_column_is_syntax_error() {
+        for msg in [
+            "no such column: missing",
+            "no such column: col1",
+            "NO SUCH COLUMN: missing",
+            "no such column: foo.bar",
+        ] {
+            assert!(
+                is_fts_syntax_error_message(msg),
+                "{msg:?} should be treated as a malformed FTS query"
+            );
+        }
+    }
+
+    #[test]
+    fn schema_and_backend_errors_are_not_syntax_errors() {
+        for msg in [
+            "no such column: o.redacted",
+            "no such column: f.rank",
+            "no such column: s.content",
+            "no such column: c.session_id",
+            "no such column: content",
+            "no such table: observations_fts",
+            "disk i/o error",
+        ] {
+            assert!(
+                !is_fts_syntax_error_message(msg),
+                "{msg:?} should propagate as a backend error"
+            );
+        }
+    }
+
+    #[test]
+    fn existing_fts_syntax_signatures_still_match() {
+        for msg in [
+            "fts5: syntax error near \"AND\"",
+            "unterminated string",
+            "unknown special query: ",
+        ] {
+            assert!(
+                is_fts_syntax_error_message(msg),
+                "{msg:?} should remain a malformed FTS query"
+            );
+        }
+    }
 }
