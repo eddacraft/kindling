@@ -233,6 +233,89 @@ async fn forget_redacts_observation() {
     assert_eq!(resp.status, StatusCode::BAD_REQUEST, "no project → 400");
 }
 
+/// Percent-encoded path segments must decode back to the stored id. Reserved
+/// characters (`/ ? # & =` plus space, `%`, `+`) would otherwise change routing
+/// or query interpretation.
+#[tokio::test]
+async fn percent_encoded_path_ids_are_decoded() {
+    let daemon = TestDaemon::start().await;
+    let mut c = daemon.connect().await;
+    let raw_id = "a/b?c#d&e=f g%+";
+    let encoded_id = "a%2Fb%3Fc%23d%26e%3Df%20g%25%2B";
+
+    let resp = c
+        .send(
+            "POST",
+            "/v1/observations",
+            Some(PROJECT_A),
+            Some(json!({
+                "id": raw_id,
+                "kind": "message",
+                "content": "encoded-path needle",
+                "scopeIds": { "sessionId": "enc" },
+            })),
+        )
+        .await;
+    assert_eq!(resp.status, StatusCode::CREATED, "append reserved id");
+    assert_eq!(resp.json()["id"], raw_id);
+
+    let resp = c
+        .send(
+            "POST",
+            &format!("/v1/observations/{encoded_id}/forget"),
+            Some(PROJECT_A),
+            None,
+        )
+        .await;
+    assert_eq!(resp.status, StatusCode::NO_CONTENT, "forget encoded id");
+
+    let resp = c
+        .send(
+            "POST",
+            "/v1/capsules",
+            Some(PROJECT_A),
+            Some(json!({
+                "id": raw_id,
+                "kind": "pocketflow_node",
+                "intent": "encoded path",
+                "scopeIds": {},
+            })),
+        )
+        .await;
+    assert_eq!(resp.status, StatusCode::CREATED, "open reserved id");
+    assert_eq!(resp.json()["id"], raw_id);
+
+    let resp = c
+        .send(
+            "PATCH",
+            &format!("/v1/capsules/{encoded_id}/close"),
+            Some(PROJECT_A),
+            Some(json!({})),
+        )
+        .await;
+    assert_eq!(resp.status, StatusCode::OK, "close encoded id");
+    assert_eq!(resp.json()["id"], raw_id);
+    assert_eq!(resp.json()["status"], "closed");
+
+    // Missing pin: the decoded id must appear in the error, proving the
+    // percent-encoded segment was routed as one `{id}` and then decoded.
+    let resp = c
+        .send(
+            "DELETE",
+            &format!("/v1/pins/{encoded_id}"),
+            Some(PROJECT_A),
+            None,
+        )
+        .await;
+    let body = resp.json();
+    let message = body["error"].as_str().unwrap_or_default();
+    assert!(
+        message.contains(raw_id),
+        "handler should see the decoded id, got status={} body={body:?}",
+        resp.status
+    );
+}
+
 #[tokio::test]
 async fn health_reports_version_and_schema() {
     let daemon = TestDaemon::start().await;

@@ -206,6 +206,69 @@ async fn forget_redacts_observation() {
     }
 }
 
+/// Capsule / pin / observation ids with reserved URI characters must round-trip
+/// through the path-segment endpoints. Unencoded `/`, `?`, `#`, `&`, `=`,
+/// space, `%`, or `+` would change routing or make the request URI ill-formed.
+#[tokio::test]
+async fn reserved_character_ids_round_trip_through_path_endpoints() {
+    let daemon = TestDaemon::start().await;
+    let client = daemon.client(PROJECT_A);
+    let reserved_id = "a/b?c#d&e=f g%+";
+
+    let mut obs_input = message_input("reserved-id needle");
+    obs_input.id = Some(reserved_id.to_string());
+    let obs = client
+        .append_observation(obs_input, None, None)
+        .await
+        .expect("append observation with reserved id")
+        .observation;
+    assert_eq!(obs.id, reserved_id);
+
+    client
+        .forget(reserved_id)
+        .await
+        .expect("forget observation with reserved id");
+
+    let capsule = client
+        .open_capsule(
+            CapsuleType::PocketflowNode,
+            "reserved id close",
+            ScopeIds::default(),
+            Some(reserved_id.to_string()),
+        )
+        .await
+        .expect("open capsule with reserved id");
+    assert_eq!(capsule.id, reserved_id);
+
+    let closed = client
+        .close_capsule(reserved_id, CloseCapsuleBody::default())
+        .await
+        .expect("close capsule with reserved id");
+    assert_eq!(closed.status, kindling_types::CapsuleStatus::Closed);
+    assert_eq!(closed.id, reserved_id);
+
+    // Pin ids are generated, but unpin still interpolates the caller-supplied
+    // id into the path. A missing reserved id must reach the daemon (404/500
+    // from the store) rather than fail as an ill-formed URI.
+    let err = client
+        .unpin(reserved_id)
+        .await
+        .expect_err("unpin missing reserved id → error");
+    match err {
+        ClientError::Api { status, message } => {
+            assert!(
+                status == 404 || status == 500,
+                "expected a routed API error, got {status}: {message}"
+            );
+            assert!(
+                message.contains(reserved_id),
+                "daemon should see the decoded id, got {message:?}"
+            );
+        }
+        other => panic!("expected Api error after encoding, got {other:?}"),
+    }
+}
+
 /// 2a. health() returns the daemon's schema version and capability block.
 #[tokio::test]
 async fn health_reports_schema_version() {
