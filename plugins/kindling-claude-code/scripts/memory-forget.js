@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 const { dbPath, runJson } = require('./lib/kindling.js');
+const {
+  forgetListPageSize,
+  resolveObservationIdFromPages,
+} = require('./lib/resolve-observation-id.js');
 
 const cwd = process.cwd();
 const db = dbPath(cwd);
@@ -12,20 +16,16 @@ if (!obsId) {
 }
 
 // Prefix-resolve the observation id. `kindling forget` takes an exact id, so we
-// scan `list observations --json` (raw rows: { id, kind, content, ... }) for the
-// first id that starts with the supplied prefix.
-const observations = runJson([
-  'list',
-  'observations',
-  '--db',
-  db,
-  '--limit',
-  '500',
-  '--json',
-]);
-const matches = (observations || []).filter((o) => String(o.id).startsWith(obsId));
+// scan `list observations --json` (raw rows: { id, kind, content, ... }) across
+// every page — not just the first 500 — and honour an exact id as soon as it
+// appears rather than treating it as a prefix of the truncated window.
+const result = resolveObservationIdFromPages(
+  (limit) => runJson(['list', 'observations', '--db', db, '--limit', String(limit), '--json']),
+  obsId,
+  forgetListPageSize(),
+);
 
-if (matches.length === 0) {
+if (result.kind === 'missing') {
   console.log('Observation not found: ' + obsId);
   process.exit(0);
 }
@@ -33,16 +33,16 @@ if (matches.length === 0) {
 // Refuse to act on an ambiguous prefix: redacting is destructive, so when more
 // than one observation matches we abort and show full IDs to disambiguate
 // rather than silently picking the first row.
-if (matches.length > 1) {
+if (result.kind === 'ambiguous') {
   console.log('Ambiguous observation id: ' + obsId);
   console.log('Multiple observations match this prefix. Re-run with a longer id:');
-  for (const m of matches) {
+  for (const m of result.matches) {
     console.log('  ' + String(m.id));
   }
   process.exit(0);
 }
 
-const obs = matches[0];
+const obs = result.observation;
 
 runJson(['forget', obs.id, '--db', db, '--json']);
 
