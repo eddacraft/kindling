@@ -39,7 +39,8 @@
 #   * `cargo publish --dry-run` of a dependent crate FAILS until its deps are on
 #     crates.io ("no matching package named ..."). That is expected for a
 #     not-yet-published workspace and does NOT indicate a packaging problem —
-#     verify packaging with `cargo package --list -p <crate>` instead.
+#     verify packaging with `cargo package --list -p <crate>` instead. Any other
+#     dry-run failure is unexpected and fails this script.
 #
 # POSIX sh, shellcheck-clean.
 
@@ -63,9 +64,22 @@ INDEX_WAIT="${INDEX_WAIT:-20}"
 for crate in $CRATES; do
   if [ "$DRY_RUN" = "1" ]; then
     printf '==> cargo publish --dry-run -p %s\n' "$crate"
-    cargo publish --dry-run -p "$crate" || {
-      printf 'note: dry-run of %s may fail until its deps are on crates.io\n' "$crate" >&2
-    }
+    status=0
+    output="$(cargo publish --dry-run -p "$crate" 2>&1)" || status=$?
+    if [ "$status" -eq 0 ]; then
+      printf '%s\n' "$output"
+    else
+      printf '%s\n' "$output" >&2
+      case "$output" in
+        *"no matching package"*)
+          printf 'note: dry-run of %s may fail until its deps are on crates.io\n' "$crate" >&2
+          ;;
+        *)
+          printf 'error: unexpected dry-run failure for %s (exit %s)\n' "$crate" "$status" >&2
+          exit "$status"
+          ;;
+      esac
+    fi
   else
     printf '==> cargo publish -p %s\n' "$crate"
     cargo publish -p "$crate"

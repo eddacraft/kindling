@@ -55,7 +55,9 @@ if (base.includes('kindling-core') || base.includes('kindling-server/src')) {
 }
 console.log('tsconfig clean');
 "
-  pnpm install --frozen-lockfile 2>&1 >"$SCRATCH/pnpm-install-full.txt"
+  # Redirect stdout first so stderr joins the same transcript (`2>&1 >file`
+  # leaves stderr on the terminal and drops install diagnostics).
+  pnpm install --frozen-lockfile >"$SCRATCH/pnpm-install-full.txt" 2>&1
   tail -3 "$SCRATCH/pnpm-install-full.txt" >"$SCRATCH/pnpm-clean.txt"
   grep -F 'Scope: all 7 workspace projects' "$SCRATCH/pnpm-install-full.txt" >/dev/null
   ls packages/ | tee "$SCRATCH/packages-list.txt" >/dev/null
@@ -68,38 +70,68 @@ step3_merge_state() {
     >"$SCRATCH/post-merge-cli.txt"
 }
 
-step5_preflight_rust() {
-  local exit_code=0
+# Status of the most recent run_logged invocation.
+last_status=0
+
+# Run one command, append its set -x transcript and a status marker to $1.
+# A group or function used as an operand of `||` has errexit disabled, so a
+# later success would otherwise mask an earlier failure. Each check is a
+# single command whose status is captured with `||` on that command alone.
+run_logged() {
+  local log="$1" label="$2"
+  shift 2
+  last_status=0
   {
     set -x
-    cargo fmt --all -- --check
-    cargo clippy --all-targets --all-features -- -D warnings 2>&1 | tail -20
-    cargo test --workspace 2>&1 | tail -10
-  } >"$SCRATCH/preflight-rust.txt" 2>&1 || exit_code=$?
-  echo "[exit=$exit_code]" >>"$SCRATCH/preflight-rust.txt"
-  return "$exit_code"
+    "$@"
+  } >>"$log" 2>&1 || last_status=$?
+  set +x
+  echo "[$label exit=$last_status]" >>"$log"
+}
+
+step5_preflight_rust() {
+  local log="$SCRATCH/preflight-rust.txt" failed=0
+  : >"$log"
+
+  run_logged "$log" fmt cargo fmt --all -- --check
+  [ "$last_status" -eq 0 ] || failed=1
+
+  run_logged "$log" clippy cargo clippy --all-targets --all-features -- -D warnings
+  [ "$last_status" -eq 0 ] || failed=1
+
+  run_logged "$log" test cargo test --workspace
+  [ "$last_status" -eq 0 ] || failed=1
+
+  echo "[exit=$failed]" >>"$log"
+  return "$failed"
 }
 
 step5_preflight_npm() {
-  local tmp exit_code=0
+  local tmp failed=0
   tmp="$(mktemp)"
-  {
-    set -x
-    pnpm install --frozen-lockfile
-    pnpm run build
-    pnpm run type-check
-    pnpm run lint
-    pnpm run test
-  } >"$tmp" 2>&1 || exit_code=$?
-  echo "[exit=$exit_code]" >>"$tmp"
-  # Phase traces from the same run (set -x) plus plan-mandated tail -20 of output.
+  : >"$tmp"
+
+  run_logged "$tmp" install pnpm install --frozen-lockfile
+  [ "$last_status" -eq 0 ] || failed=1
+  run_logged "$tmp" build pnpm run build
+  [ "$last_status" -eq 0 ] || failed=1
+  run_logged "$tmp" type_check pnpm run type-check
+  [ "$last_status" -eq 0 ] || failed=1
+  run_logged "$tmp" lint pnpm run lint
+  [ "$last_status" -eq 0 ] || failed=1
+  run_logged "$tmp" test pnpm run test
+  [ "$last_status" -eq 0 ] || failed=1
+
+  echo "[exit=$failed]" >>"$tmp"
+  # Phase traces from the same run (set -x) plus the full transcript so a
+  # failed install, build, or test keeps its diagnostics.
   {
     grep '^+ pnpm' "$tmp" || true
-    echo '--- tail -20 ---'
-    tail -20 "$tmp"
+    echo '--- output ---'
+    cat "$tmp"
   } >"$SCRATCH/preflight-npm.txt"
   rm -f "$tmp"
-  return "$exit_code"
+  return "$failed"
 }
 
 step5_version_and_schema() {
