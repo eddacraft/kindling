@@ -269,12 +269,14 @@ impl Runtime {
     /// Start the runtime: build a client for the configured socket and wire the
     /// [`SpawnStrategy`]. Probes the daemon with a `health` call (which triggers
     /// attach-or-spawn) so a started runtime is immediately usable.
+    ///
+    /// If the probe fails or this future is cancelled after the embedded
+    /// spawner has run, the spawned task is aborted rather than detached.
     pub async fn start(config: RuntimeConfig) -> Result<Self, RuntimeError> {
         let spawn_flag = spawn::SpawnFlag::new();
 
         #[cfg(feature = "embedded-daemon")]
-        let server_handle: spawn::ServerHandleSlot =
-            std::sync::Arc::new(std::sync::Mutex::new(None));
+        let server_handle = spawn::ServerHandleSlot::new();
 
         let spawner = build_spawner(&config, spawn_flag.clone(), {
             #[cfg(feature = "embedded-daemon")]
@@ -303,7 +305,20 @@ impl Runtime {
 
         // Probe: this triggers attach-or-spawn. A running daemon answers without
         // the spawner firing; otherwise the strategy decides what happens.
-        client.health().await?;
+        // AbortOnDrop covers cancellation; the error path joins the aborted
+        // task so a failed start does not leave a listener behind.
+        #[cfg(feature = "embedded-daemon")]
+        let abort_guard = spawn::AbortOnDrop::new(server_handle.clone());
+        if let Err(e) = client.health().await {
+            #[cfg(feature = "embedded-daemon")]
+            {
+                abort_guard.defuse();
+                server_handle.abort_and_join().await;
+            }
+            return Err(e.into());
+        }
+        #[cfg(feature = "embedded-daemon")]
+        abort_guard.defuse();
 
         #[cfg(feature = "spool")]
         let spooled = SpooledClient::new(client.clone(), config.effective_spool_path());
@@ -349,18 +364,7 @@ impl Runtime {
     pub async fn shutdown(self) -> Result<(), RuntimeError> {
         #[cfg(feature = "embedded-daemon")]
         {
-            // `.lock().ok()` swallows a poisoned mutex: the only code that holds
-            // this lock is the spawner closure storing the JoinHandle, which
-            // never panics while holding it, so poisoning cannot occur in
-            // practice. If it somehow did, treating it as "no handle to abort"
-            // is the benign outcome (the daemon idles out on its own).
-            let handle = self.server_handle.lock().ok().and_then(|mut g| g.take());
-            if let Some(handle) = handle {
-                handle.abort();
-                // Best-effort await of the aborted task; ignore the Cancelled
-                // join error.
-                let _ = handle.await;
-            }
+            self.server_handle.abort_and_join().await;
         }
         Ok(())
     }

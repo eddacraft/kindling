@@ -384,3 +384,67 @@ async fn shutdown_stops_embedded_daemon() {
         "expected a client/unavailable error after shutdown, got {err:?}"
     );
 }
+
+/// Cancelling `Runtime::start` after the embedded spawner has run must abort
+/// the daemon task rather than detaching it.
+#[tokio::test(flavor = "current_thread")]
+async fn cancelled_start_aborts_embedded_daemon() {
+    let home = tempfile::tempdir().unwrap();
+    let socket = home.path().join("kindling.sock");
+    let config = RuntimeConfig::with_home(home.path(), PROJECT, SpawnStrategy::Embedded);
+
+    let start = tokio::spawn(async move { Runtime::start(config).await });
+    // First poll of `start` invokes the spawner (sync) then awaits the
+    // post-spawn connect poll. The current-thread runtime will not complete
+    // health before we abort: `serve` cannot bind during that first poll.
+    tokio::task::yield_now().await;
+    start.abort();
+    assert!(
+        start.await.expect_err("start was cancelled").is_cancelled(),
+        "the start task itself must be cancelled"
+    );
+    // Let the aborted `serve` task be polled so its listener is gone before
+    // we probe with AttachOnly.
+    tokio::task::yield_now().await;
+
+    let attach = RuntimeConfig::with_home(home.path(), PROJECT, SpawnStrategy::AttachOnly);
+    let err = Runtime::start(attach)
+        .await
+        .expect_err("cancelled start must not leave a live daemon");
+    assert!(
+        matches!(err, kindling_runtime::RuntimeError::Client(_)),
+        "expected a client/unavailable error after cancelled start, got {err:?}"
+    );
+    let _ = std::fs::remove_file(&socket);
+}
+
+/// Two overlapping cold `Runtime::start` calls on the same home, then
+/// shutdown of both. Each runtime owns its own slot; shutdown must not leak
+/// a listener.
+#[tokio::test]
+async fn overlapping_embedded_starts_shutdown_cleanly() {
+    let home = tempfile::tempdir().unwrap();
+    let socket = home.path().join("kindling.sock");
+    let config_a = RuntimeConfig::with_home(home.path(), PROJECT, SpawnStrategy::Embedded);
+    let config_b = RuntimeConfig::with_home(home.path(), PROJECT, SpawnStrategy::Embedded);
+
+    let (a, b) = tokio::join!(Runtime::start(config_a), Runtime::start(config_b));
+    let runtime_a = a.expect("overlapping start a");
+    let runtime_b = b.expect("overlapping start b");
+
+    runtime_a.client().health().await.expect("health a");
+    runtime_b.client().health().await.expect("health b");
+
+    runtime_a.shutdown().await.expect("shutdown a");
+    runtime_b.shutdown().await.expect("shutdown b");
+
+    let attach = RuntimeConfig::with_home(home.path(), PROJECT, SpawnStrategy::AttachOnly);
+    let err = Runtime::start(attach)
+        .await
+        .expect_err("both overlapping runtimes must stop the daemon they own");
+    assert!(
+        matches!(err, kindling_runtime::RuntimeError::Client(_)),
+        "expected a client/unavailable error after overlapping shutdown, got {err:?}"
+    );
+    let _ = std::fs::remove_file(&socket);
+}
