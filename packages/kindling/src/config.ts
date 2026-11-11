@@ -11,7 +11,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /** Socket file name under the kindling home. */
@@ -74,7 +74,8 @@ export function defaultSocketPath(): string {
  * Resolve the project root used for the `X-Kindling-Project` header, matching
  * the Claude Code hook's `getProjectRoot(cwd)`:
  *
- *   1. `KINDLING_REPO_ROOT` if set AND `resolve(cwd)` starts with it.
+ *   1. `KINDLING_REPO_ROOT` if set AND the resolved cwd is that root or a
+ *      path beneath it (component-wise, after normalising the override).
  *   2. `git rev-parse --show-toplevel` run in `cwd`, trimmed.
  *   3. The resolved `cwd`.
  */
@@ -82,7 +83,7 @@ export function resolveProjectRoot(cwd: string = process.cwd()): string {
   const resolved = resolve(cwd);
 
   const envRoot = process.env.KINDLING_REPO_ROOT;
-  if (envRoot && envRoot.length > 0 && resolved.startsWith(envRoot)) {
+  if (envRoot && envRoot.length > 0 && cwdIsUnderRoot(resolved, resolve(envRoot))) {
     return envRoot;
   }
 
@@ -100,6 +101,21 @@ export function resolveProjectRoot(cwd: string = process.cwd()): string {
   }
 
   return resolved;
+}
+
+/**
+ * True when `cwdResolved` is `rootResolved` or a directory under it.
+ *
+ * Both arguments must already be `path.resolve`d. A raw string prefix would
+ * accept siblings (cwd `/work/repo-copy` for root `/work/repo`); require an
+ * exact match or a real path-boundary, matching the plugin helper.
+ */
+function cwdIsUnderRoot(cwdResolved: string, rootResolved: string): boolean {
+  if (cwdResolved === rootResolved) {
+    return true;
+  }
+  const prefix = rootResolved.endsWith(sep) ? rootResolved : rootResolved + sep;
+  return cwdResolved.startsWith(prefix);
 }
 
 /** Options for constructing a {@link Kindling} client. */

@@ -25,6 +25,9 @@ eddacraft-kindling`, Homebrew, the install script), the crates on crates.io,
   install stderr is kept in the transcript. `publish.sh` dry-run still treats
   a missing crates.io dependency as expected, and fails on any other cargo
   error.
+- **Hook and client project-root override rejects sibling directory prefixes (GH-173).**
+  `KINDLING_REPO_ROOT` is normalised and compared as path components, so a cwd
+  such as `/work/repo-copy` is no longer treated as inside `/work/repo`.
 
 ## [0.4.1] - 2026-11-10
 
