@@ -298,6 +298,81 @@ test('memory-forget aborts on an ambiguous prefix without redacting', { skip }, 
   );
 });
 
+test('memory-forget redacts an exact id older than the first list page', { skip }, () => {
+  const { db, env } = freshEnv();
+  // Shrink the list window so three rows span two pages without seeding 500+.
+  env.KINDLING_FORGET_PAGE_SIZE = '2';
+  seed(db, 'oldest observation unique-forget-needle');
+  seed(db, 'middle observation');
+  seed(db, 'newest observation');
+
+  const obs = cliJson(db, ['list', 'observations', '--limit', '10']);
+  assert.equal(obs.length, 3);
+  const oldest = obs[obs.length - 1];
+  assert.ok(oldest.content.includes('unique-forget-needle'));
+
+  const out = runScript('memory-forget.js', [oldest.id], env);
+  assert.match(out, /Redacted observation:/);
+  assert.match(out, /unique-forget-needle/);
+
+  const after = cliJson(db, ['list', 'observations', '--limit', '10']);
+  const row = after.find((o) => o.id === oldest.id);
+  assert.equal(row.redacted, 1);
+});
+
+test('memory-forget treats a prefix as ambiguous when matches span list pages', { skip }, () => {
+  const { db, env } = freshEnv();
+  const pageSize = 2;
+  env.KINDLING_FORGET_PAGE_SIZE = String(pageSize);
+
+  // UUIDs: 16 first hex chars. 17 rows guarantee a shared prefix; extra newer
+  // rows then push the older match past the first page.
+  for (let i = 0; i < 17; i++) seed(db, 'cross-page observation ' + i);
+
+  function listed() {
+    return cliJson(db, ['list', 'observations', '--limit', '100']);
+  }
+
+  function matchIndices(rows, prefix) {
+    return rows
+      .map((o, i) => (String(o.id).startsWith(prefix) ? i : -1))
+      .filter((i) => i >= 0);
+  }
+
+  let obs = listed();
+  const counts = new Map();
+  for (const o of obs) {
+    const c = String(o.id)[0];
+    counts.set(c, (counts.get(c) || 0) + 1);
+  }
+  let prefix = null;
+  for (const [c, n] of counts) {
+    if (n >= 2) {
+      prefix = c;
+      break;
+    }
+  }
+  assert.ok(prefix, 'expected at least two observation ids to share a first char');
+
+  while (true) {
+    obs = listed();
+    const idxs = matchIndices(obs, prefix);
+    assert.ok(idxs.length >= 2, 'prefix should keep matching at least two ids');
+    if (Math.max(...idxs) >= pageSize) break;
+    seed(db, 'newer observation to push a match onto the next page');
+  }
+
+  const out = runScript('memory-forget.js', [prefix], env);
+  assert.match(out, /Ambiguous observation id/);
+  assert.doesNotMatch(out, /Redacted observation:/);
+
+  const after = listed();
+  assert.ok(
+    after.every((o) => !o.redacted),
+    'no observation should be redacted after an aborted cross-page ambiguous forget',
+  );
+});
+
 test('scripts fail soft (exit 0) when the binary is missing', { skip }, () => {
   const { env } = freshEnv();
   const badEnv = { ...env, KINDLING_BIN: '/nonexistent/kindling-binary' };
