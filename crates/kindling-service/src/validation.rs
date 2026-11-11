@@ -232,3 +232,70 @@ pub fn validate_pin(input: PinInput, now: Timestamp) -> Result<Pin, Vec<Validati
         scope_ids: input.scope_ids,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use kindling_types::{CapsuleType, ObservationKind, PinTargetType, ScopeIds};
+
+    /// Ids with reserved URI characters are accepted as-is. Encoding them for
+    /// HTTP path segments is the client's job; validation must not reject them.
+    const RESERVED_ID: &str = "a/b?c#d&e=f g%+";
+
+    #[test]
+    fn validate_capsule_accepts_reserved_character_ids() {
+        let capsule = validate_capsule(
+            CapsuleInput {
+                id: Some(RESERVED_ID.to_string()),
+                kind: CapsuleType::PocketflowNode,
+                intent: "reserved id".to_string(),
+                status: None,
+                opened_at: None,
+                closed_at: None,
+                scope_ids: ScopeIds::default(),
+                observation_ids: None,
+                summary_id: None,
+            },
+            1,
+        )
+        .expect("reserved capsule id accepted");
+        assert_eq!(capsule.id, RESERVED_ID);
+    }
+
+    #[test]
+    fn validate_observation_accepts_reserved_character_ids() {
+        let observation = validate_observation(
+            ObservationInput {
+                id: Some(RESERVED_ID.to_string()),
+                kind: ObservationKind::Message,
+                content: "hello".to_string(),
+                provenance: None,
+                ts: None,
+                scope_ids: ScopeIds::default(),
+                redacted: None,
+            },
+            1,
+        )
+        .expect("reserved observation id accepted");
+        assert_eq!(observation.id, RESERVED_ID);
+    }
+
+    #[test]
+    fn validate_pin_accepts_reserved_character_ids() {
+        let pin = validate_pin(
+            PinInput {
+                id: Some(RESERVED_ID.to_string()),
+                target_type: PinTargetType::Observation,
+                target_id: RESERVED_ID.to_string(),
+                reason: None,
+                created_at: None,
+                expires_at: None,
+                scope_ids: ScopeIds::default(),
+            },
+            1,
+        )
+        .expect("reserved pin id accepted");
+        assert_eq!(pin.id, RESERVED_ID);
+        assert_eq!(pin.target_id, RESERVED_ID);
+    }
+}

@@ -258,10 +258,7 @@ impl Client {
     /// the Stop hook resolves the capsule it must close through this endpoint
     /// rather than tracking it in-process.
     pub async fn get_open_capsule(&self, session_id: &str) -> Result<Option<Capsule>, ClientError> {
-        let path = format!(
-            "/v1/capsules/open?sessionId={}",
-            percent_encode_query(session_id)
-        );
+        let path = format!("/v1/capsules/open?sessionId={}", percent_encode(session_id));
         self.call("GET", &path, true, None::<&()>, &[StatusCode::OK])
             .await
     }
@@ -272,7 +269,7 @@ impl Client {
         capsule_id: &str,
         body: CloseCapsuleBody,
     ) -> Result<Capsule, ClientError> {
-        let path = format!("/v1/capsules/{}/close", capsule_id);
+        let path = format!("/v1/capsules/{}/close", percent_encode(capsule_id));
         self.call("PATCH", &path, true, Some(&body), &[StatusCode::OK])
             .await
     }
@@ -357,7 +354,7 @@ impl Client {
 
     /// `DELETE /v1/pins/:id` — remove a pin.
     pub async fn unpin(&self, pin_id: &str) -> Result<(), ClientError> {
-        let path = format!("/v1/pins/{}", pin_id);
+        let path = format!("/v1/pins/{}", percent_encode(pin_id));
         self.call_no_content("DELETE", &path, true, &[StatusCode::NO_CONTENT])
             .await
     }
@@ -369,7 +366,7 @@ impl Client {
     /// daemon maps the store's `ObservationNotFound`). The `observation_id` must
     /// be exact — prefix resolution is a higher-layer concern.
     pub async fn forget(&self, observation_id: &str) -> Result<(), ClientError> {
-        let path = format!("/v1/observations/{}/forget", observation_id);
+        let path = format!("/v1/observations/{}/forget", percent_encode(observation_id));
         self.call_no_content("POST", &path, true, &[StatusCode::NO_CONTENT])
             .await
     }
@@ -501,11 +498,11 @@ impl Client {
     }
 }
 
-/// Percent-encode a query-parameter value, escaping everything outside the
-/// RFC 3986 unreserved set (`A-Z a-z 0-9 - . _ ~`). Keeps the
-/// [`get_open_capsule`](Client::get_open_capsule) URL well-formed for arbitrary
-/// session ids; UUIDs pass through unchanged.
-fn percent_encode_query(value: &str) -> String {
+/// Percent-encode a URI component, escaping everything outside the RFC 3986
+/// unreserved set (`A-Z a-z 0-9 - . _ ~`). Used for both query values and
+/// single path segments so caller-supplied ids cannot change routing or query
+/// interpretation. UUIDs pass through unchanged.
+fn percent_encode(value: &str) -> String {
     let mut out = String::with_capacity(value.len());
     for byte in value.bytes() {
         match byte {
@@ -552,4 +549,28 @@ fn ensure_status(raw: &transport::RawResponse, expected: &[StatusCode]) -> Resul
         status: raw.status.as_u16(),
         message,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::percent_encode;
+
+    #[test]
+    fn percent_encode_leaves_unreserved_and_uuids_unchanged() {
+        let uuid = "550e8400-e29b-41d4-a716-446655440000";
+        assert_eq!(percent_encode(uuid), uuid);
+        assert_eq!(percent_encode("abcXYZ09-._~"), "abcXYZ09-._~");
+        assert_eq!(percent_encode(""), "");
+    }
+
+    #[test]
+    fn percent_encode_escapes_reserved_path_and_query_characters() {
+        // Characters that would change routing (`/`), start a query (`?`),
+        // start a fragment (`#`), or break query parsing (`&`, `=`, `+`),
+        // plus space and `%` which make the URI ill-formed if left raw.
+        assert_eq!(
+            percent_encode("a/b?c#d&e=f g%+"),
+            "a%2Fb%3Fc%23d%26e%3Df%20g%25%2B"
+        );
+    }
 }
