@@ -13,7 +13,7 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use kindling_client::spool::{AppendOutcome, SpoolConfig, SpoolEntry, SpoolError, SpooledClient};
-use kindling_client::ClientError;
+use kindling_client::{Client, ClientConfig, ClientError, Spawner, Transport};
 use kindling_types::{ObservationInput, ObservationKind, RetrieveOptions, ScopeIds};
 use serde_json::Value;
 use support::{down_client, TestDaemon};
@@ -572,6 +572,167 @@ async fn flush_keeps_remainder_when_down() {
     assert_eq!(report.replayed, 0);
     assert_eq!(report.remaining, 2);
     assert_eq!(spooled.pending_count().unwrap(), 2);
+}
+
+/// A prefix of successful replays followed by a connectivity failure must keep
+/// the error and retry deadline. A subsequent append during backoff therefore
+/// spools without probing health or retrying the remainder.
+#[cfg(unix)]
+#[tokio::test]
+async fn partial_replay_preserves_backoff_on_subsequent_append() {
+    let dir = tempfile::tempdir().unwrap();
+    let socket = dir.path().join("partial.sock");
+    let (_spool_dir, spool_path) = spool_tempdir();
+
+    write_spool(
+        &spool_path,
+        &[
+            spool_entry("partial first", Some(1)),
+            spool_entry("partial second", Some(2)),
+        ],
+    );
+
+    let schema_version = support::schema_version_u32();
+    let _server = spawn_one_success_then_outage(socket.clone(), schema_version);
+
+    let spooled = SpooledClient::new(
+        Client::with_config(ClientConfig {
+            socket_path: socket,
+            port_path: PathBuf::from("unused.port"),
+            project_root: PROJECT.to_string(),
+            expected_schema_version: schema_version,
+            connect_timeout: std::time::Duration::from_millis(150),
+            poll_interval: std::time::Duration::from_millis(10),
+            spawn: Spawner::custom(|| panic!("spawner must not be called")),
+            transport: Transport::Uds,
+            spawn_log_path: None,
+        }),
+        spool_path,
+    );
+
+    let report = spooled.flush().await.expect("partial flush is ok");
+    assert_eq!(report.replayed, 1);
+    assert_eq!(report.remaining, 1);
+
+    let after_flush = spooled
+        .spool_status()
+        .await
+        .expect("status after partial flush");
+    assert_eq!(after_flush.pending_count, 1);
+    assert!(
+        after_flush.last_error.is_some(),
+        "connectivity error must survive a partial replay"
+    );
+    assert!(
+        after_flush.last_flush_time_ms.is_none(),
+        "partial replay must not be recorded as a successful flush"
+    );
+    assert_eq!(after_flush.replay_attempts, 2);
+
+    let outcome = spooled
+        .append_observation(message_input("after partial outage"), None, None)
+        .await
+        .expect("append during backoff must spool");
+    assert!(matches!(outcome, AppendOutcome::Spooled));
+
+    let after_append = spooled.spool_status().await.expect("status after append");
+    assert_eq!(after_append.pending_count, 2);
+    assert_eq!(
+        after_append.replay_attempts, 2,
+        "backoff must skip health+flush of the remainder"
+    );
+    assert!(after_append.last_error.is_some());
+}
+
+/// Serve one successful `POST /v1/observations`, then drop later observation
+/// posts while still answering `/v1/health`. That lets a cleared backoff probe
+/// health and retry the remainder — which this regression must not do.
+#[cfg(unix)]
+fn spawn_one_success_then_outage(
+    socket_path: PathBuf,
+    schema_version: u32,
+) -> std::thread::JoinHandle<()> {
+    let (ready_tx, ready_rx) = std::sync::mpsc::channel();
+    let handle = std::thread::spawn(move || {
+        let listener =
+            std::os::unix::net::UnixListener::bind(&socket_path).expect("bind partial daemon");
+        let _ = ready_tx.send(());
+        let mut observation_posts = 0usize;
+        for stream in listener.incoming() {
+            let Ok(mut stream) = stream else {
+                break;
+            };
+            let req = read_http_request(&mut stream);
+            let first_line = req.lines().next().unwrap_or("");
+            if first_line.starts_with("GET /v1/health") {
+                let body = format!(
+                    r#"{{"version":"test","schemaVersion":{schema_version},"supportedKinds":[],"storagePath":"/tmp","kindRegistry":[],"projects":[]}}"#
+                );
+                write_http(&mut stream, "200 OK", &body);
+            } else if first_line.starts_with("POST /v1/observations") {
+                observation_posts += 1;
+                if observation_posts == 1 {
+                    let body = r#"{"id":"id-partial-first","kind":"message","content":"partial first","provenance":{},"ts":1,"scopeIds":{},"redacted":false,"deduplicated":false,"redaction":{"count":0,"classes":[]}}"#;
+                    write_http(&mut stream, "201 Created", body);
+                }
+                // Later observation posts: drop the stream for a connectivity error.
+            }
+        }
+    });
+    ready_rx.recv().expect("partial daemon started");
+    handle
+}
+
+#[cfg(unix)]
+fn read_http_request(stream: &mut std::os::unix::net::UnixStream) -> String {
+    use std::io::Read;
+
+    let _ = stream.set_read_timeout(Some(std::time::Duration::from_secs(2)));
+    let mut buf = Vec::new();
+    let mut tmp = [0u8; 512];
+    loop {
+        match stream.read(&mut tmp) {
+            Ok(0) => break,
+            Ok(n) => buf.extend_from_slice(&tmp[..n]),
+            Err(_) => break,
+        }
+        if let Some(header_end) = buf.windows(4).position(|w| w == b"\r\n\r\n") {
+            let headers = &buf[..header_end];
+            let content_len = headers
+                .split(|&b| b == b'\n')
+                .find_map(|line| {
+                    let line = line.strip_suffix(b"\r").unwrap_or(line);
+                    let line = std::str::from_utf8(line).ok()?;
+                    let (name, value) = line.split_once(':')?;
+                    if name.eq_ignore_ascii_case("content-length") {
+                        value.trim().parse::<usize>().ok()
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or(0);
+            if buf.len() >= header_end + 4 + content_len {
+                break;
+            }
+        }
+        if buf.len() > 64 * 1024 {
+            break;
+        }
+    }
+    String::from_utf8_lossy(&buf).into_owned()
+}
+
+#[cfg(unix)]
+fn write_http(stream: &mut std::os::unix::net::UnixStream, status: &str, body: &str) {
+    use std::io::Write;
+
+    let resp = format!(
+        "HTTP/1.1 {status}\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+        body.len()
+    );
+    let _ = stream.write_all(resp.as_bytes());
+    let _ = stream.flush();
+    let _ = stream.shutdown(std::net::Shutdown::Both);
 }
 
 // --- Retention cap (KINTEG-009) ---------------------------------------------

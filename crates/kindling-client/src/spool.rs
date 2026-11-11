@@ -479,7 +479,10 @@ impl SpooledClient {
             return Err(SpoolError::Client(err));
         }
 
-        if replayed > 0 {
+        // A prefix of successes followed by a connectivity failure is not a
+        // successful flush: keep the error and retry deadline so opportunistic
+        // appends stay on backoff while undelivered entries remain.
+        if replayed > 0 && remainder.is_empty() {
             self.record_successful_flush().await;
         }
 
