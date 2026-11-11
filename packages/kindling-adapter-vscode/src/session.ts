@@ -254,15 +254,16 @@ export class EditorSessionManager {
       throw new Error(`No active session found for sessionId: ${sessionId}`);
     }
 
-    const closed = await this.kindling.closeCapsule(context.activeCapsuleId, {
-      ...(signals?.summaryContent
+    const closed = await this.kindling.closeCapsule(
+      context.activeCapsuleId,
+      signals?.summaryContent
         ? {
             generateSummary: true,
             summaryContent: signals.summaryContent,
             confidence: signals.summaryConfidence ?? 0.8,
           }
-        : {}),
-    });
+        : {},
+    );
 
     this.activeSessions.delete(sessionId);
     return closed;
