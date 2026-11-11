@@ -1,42 +1,40 @@
 /**
  * VS Code extension entry point.
  *
- * Wires workspace save events and kindling commands into the
- * {@link EditorSessionManager}.
+ * Wires workspace save events and kindling commands into
+ * {@link WorkspaceCapture}, which routes each document to the workspace
+ * folder that contains it.
  */
 
 import * as vscode from 'vscode';
 
 import { Kindling } from '@eddacraft/kindling';
 
-import { EditorSessionManager } from './session.js';
+import { WorkspaceCapture, resolveWorkspaceRoot } from './workspace.js';
 
 const OUTPUT_CHANNEL_NAME = 'Kindling';
 
-let manager: EditorSessionManager | undefined;
-let kindling: Kindling | undefined;
+let capture: WorkspaceCapture | undefined;
 let outputChannel: vscode.OutputChannel | undefined;
 let sessionId: string | undefined;
-let repoId: string | undefined;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   outputChannel = vscode.window.createOutputChannel(OUTPUT_CHANNEL_NAME);
   context.subscriptions.push(outputChannel);
 
-  repoId = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   sessionId = vscode.env.sessionId;
-
-  kindling = new Kindling({
-    ...(repoId ? { projectRoot: repoId } : {}),
+  capture = new WorkspaceCapture({
+    sessionId,
+    intent: 'VS Code editor session',
+    createKindling: (projectRoot) =>
+      new Kindling({
+        ...(projectRoot ? { projectRoot } : {}),
+      }),
   });
-  manager = new EditorSessionManager(kindling);
 
+  const firstRoot = workspaceFolderPaths()[0];
   try {
-    await manager.onSessionStart({
-      sessionId,
-      intent: 'VS Code editor session',
-      repoId,
-    });
+    await capture.ensureSession(firstRoot);
     log(`Session started (${sessionId})`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -45,7 +43,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   context.subscriptions.push(
     vscode.workspace.onDidSaveTextDocument(async (document) => {
-      if (!manager || !sessionId) {
+      if (!capture || !sessionId) {
         return;
       }
 
@@ -54,12 +52,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
 
       try {
-        const result = await manager.onFileSave({
-          sessionId,
-          filePath: document.uri.fsPath,
-          repoId,
-          timestamp: Date.now(),
-        });
+        const result = await capture.captureSave(
+          document.uri.fsPath,
+          workspaceFolderPaths(),
+          Date.now(),
+        );
 
         if (result.error) {
           log(`File save skipped: ${result.error}`);
@@ -73,7 +70,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   context.subscriptions.push(
     vscode.commands.registerCommand('kindling.search', async () => {
-      if (!kindling) {
+      if (!capture) {
         return;
       }
 
@@ -85,6 +82,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (!query) {
         return;
       }
+
+      const repoId = repoIdForSearch();
+      const kindling = capture.kindlingFor(repoId);
 
       try {
         const result = await kindling.retrieve({
@@ -127,35 +127,43 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   context.subscriptions.push(
     vscode.commands.registerCommand('kindling.logSelection', async () => {
-      if (!kindling || !manager || !sessionId) {
+      if (!capture || !sessionId) {
         return;
       }
 
       const editor = vscode.window.activeTextEditor;
       const selection = editor?.document.getText(editor.selection)?.trim();
 
-      if (!selection) {
+      if (!editor || !selection) {
         vscode.window.showInformationMessage('Kindling: no text selected.');
         return;
       }
 
-      try {
-        const context = manager.getSession(sessionId);
-        if (!context) {
-          await manager.onSessionStart({ sessionId, repoId });
-        }
+      if (editor.document.uri.scheme !== 'file') {
+        vscode.window.showInformationMessage('Kindling: only file documents can be logged.');
+        return;
+      }
 
-        await kindling.appendObservation(
+      const repoId = resolveWorkspaceRoot(editor.document.uri.fsPath, workspaceFolderPaths());
+      if (!repoId) {
+        vscode.window.showInformationMessage('Kindling: file is outside the workspace.');
+        return;
+      }
+
+      try {
+        const context = await capture.ensureSession(repoId);
+
+        await capture.kindlingFor(repoId).appendObservation(
           {
             kind: 'message',
             content: selection,
             scopeIds: {
               sessionId,
-              ...(repoId ? { repoId } : {}),
+              repoId,
             },
           },
           {
-            capsuleId: manager.getSession(sessionId)?.activeCapsuleId,
+            capsuleId: context.activeCapsuleId,
           },
         );
 
@@ -169,13 +177,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   context.subscriptions.push(
     vscode.commands.registerCommand('kindling.status', async () => {
-      if (!kindling) {
+      if (!capture) {
         return;
       }
 
       try {
-        const health = await kindling.health();
-        const active = manager?.getActiveSessions() ?? [];
+        const health = await capture.kindlingFor(workspaceFolderPaths()[0]).health();
+        const active = capture.getActiveSessions();
 
         const lines = [
           'Kindling Status',
@@ -198,9 +206,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 }
 
 export async function deactivate(): Promise<void> {
-  if (manager && sessionId && manager.isSessionActive(sessionId)) {
+  if (capture) {
     try {
-      await manager.onSessionEnd(sessionId, {
+      await capture.closeAll({
         reason: 'extension_deactivate',
         summaryContent: 'VS Code editor session ended.',
         summaryConfidence: 0.5,
@@ -212,10 +220,25 @@ export async function deactivate(): Promise<void> {
     }
   }
 
-  manager = undefined;
-  kindling = undefined;
+  capture = undefined;
   sessionId = undefined;
-  repoId = undefined;
+}
+
+function workspaceFolderPaths(): string[] {
+  return vscode.workspace.workspaceFolders?.map((folder) => folder.uri.fsPath) ?? [];
+}
+
+/**
+ * Search scopes to the active document's workspace when it belongs to one,
+ * otherwise the first folder (or unscoped when the window has no folder).
+ */
+function repoIdForSearch(): string | undefined {
+  const folders = workspaceFolderPaths();
+  const active = vscode.window.activeTextEditor?.document;
+  if (active?.uri.scheme === 'file') {
+    return resolveWorkspaceRoot(active.uri.fsPath, folders) ?? folders[0];
+  }
+  return folders[0];
 }
 
 function log(message: string): void {
