@@ -74,6 +74,11 @@ impl TestDaemon {
     pub async fn join(self) -> Result<(), kindling_server::ServerError> {
         self.handle.await.expect("serve task panicked")
     }
+
+    /// Whether the serve task has already exited.
+    pub fn is_finished(&self) -> bool {
+        self.handle.is_finished()
+    }
 }
 
 /// One HTTP/1 connection over a Unix socket.

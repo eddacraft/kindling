@@ -57,3 +57,46 @@ async fn early_request_keeps_alive_then_shuts_down() {
     );
     assert!(result.unwrap().is_ok());
 }
+
+#[tokio::test]
+async fn cancelled_in_flight_request_does_not_pin_daemon_busy() {
+    use std::io::Write;
+    use std::os::unix::net::UnixStream;
+
+    let daemon = TestDaemon::start_with_idle(Duration::from_millis(200)).await;
+
+    // Headers + a partial body: the JSON extractor waits, so the activity
+    // middleware has entered and the handler future is still pending.
+    let mut stream = UnixStream::connect(&daemon.socket_path).expect("connect uds");
+    stream
+        .write_all(
+            b"POST /v1/observations HTTP/1.1\r\n\
+              Host: kindling.local\r\n\
+              Content-Type: application/json\r\n\
+              X-Kindling-Project: /tmp/idle-cancel\r\n\
+              Content-Length: 1000000\r\n\
+              \r\n\
+              {",
+        )
+        .expect("write partial request");
+    stream.flush().expect("flush partial request");
+
+    // Well past the idle timeout: the daemon must stay up while this request
+    // is in flight, which also proves enter() ran.
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    assert!(
+        !daemon.is_finished(),
+        "an in-flight request must keep the daemon from going idle"
+    );
+
+    // Dropping the connection cancels the handler future. Without a drop
+    // guard, leave() is skipped and the daemon stays busy forever.
+    drop(stream);
+
+    let result = tokio::time::timeout(Duration::from_secs(3), daemon.join()).await;
+    assert!(
+        result.is_ok(),
+        "cancelling a request must not leak in-flight activity"
+    );
+    assert!(result.unwrap().is_ok(), "serve should resolve Ok on idle");
+}
