@@ -15,30 +15,35 @@ const query = process.argv.slice(2).join(' ') || '';
 // faithful to "the memory for this project".
 const result = runJson(['search', query, '--db', db, '--max', '15', '--json']);
 
-if (result.pins && result.pins.length > 0) {
+const hasPins = result.pins && result.pins.length > 0;
+const hasCandidates = result.candidates && result.candidates.length > 0;
+
+if (hasPins) {
   console.log('=== Pinned Items ===');
   result.pins.forEach((p) => {
     const entity = (p && p.target) || {};
     const note = (p && p.pin && p.pin.reason) || 'Pin';
     const preview = (entity.content || '').substring(0, 200).replace(/\n/g, ' ');
-    console.log('  [PIN] ' + note + ': ' + preview);
+    const id = entity.id ? String(entity.id) : '';
+    console.log('  [PIN] [' + id + '] ' + note + ': ' + preview);
   });
   console.log('');
 }
 
-if (result.candidates && result.candidates.length > 0) {
+if (hasCandidates) {
   console.log('=== Search Results ===');
   result.candidates.forEach((c, i) => {
     const e = c.entity || {};
     const ts = e.ts ? new Date(e.ts).toLocaleString() : '';
     const preview = (e.content || '').substring(0, 300).replace(/\n/g, ' ');
-    console.log(i + 1 + '. [' + ts + '] ' + (e.kind || '') + ': ' + preview);
+    const id = e.id ? String(e.id) : '';
+    console.log(i + 1 + '. [' + id + '] [' + ts + '] ' + (e.kind || '') + ': ' + preview);
   });
 }
 
-if (
-  (!result.pins || result.pins.length === 0) &&
-  (!result.candidates || result.candidates.length === 0)
-) {
+if (!hasPins && !hasCandidates) {
   console.log('No results found for: ' + query);
+} else {
+  console.log('');
+  console.log('Use /memory forget <id> to redact an observation.');
 }
