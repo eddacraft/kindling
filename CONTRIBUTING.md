@@ -39,8 +39,11 @@ kindling/
 
 ### Prerequisites
 
-- Rust (stable) — the toolchain is pinned in [`rust-toolchain.toml`](rust-toolchain.toml); `rustup` installs it automatically.
-- Node.js >= 24 and pnpm >= 8.0.0 — only needed to work on the npm thin client / adapters.
+- Rust via `rustup` — the toolchain is pinned in [`rust-toolchain.toml`](rust-toolchain.toml) (MSRV 1.89); `rustup` installs it automatically.
+- A C compiler (`cc`/`clang`/`gcc`, Xcode Command Line Tools on macOS) — SQLite is compiled from source via `rusqlite`'s `bundled` feature.
+- Node.js 24 (see [`.nvmrc`](.nvmrc)) and pnpm 10 — needed for the thin client / adapters and to install the git hooks.
+
+See the [README's Development section](README.md#development) for the full setup walkthrough.
 
 ### Development Setup
 
