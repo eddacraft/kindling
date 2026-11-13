@@ -1,12 +1,22 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for AI coding agents (Claude Code, Codex, Cursor, OpenCode, and others) working in this repository. Humans should start with [README.md](README.md#development) and [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Project Overview
 
 kindling is a local memory and continuity engine for AI-assisted development. It captures observations (tool calls, diffs, commands, errors) from AI workflows, organizes them into capsules (bounded units of meaning), and makes context retrievable with deterministic, explainable results. All data is stored locally using embedded SQLite with FTS5.
 
 **kindling is Rust-canonical.** The engine is a Cargo workspace in `crates/`; the binary is `kindling` (published as the `eddacraft-kindling` crate — the bare `kindling` name is taken on crates.io). The TypeScript `@eddacraft/kindling` package (`packages/kindling`) is a thin HTTP-over-UDS client for that binary. kindling no longer publishes to npm (D-010): it ships as the binary (cargo, Homebrew, install.sh), the crates on crates.io, and GitHub Release assets. The older TypeScript implementation packages were removed; they, and the 0.1.x `@eddacraft/kindling` and adapter versions, live on only as deprecated npm versions.
+
+## Developer docs
+
+- `CONTEXT.md` — domain vocabulary (observation, capsule, pin, scope, project, spool, …). Use these terms.
+- `docs/architecture.md` — crate topology, daemon model, v1 API, data flow.
+- `docs/development.md` — repo map, generated files + CI drift gates, test suites, invariants, change recipes (new observation kind, schema migration, v1 endpoint, CLI subcommand, hook changes).
+- `docs/README.md` — index of all docs (reference vs. guides vs. historical).
+- `schema/README.md` — schema contract and migration procedure.
+
+Keep these in sync when you change what they describe (crates, endpoints, CLI verbs, schema version, kinds).
 
 ## Commands
 
@@ -32,15 +42,17 @@ pnpm run lint
 
 ```
 eddacraft-kindling   → the `kindling` CLI binary + Claude Code hooks (lib + bin)
-kindling-client      → daemon-backed Rust SDK (HTTP/1 over UDS); default for integrations
+kindling-client      → daemon-backed Rust SDK (HTTP/1 over UDS); default for integrations; opt-in `spool` (durable emit)
+kindling-runtime     → facade for Rust downstreams: attach-or-start daemon (in-process) + spooled client
 kindling-service     → in-process orchestration (embedded, zero-IPC)
 kindling-server      → daemon runtime (`kindling serve`); per-project routing
 kindling-store       → SQLite persistence (FTS5 + WAL); schema in `schema/`
 kindling-provider    → deterministic local retrieval (FTS5 BM25 + recency)
 kindling-types       → shared domain types (+ optional ts-rs bindings)
+kindling-bench       → private benchmark/resource-profile harness (not published)
 ```
 
-Dependency flow: `types ← store ← provider`; `service → types,store,provider`; `server → types,store,service`; `client → types`; the binary → all. Most integrations use `kindling-client` (daemon) or `kindling-service` (embedded). The daemon makes concurrent multi-tool access safe.
+Dependency flow: `types ← store ← provider`; `service → types,store,provider`; `server → types,store,service`; `client → types`; `runtime → types, client (optional), server (optional)`; the binary → all. Most integrations use `kindling-client` (daemon) or `kindling-service` (embedded). The daemon makes concurrent multi-tool access safe.
 
 ### TypeScript packages (`packages/`)
 
@@ -94,6 +106,22 @@ The adapters depend only on `@eddacraft/kindling`. Claude Code integration is bu
 Domain types live in `crates/kindling-types/src/` (`observation.rs`, `capsule.rs`, `retrieval.rs`, `common.rs`). They serialize as camelCase JSON; the optional `ts-rs` feature emits TypeScript bindings under `crates/kindling-types/bindings/` (CI fails on drift), which the thin TS client consumes.
 
 The TypeScript packages are ESM-only (`"type": "module"`) with `.js` extensions in imports.
+
+## Picking Up Work
+
+Planned work lives in APS specs under `plans/` (see `plans/aps-rules.md` for the format and `plans/project-context.md` for kindling-specific context). Before writing code:
+
+1. **Find authority.** The change needs a work item with status `Ready` in `plans/modules/*.aps.md`, or a GitHub issue. Check that it isn't already claimed: no open PR referencing the work item ID or issue, and the work item status is not `In Progress`.
+2. **Open an issue first only when needed:**
+   - the work is in the "Discuss first" lane of [CONTRIBUTING.md](CONTRIBUTING.md#discuss-first) (schema, public API, ranking, retention/redaction, new adapters, new CLI commands, heavy dependencies). Wait for a maintainer to agree the approach before opening a PR.
+   - no Ready work item exists. Propose it in an issue (or add a `Draft` work item) rather than inventing scope.
+
+   Do not create a GitHub issue that only mirrors an existing Ready work item.
+
+3. **Claim with a draft PR.** Branch from `main`, and make the first commit set the work item status to `In Progress`. Push and open a **draft** PR against `main` straight away. The draft PR is the claim. Its body must include the work item ID (e.g. `PORT-011`) and/or `Closes #N`. Trivial fixes with neither should say why in a `No APS item:` line.
+4. **Finish.** Mark the PR ready for review once checks pass, and update the work item status per the session-end ritual in `plans/aps-rules.md`.
+
+A claim is stale if its draft PR has had no activity for 14 days. Ask on the PR before taking the work over.
 
 ## Branching Workflow
 

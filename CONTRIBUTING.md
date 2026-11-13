@@ -35,12 +35,22 @@ kindling/
 > this repository and survive only as deprecated 0.1.x versions on npm. New
 > feature work targets the Rust crates.
 
+## Developer docs
+
+- [CONTEXT.md](CONTEXT.md) — the domain vocabulary. Use these terms in code, issues and PRs.
+- [docs/architecture.md](docs/architecture.md) — how the crates and the daemon fit together.
+- [docs/development.md](docs/development.md) — generated files and CI drift gates, test suites, invariants, and step-by-step recipes for common changes.
+- [docs/README.md](docs/README.md) — index of everything else.
+
 ## Getting Started
 
 ### Prerequisites
 
-- Rust (stable) — the toolchain is pinned in [`rust-toolchain.toml`](rust-toolchain.toml); `rustup` installs it automatically.
-- Node.js >= 24 and pnpm >= 8.0.0 — only needed to work on the npm thin client / adapters.
+- Rust via `rustup` — the toolchain is pinned in [`rust-toolchain.toml`](rust-toolchain.toml) (MSRV 1.89); `rustup` installs it automatically.
+- A C compiler (`cc`/`clang`/`gcc`, Xcode Command Line Tools on macOS) — SQLite is compiled from source via `rusqlite`'s `bundled` feature.
+- Node.js 24 (see [`.nvmrc`](.nvmrc)) and pnpm 10 — needed for the thin client / adapters and to install the git hooks.
+
+See the [README's Development section](README.md#development) for the full setup walkthrough.
 
 ### Development Setup
 
@@ -125,13 +135,14 @@ See the detailed guides for the full policy:
 ## Pull Request Process
 
 1. **Check the lane** in [What we accept](#what-we-accept); open an issue first for discuss-first work
-2. **Create a branch from `main`** for normal work and production hotfixes
-3. **Write tests** for new functionality
-4. **Update documentation** if behavior changes
-5. **Keep PRs focused** — one logical change per PR
-6. **Run the checks**: `cargo fmt --all -- --check && cargo clippy --all-targets --all-features -- -D warnings && cargo test` (plus `pnpm build && pnpm test` if you touched the npm packages)
-7. **Ensure CI passes** before requesting review
-8. **Target `main`** — all PRs target `main` unless they are scoped to an
+2. **Check nobody has claimed it**: look for an open PR referencing the issue or APS work item ID (e.g. `PORT-011`), or a work item marked `In Progress`
+3. **Claim it with a draft PR**: create a branch from `main`, push early, and open a draft PR whose description includes `Closes #N` and/or the work item ID. If the work comes from an APS work item, the first commit sets its status to `In Progress`. Drafts with no activity for 14 days are treated as abandoned; ask on the PR before taking one over
+4. **Write tests** for new functionality
+5. **Update documentation** if behavior changes
+6. **Keep PRs focused** — one logical change per PR
+7. **Run the checks**: `cargo fmt --all -- --check && cargo clippy --all-targets --all-features -- -D warnings && cargo test` (plus `pnpm build && pnpm test` if you touched the npm packages)
+8. **Ensure CI passes**, then mark the PR ready for review
+9. **Target `main`** — all PRs target `main` unless they are scoped to an
    active `release/*` branch.
 
 ### Commit Messages

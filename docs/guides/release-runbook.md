@@ -12,7 +12,7 @@ kindling is Rust-canonical. A release is a **GitHub Release** plus a
    attaches the editor extension VSIX (`kindling-<version>.vsix` plus its
    `.sha256`), and opens the Homebrew tap PR. The install script
    (`install.sh`) downloads from these assets.
-2. **crates.io:** the seven Rust crates in `crates/` (the engine). Published
+2. **crates.io:** the eight published Rust crates in `crates/` (the engine; `kindling-bench` is `publish = false`). Published
    manually with `scripts/publish.sh` (credential-gated). See
    [crates.io release](#cratesio-release) below.
 
@@ -197,7 +197,8 @@ Prerequisites:
 crates.io requires each crate's dependencies to be published first, so the
 script publishes in topological order (leaves first, the `kindling` binary
 last): `kindling-types` → `kindling-store` → `kindling-provider` →
-`kindling-service` → `kindling-server` → `kindling-client` → `eddacraft-kindling`.
+`kindling-service` → `kindling-server` → `kindling-client` → `kindling-runtime` →
+`eddacraft-kindling`.
 `kindling-client` carries a versioned dev-dependency on `kindling-server`, so the
 server must already be on crates.io when the client publishes — this is why the
 server precedes the client (the order encoded in `scripts/publish.sh`).
