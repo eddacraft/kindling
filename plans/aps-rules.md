@@ -262,6 +262,8 @@ If no Ready work item exists:
 
 ### Session End Ritual
 
+In kindling, steps 1–4 belong to the **bookkeeping pass**, not to feature branches. A feature branch leaves APS statuses and plan files alone and lists completed and discovered work in its PR description. A separate bookkeeping pass, in its own PR, applies them after work merges.
+
 After completing work:
 
 1. **Update status** — Mark work items: `In Progress`, `Complete: YYYY-MM-DD`, or `Blocked: [reason]`

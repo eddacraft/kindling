@@ -148,8 +148,8 @@ records and generating GitHub Release notes.
 ## Pull Request Process
 
 1. **Check the lane** in [What we accept](#what-we-accept); open an issue first for discuss-first work
-2. **Check nobody has claimed it**: look for an open PR referencing the issue or APS work item ID (e.g. `PORT-011`), or a work item marked `In Progress`
-3. **Claim it with a draft PR**: create a branch from `main`, push early, and open a draft PR whose description includes `Closes #N` and/or the work item ID. If the work comes from an APS work item, the first commit sets its status to `In Progress`. Drafts with no activity for 14 days are treated as abandoned; ask on the PR before taking one over
+2. **Check nobody has claimed it**: look for an open PR referencing the issue or APS work item ID (e.g. `PORT-011`)
+3. **Claim it with a draft PR**: create a branch from `main`, push early, and open a draft PR whose description includes `Closes #N` and/or the work item ID. Don't edit APS statuses or other plan files in the PR; maintainers update them in a later bookkeeping pass. Drafts with no activity for 14 days are treated as abandoned; ask on the PR before taking one over
 4. **Write tests** for new functionality
 5. **Update documentation** if behavior changes
 6. **Keep PRs focused** — one logical change per PR
