@@ -1,5 +1,8 @@
 # Rust-Canonical kindling with Thin TS Client — Design Spec
 
+> Reconciled 2026-11-13: Rust-canonical implementation is delivered through v0.4.1. D-010 retires the proposed npm binary channel. The active PORT module owns outstanding native/plugin acceptance and lifecycle decisions.
+> Current status and archive: [plan index](../index.aps.md).
+
 | Field      | Value                                                        |
 | ---------- | ------------------------------------------------------------ |
 | Status     | Decided                                                      |

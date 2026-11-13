@@ -1,5 +1,8 @@
 # Kindling performance hardening
 
+> Reconciled 2026-11-13: KINTEG-013 is delivered in v0.4.0/v0.4.1 (PR #143). Benchmark defects remain separately tracked in GitHub; this design is retained as historical rationale.
+> Current status and archive: [plan index](../index.aps.md).
+
 **Status:** Approved for KINTEG-013 by the 2026-08-03 implementation request.
 
 ## Problem

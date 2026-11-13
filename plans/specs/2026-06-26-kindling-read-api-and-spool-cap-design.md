@@ -1,5 +1,8 @@
 # kindling read API + spool retention cap — design
 
+> Reconciled 2026-11-13: KINTEG-003/009 are delivered in crates.io 0.3.0 and GitHub v0.4.0/v0.4.1. Completeness under arbitrary concurrent inserts is disputed by GH-186; retain that limitation when using the original design claims.
+> Current status and archive: [plan index](../index.aps.md).
+
 | Field   | Value                                                        |
 | ------- | ------------------------------------------------------------ |
 | Status  | Accepted                                                     |

@@ -1,10 +1,16 @@
 # Conversion Surface Delivery Plan
 
+> Reconciled 2026-11-13. The [module](../modules/08-conversion-surface.aps.md)
+> owns current status. C1/C3/C4 are Complete and archived; C0/C2/C12 retain
+> acceptance gaps. Original branch names and steps below are historical, not
+> instructions to replay already released work. D-010 retired npm; no publish.yml
+> or npm binary install is part of the supported delivery path.
+
 **Goal:** Ship a complete first-impression and non-Anvil conversion surface for kindling: land built work, publish through all channels, then add CLI/adapter/docs improvements that close the remaining gaps.
 
 **Architecture:** Work proceeds in five waves with explicit gates. Wave 0 merges `feat/conversion-surface` and completes release ops (no new features). Waves 1–3 add Rust CLI capabilities and adapter/docs polish in small, committable PRs. Wave 4 adds distribution automation and optional CI/GitHub Action adapters. Each wave produces a releasable increment; nothing waits for the full programme to finish.
 
-**Tech Stack:** Rust (`eddacraft-kindling`, `ratatui`/`crossterm` for TUI), TypeScript (`@eddacraft/kindling-adapter-vscode`, composite GitHub Action), GitHub Actions (`release.yml`, `publish.yml`, `homebrew-tap-pr`), Homebrew (`eddacraft/homebrew-tap`), external docs (`docs.eddacraft.ai`).
+**Tech Stack:** Rust (`eddacraft-kindling`, `ratatui`/`crossterm` for TUI), TypeScript (`@eddacraft/kindling-adapter-vscode`, composite GitHub Action), GitHub Actions (`release.yml`, `homebrew-tap-pr`), Homebrew (`eddacraft/homebrew-tap`), external docs (`docs.eddacraft.ai`).
 
 ---
 
@@ -26,7 +32,7 @@
 | Demo recording script                                         | `scripts/record-demo.sh`                                                            |
 | Formula generator                                             | `scripts/generate-homebrew-formula.sh`                                              |
 
-### Still to deliver (this plan)
+### Original delivery inventory (current status is in module 08)
 
 | ID  | Deliverable                                                        | Wave |
 | --- | ------------------------------------------------------------------ | ---- |
@@ -100,15 +106,17 @@ flowchart TD
 **Ops checklist (no code):**
 
 1. Add `HOMEBREW_TAP_TOKEN` to kindling repo secrets (`contents:write` on `eddacraft/homebrew-tap`).
-2. Ensure `NPM_TOKEN` and release workflow permissions are current.
+2. Confirm release workflow permissions; remove unused `NPM_TOKEN` after D-010.
 3. Tag `vX.Y.Z` matching `package.json` / `Cargo.toml` workspace version.
 4. Confirm `release.yml` attaches 7 target archives + `.sha256` sidecars (including Linux gnu).
 5. Merge automated `homebrew-tap` PR; verify `brew install eddacraft/tap/kindling` on macOS and Linux.
-6. Confirm `publish.yml` publishes `@eddacraft/kindling` and add `@eddacraft/kindling-adapter-vscode` to publish scope.
+6. Confirm the release carries the VSIX; publish Rust crates via `scripts/publish.sh`. npm is retired by D-010.
 7. Record asciinema: `asciinema rec -c "./scripts/record-demo.sh" docs/assets/kindling-demo.cast`; upload; embed in `README.md`.
 8. Mirror `docs/quickstart/`, `docs/integrations.md`, `docs/adapters/cookbook.md` on `docs.eddacraft.ai` (manual or C10 script).
 
 ### Task 0.1 — Merge conversion surface PR
+
+**Reconciled status (2026-11-13):** Merged and included in v0.4.0; remaining C0 acceptance is in module 08.
 
 **Files:**
 
@@ -129,7 +137,7 @@ pnpm --filter @eddacraft/kindling-adapter-vscode test
 
 ### Task 0.2 — Release verification (C12)
 
-**Checkpoint:** Tagged release installs via curl, brew (macOS + Linux), and npm; tap PR merged.
+**Checkpoint:** Tagged release installs via install.sh, cargo and brew; native receipts recorded.
 
 **Validate:**
 
@@ -137,7 +145,7 @@ pnpm --filter @eddacraft/kindling-adapter-vscode test
 curl -fsSL https://raw.githubusercontent.com/eddacraft/kindling/main/install.sh | sh
 kindling demo && kindling search JWT && kindling browse --no-open
 brew install eddacraft/tap/kindling   # macOS or Linux Homebrew
-npm install @eddacraft/kindling
+cargo install eddacraft-kindling
 ```
 
 ---
@@ -145,6 +153,8 @@ npm install @eddacraft/kindling
 ## Wave 1 — First-run polish (C1, C2, C3, C4)
 
 ### Task 1.1 — `install.sh` demo prompt (C1)
+
+**Reconciled status (2026-11-13):** Complete; released in v0.4.0 and archived as C1.
 
 **Files:**
 
@@ -190,6 +200,8 @@ cd packages/kindling-adapter-vscode && pnpm run package
 
 ### Task 1.3 — Workspace auto-detection (C3)
 
+**Reconciled status (2026-11-13):** Complete; released in v0.4.0 and archived as C3.
+
 **Files:**
 
 - Create: `crates/kindling/src/git.rs`
@@ -211,6 +223,8 @@ cargo test -p eddacraft-kindling --test cli search
 ```
 
 ### Task 1.4 — `kindling stats` (C4)
+
+**Reconciled status (2026-11-13):** Complete; released in v0.4.0 and archived as C4.
 
 **Files:**
 
@@ -426,7 +440,7 @@ PRs 2–5 can run in parallel after PR1. PR6–8 parallel after PR1. PR7 benefit
 
 ## APS linkage
 
-Track progress in [`plans/modules/08-conversion-surface.aps.md`](../modules/08-conversion-surface.aps.md). Mark work items `Ready` → `In Progress` → `Merged` per PR.
+Track progress in [`plans/modules/08-conversion-surface.aps.md`](../modules/08-conversion-surface.aps.md). Mark work items `Ready` → `In Progress` → `Merged` per PR, then `Complete` only after release or internal-use evidence and acceptance.
 
 ---
 
@@ -434,7 +448,7 @@ Track progress in [`plans/modules/08-conversion-surface.aps.md`](../modules/08-c
 
 - [ ] `feat/conversion-surface` merged; `vX.Y.Z` released
 - [ ] `brew install eddacraft/tap/kindling` works on macOS and Linux (glibc)
-- [ ] `npm install @eddacraft/kindling-adapter-vscode` published (or VSIX on releases)
+- [x] VSIX attached to v0.4.0 and v0.4.1 (npm delivery superseded by D-010)
 - [ ] README embeds asciinema demo
 - [ ] New user path: install → demo → search → browse/tui without Claude Code
 - [ ] Cursor/Windsurf documented with working VSIX path
@@ -458,4 +472,4 @@ Track progress in [`plans/modules/08-conversion-surface.aps.md`](../modules/08-c
 
 Plan saved at `plans/execution/2026-06-22-conversion-surface-delivery.md`.
 
-**Next step:** Mark C0 `Ready` in APS module 08, merge `feat/conversion-surface`, then parallelise Wave 1 PRs (C1–C4) via worktrees.
+**Next step (2026-11-13):** Supply C0/C2/C12 acceptance receipts or approve the next Draft item in module 08. C1/C3/C4 are already released; do not replay their implementation.

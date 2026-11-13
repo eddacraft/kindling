@@ -4,7 +4,7 @@
 | --- | ------ | ---------- |
 | CLI | @aneki | Superseded |
 
-> **Superseded by [`05-rust-port`](./05-rust-port.aps.md) on 2026-04-15.**
+> **Superseded by [`05-rust-port`](../../modules/05-rust-port.aps.md) on 2026-04-15.**
 > CLI and server work is absorbed into Phase 3 of module 05 (PORT-011..PORT-014);
 > type sync moves to Phase 4 (PORT-015..PORT-016).
 > See `plans/specs/2026-04-15-rust-port-design.md` for rationale.
@@ -56,32 +56,32 @@ Extend the Rust binary from a hook-only tool to a full CLI replacing the TypeScr
 - **Intent:** Port the local FTS provider to Rust
 - **Expected Outcome:** FTS5 search with BM25 normalization, tiered retrieval (pins, summary, candidates)
 - **Validation:** `cargo test` passes retrieval tests matching TypeScript behavior
-- **Status:** Draft
+- **Status:** Superseded — absorbed into PORT work under D-004 (2026-04-15); not an executable backlog item. Previous status: Draft.
 
 ### CLI-002: CLI commands
 
 - **Intent:** All 12 commands available via clap
 - **Expected Outcome:** `kindling status`, `kindling search`, `kindling list`, etc. all work with JSON and text output
 - **Validation:** Integration tests for each command
-- **Status:** Draft
+- **Status:** Superseded — absorbed into PORT work under D-004 (2026-04-15); not an executable backlog item. Previous status: Draft.
 
 ### CLI-003: HTTP API server
 
 - **Intent:** Replace Fastify with axum in the same binary
 - **Expected Outcome:** `kindling serve` starts HTTP API with same endpoints
 - **Validation:** Existing API integration tests pass against the Rust server
-- **Status:** Draft
+- **Status:** Superseded — absorbed into PORT work under D-004 (2026-04-15); not an executable backlog item. Previous status: Draft.
 
 ### CLI-004: Distribution
 
 - **Intent:** Multiple install methods available
 - **Expected Outcome:** `cargo install kindling`, Homebrew tap, and GitHub release binaries
 - **Validation:** Install via each method on a clean machine
-- **Status:** Draft
+- **Status:** Superseded — absorbed into PORT work under D-004 (2026-04-15); not an executable backlog item. Previous status: Draft.
 
 ### CLI-005: TypeScript type sync
 
 - **Intent:** Rust struct changes propagate to TypeScript types
 - **Expected Outcome:** `ts-rs` generates TypeScript type definitions from Rust structs
 - **Validation:** Generated types match existing `kindling-core` types
-- **Status:** Draft
+- **Status:** Superseded — absorbed into PORT work under D-004 (2026-04-15); not an executable backlog item. Previous status: Draft.

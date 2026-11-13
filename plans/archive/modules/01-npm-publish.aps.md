@@ -1,8 +1,12 @@
 # npm Publishing
 
-| ID      | Owner  | Status |
-| ------- | ------ | ------ |
-| PUBLISH | @aneki | Done   |
+| ID      | Owner  | Status   |
+| ------- | ------ | -------- |
+| PUBLISH | @aneki | Complete |
+
+> Archived 2026-11-13. Delivery evidence is recorded per item and in the
+> [completed index](../../completed.aps.md). Original scope and commands below
+> describe the historical delivery, including packages since retired by D-010.
 
 ## Purpose
 
@@ -47,39 +51,51 @@ Get all kindling packages published to npm so users can install them. This inclu
 - **Intent:** All pending work lands on main
 - **Expected Outcome:** PRs #14, #15, #35 merged, main branch green
 - **Validation:** `git log --oneline -10` shows merged commits, `pnpm run test` passes
-- **Status:** Ready
+- **Status:** Complete
+- **Delivery evidence (2026-11-13):** PRs #14/#15/#35 are merged and ancestors of v0.4.0; #35 postdates v0.1.2.
+- **Historical status:** Ready
 
 ### PUBLISH-002: Claim npm scope
 
 - **Intent:** Reserve the `@eddacraft` scope on npm
 - **Expected Outcome:** `@eddacraft` org exists on npmjs.com, team has publish access
 - **Validation:** `npm org ls @eddacraft` returns members
-- **Status:** Ready
+- **Status:** Complete
+- **Delivery evidence (2026-11-13):** Historical npm 0.1.2 publication and successful Publish to npm release workflow; channel retired by D-010.
+- **Historical status:** Ready
 
 ### PUBLISH-003: Package metadata
 
 - **Intent:** All packages have correct metadata for npm discovery
 - **Expected Outcome:** Every `package.json` has description, keywords, repository, license, engines, and files fields
 - **Validation:** `pnpm -r exec -- node -e "const p=require('./package.json'); console.log(p.name, !!p.description, !!p.repository)"`
-- **Status:** Ready
+- **Status:** Complete
+- **Delivery evidence (2026-11-13):** Historical npm 0.1.2 publication and successful Publish to npm release workflow; channel retired by D-010.
+- **Historical status:** Ready
 
 ### PUBLISH-004: Per-package READMEs
 
 - **Intent:** Each package has a README suitable for its npm page
 - **Expected Outcome:** Every package directory contains a README.md with install, usage, and API overview
 - **Validation:** `for d in packages/*/; do test -f "$d/README.md" && echo "OK: $d" || echo "MISSING: $d"; done`
-- **Status:** Ready
+- **Status:** Complete
+- **Delivery evidence (2026-11-13):** Historical npm 0.1.2 publication and successful Publish to npm release workflow; channel retired by D-010.
+- **Historical status:** Ready
 
 ### PUBLISH-005: Publish pipeline
 
 - **Intent:** One command publishes all packages in correct order
 - **Expected Outcome:** Script handles topological ordering (core → store/provider → main → adapters → cli)
 - **Validation:** `pnpm publish -r --dry-run` completes without errors
-- **Status:** Ready
+- **Status:** Complete
+- **Delivery evidence (2026-11-13):** Historical npm 0.1.2 publication and successful Publish to npm release workflow; channel retired by D-010.
+- **Historical status:** Ready
 
 ### PUBLISH-006: CI release workflow
 
 - **Intent:** Tagging a release triggers automated publish
 - **Expected Outcome:** GitHub Actions workflow publishes to npm on version tag push
 - **Validation:** Workflow file exists and passes `act` dry run or manual trigger
-- **Status:** Draft
+- **Status:** Complete
+- **Delivery evidence (2026-11-13):** Historical npm 0.1.2 publication and successful Publish to npm release workflow; channel retired by D-010.
+- **Historical status:** Draft

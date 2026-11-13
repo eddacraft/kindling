@@ -1,5 +1,9 @@
 # Post-merge: feat/kinteg-009-spool-retention
 
+> Reconciled 2026-11-13: KINTEG-009 and KINTEG-003 are Complete; kindling-client 0.3.0 was published 2026-06-25 and both APIs are included in v0.4.0/v0.4.1. The old user-gated publication and KDS blockers below are historical.
+> Current item records: [completed index](../../completed.aps.md).
+> Original checklists below are retained as dated handoff evidence.
+
 **PR:** #126  
 **Merged:** 2026-06-26  
 **APS:** KINTEG-009 (D-009 spool cap)

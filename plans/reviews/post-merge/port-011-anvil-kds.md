@@ -1,5 +1,9 @@
 # Post-merge: PORT-011 (anvil KDS proof)
 
+> Reconciled 2026-11-13: PORT-011 is Complete: both anvil integration PRs are ancestors of published v0.9.0-beta. KINTEG-003/009 are published; the old pending-kindling blockers below are historical.
+> Current item records: [completed index](../../completed.aps.md).
+> Original checklists below are retained as dated handoff evidence.
+
 **Completed:** 2026-06-24  
 **Anvil:** eddacraft/anvil-001 PR #2897 (KDS-001 + KDS-003), PR #2906 (KDS-002)  
 **Kindling:** [#124](https://github.com/eddacraft/kindling/issues/124)

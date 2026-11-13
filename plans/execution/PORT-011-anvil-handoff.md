@@ -4,7 +4,11 @@
 **To:** anvil (eddacraft/anvil-001) — KDS module / `KindlingDaemonSink`  
 **Date:** 2026-06-24  
 **Completed:** 2026-06-24 — anvil PR #2897 (KDS-001 + KDS-003) + #2906 (KDS-002).  
-**Status:** Done (kindling PORT-011 Merged; anvil follow-on KDS-004/005 blocked on kindling D-009)
+**Status:** Complete — anvil PRs #2897/#2906 are included in published v0.9.0-beta (2026-07-12); ancestry rechecked 2026-11-13.
+
+> Historical handoff. Current delivery record: [PORT archive](../archive/modules/05-rust-port.aps.md).
+> KINTEG-003/009 are also published (crates.io 0.3.0 onward); the old blocker
+> and suggested implementation sequence below must not be replayed.
 
 This document is the implementation guide anvil needs to complete **PORT-011**
 (kindling) and **KDS-003** (anvil): prove direct Rust-to-Rust observation emit
