@@ -463,12 +463,19 @@ async fn spawn_failure_writes_spawn_log() {
     );
 }
 
-/// 4b. Default `Spawner::Command` execs the (absent in CI) `kindling` binary;
-/// the call must still fail cleanly with Unavailable, not panic or hang.
+/// 4b. Default `Spawner::Command` execs the `kindling` binary; when that binary
+/// is missing the call must still fail cleanly with Unavailable, not panic or
+/// hang. The binary name is overridden via `KINDLING_BIN` so the missing-binary
+/// path is exercised deterministically, independent of the ambient PATH.
 #[tokio::test]
 async fn default_spawner_missing_binary_is_unavailable() {
     let dir = tempfile::tempdir().unwrap();
     let socket_path: PathBuf = dir.path().join("nonexistent.sock");
+
+    // Point the default spawner at a binary that cannot exist (an empty temp
+    // dir has no such entry) so `Command::spawn` fails with NotFound here even
+    // when the real `kindling` binary is on PATH.
+    std::env::set_var("KINDLING_BIN", dir.path().join("kindling-missing-bin"));
 
     let client = Client::with_config(ClientConfig {
         socket_path,
@@ -477,7 +484,7 @@ async fn default_spawner_missing_binary_is_unavailable() {
         expected_schema_version: schema_version_u32(),
         connect_timeout: Duration::from_millis(200),
         poll_interval: Duration::from_millis(10),
-        spawn: Spawner::Command, // execs `kindling`, not on PATH in CI
+        spawn: Spawner::Command, // execs $KINDLING_BIN (absent), not the real binary
         transport: Transport::Uds,
         spawn_log_path: None,
     });

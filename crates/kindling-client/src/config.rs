@@ -144,7 +144,11 @@ impl Spawner {
 /// process group. The returned child is adopted so a failed launcher is
 /// reaped instead of being dropped.
 fn spawn_kindling_command() -> io::Result<()> {
-    let mut cmd = Command::new("kindling");
+    // `KINDLING_BIN` overrides the daemon binary name so tests can point the
+    // default spawner at a name that is guaranteed absent and exercise the
+    // missing-binary path deterministically, regardless of the ambient PATH.
+    let bin = std::env::var("KINDLING_BIN").unwrap_or_else(|_| "kindling".to_string());
+    let mut cmd = Command::new(bin);
     cmd.args(["serve", "--daemonize"])
         // Detach the daemon's stdio from ours. Without this the
         // long-lived daemon inherits the spawner's stdout — fatal
