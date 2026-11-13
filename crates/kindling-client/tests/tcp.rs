@@ -25,6 +25,12 @@ fn raw_status(
 ) -> u16 {
     use std::io::{Read, Write};
     let mut stream = std::net::TcpStream::connect(("127.0.0.1", port)).expect("connect");
+    // Bound the blocking read so a server that fails to close the connection
+    // (despite the `connection: close` request header) fails the test instead of
+    // hanging forever on `read_to_end`.
+    stream
+        .set_read_timeout(Some(Duration::from_secs(5)))
+        .expect("set read timeout");
     let mut req = format!(
         "{method} {path} HTTP/1.1\r\nhost: kindling.local\r\n\
          content-type: application/json\r\nconnection: close\r\n"
