@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for AI coding agents (Claude Code, Codex, Cursor, OpenCode, and others) working in this repository. Humans should start with [README.md](README.md#development) and [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Project Overview
 
@@ -33,14 +33,16 @@ pnpm run lint
 ```
 eddacraft-kindling   → the `kindling` CLI binary + Claude Code hooks (lib + bin)
 kindling-client      → daemon-backed Rust SDK (HTTP/1 over UDS); default for integrations
+kindling-runtime     → embeddable facade: in-process daemon + client + durable spool
 kindling-service     → in-process orchestration (embedded, zero-IPC)
 kindling-server      → daemon runtime (`kindling serve`); per-project routing
 kindling-store       → SQLite persistence (FTS5 + WAL); schema in `schema/`
 kindling-provider    → deterministic local retrieval (FTS5 BM25 + recency)
 kindling-types       → shared domain types (+ optional ts-rs bindings)
+kindling-bench       → latency, throughput, and resource benchmarks (not published)
 ```
 
-Dependency flow: `types ← store ← provider`; `service → types,store,provider`; `server → types,store,service`; `client → types`; the binary → all. Most integrations use `kindling-client` (daemon) or `kindling-service` (embedded). The daemon makes concurrent multi-tool access safe.
+Dependency flow: `types ← store ← provider`; `service → types,store,provider`; `server → types,store,service`; `client → types`; `runtime → types,client,server`; the binary → all. Most integrations use `kindling-client` (daemon) or `kindling-service` (embedded). The daemon makes concurrent multi-tool access safe.
 
 ### TypeScript packages (`packages/`)
 
@@ -95,6 +97,22 @@ Domain types live in `crates/kindling-types/src/` (`observation.rs`, `capsule.rs
 
 The TypeScript packages are ESM-only (`"type": "module"`) with `.js` extensions in imports.
 
+## Picking Up Work
+
+Planned work lives in APS specs under `plans/` (see `plans/aps-rules.md` for the format and `plans/project-context.md` for kindling-specific context). Before writing code:
+
+1. **Find authority.** The change needs a work item with status `Ready` in `plans/modules/*.aps.md`, or a GitHub issue. Check that it isn't already claimed: no open PR referencing the work item ID or issue, and the work item status is not `In Progress`.
+2. **Open an issue first only when needed:**
+   - the work is in the "Discuss first" lane of [CONTRIBUTING.md](CONTRIBUTING.md#discuss-first) (schema, public API, ranking, retention/redaction, new adapters, new CLI commands, heavy dependencies). Wait for a maintainer to agree the approach before opening a PR.
+   - no Ready work item exists. Propose it in an issue (or add a `Draft` work item) rather than inventing scope.
+
+   Do not create a GitHub issue that only mirrors an existing Ready work item.
+
+3. **Claim with a draft PR.** Branch from `main`, and make the first commit set the work item status to `In Progress`. Push and open a **draft** PR against `main` straight away. The draft PR is the claim. Its body must include the work item ID (e.g. `PORT-011`) and/or `Closes #N`. Trivial fixes with neither should say why in a `No APS item:` line.
+4. **Finish.** Mark the PR ready for review once checks pass, and update the work item status per the session-end ritual in `plans/aps-rules.md`.
+
+A claim is stale if its draft PR has had no activity for 14 days. Ask on the PR before taking the work over.
+
 ## Branching Workflow
 
 This repository uses a single permanent branch model with short-lived work
@@ -124,6 +142,22 @@ See the detailed guides for the full policy:
 - `docs/guides/release-runbook.md`
 
 Never push directly to `main` — always use pull requests.
+
+## Release Documentation
+
+- Record user-visible changes, security outcomes, deprecations, and required
+  upgrade actions in [CHANGELOG.md](CHANGELOG.md).
+- Record implementation, architecture, performance, security analysis, and
+  schema or API details in [ENGINEERING-HISTORY.md](ENGINEERING-HISTORY.md).
+  Link to relevant PRs, issues, ADRs, and APS work items where available.
+- Add entries under `Unreleased` for changes landing on `main` with the PR or
+  already present there. Update both records when the change affects both
+  audiences. Routine housekeeping can go undocumented.
+- Keep the `Unreleased` and version/date headings aligned across both files.
+  Preserve historical dates. Run `python3 scripts/check-release-docs.py` after
+  editing either record.
+- Follow the [release runbook](docs/guides/release-runbook.md) to promote the
+  entries and generate GitHub Release notes from the changelog.
 
 ## PocketFlow (Vendored)
 

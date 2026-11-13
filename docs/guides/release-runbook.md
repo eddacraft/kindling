@@ -147,12 +147,11 @@ git push origin vX.Y.Z
 Then create the GitHub Release:
 
 ```bash
-python3 scripts/check-release-docs.py --release-version X.Y.Z \\
-  --notes-version X.Y.Z --notes-output /tmp/kindling-release-notes.md
-
-gh release create vX.Y.Z \\
-  --title "vX.Y.Z" \\
-  --notes-file /tmp/kindling-release-notes.md \\
+python3 scripts/check-release-docs.py --release-version X.Y.Z \
+  --notes-version X.Y.Z --notes-output /tmp/kindling-release-notes.md &&
+gh release create vX.Y.Z \
+  --title "vX.Y.Z" \
+  --notes-file /tmp/kindling-release-notes.md \
   --target main
 ```
 

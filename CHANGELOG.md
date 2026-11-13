@@ -148,4 +148,3 @@ Kindling's engine moved to Rust, with an installable CLI, local daemon and Rust 
 - Automatic redaction of secrets in captured content
 - Configurable excluded file patterns for sensitive paths
 - Bounded output capture to prevent excessive storage
-
