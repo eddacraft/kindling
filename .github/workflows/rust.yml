@@ -7,16 +7,22 @@ on:
       - 'crates/**'
       - 'schema/**'
       - 'scripts/sync-vendored-schema.sh'
-      - 'packages/kindling/src/generated/**'
-      - 'packages/kindling/schema/**'
-      - 'packages/kindling/scripts/sync-types.mjs'
-      # The live adapters consume the thin client and are exercised against the
-      # daemon by the thin-client job.
+      - 'packages/kindling/**'
       - 'packages/kindling-adapter-opencode/**'
       - 'packages/kindling-adapter-pocketflow/**'
+      - 'packages/kindling-adapter-vscode/**'
+      - 'examples/**'
       # /memory slash-command scripts are exercised against the debug binary
       # by the thin-client job.
       - 'plugins/kindling-claude-code/**'
+      # Root dependency/config files the thin-client and ts-generated-copy jobs read.
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'tsconfig.json'
+      - 'tsconfig.base.json'
+      - '.nvmrc'
+      - '.npmrc'
       - 'Cargo.toml'
       - 'Cargo.lock'
       - 'rust-toolchain.toml'
@@ -28,16 +34,22 @@ on:
       - 'crates/**'
       - 'schema/**'
       - 'scripts/sync-vendored-schema.sh'
-      - 'packages/kindling/src/generated/**'
-      - 'packages/kindling/schema/**'
-      - 'packages/kindling/scripts/sync-types.mjs'
-      # The live adapters consume the thin client and are exercised against the
-      # daemon by the thin-client job.
+      - 'packages/kindling/**'
       - 'packages/kindling-adapter-opencode/**'
       - 'packages/kindling-adapter-pocketflow/**'
+      - 'packages/kindling-adapter-vscode/**'
+      - 'examples/**'
       # /memory slash-command scripts are exercised against the debug binary
       # by the thin-client job.
       - 'plugins/kindling-claude-code/**'
+      # Root dependency/config files the thin-client and ts-generated-copy jobs read.
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'tsconfig.json'
+      - 'tsconfig.base.json'
+      - '.nvmrc'
+      - '.npmrc'
       - 'Cargo.toml'
       - 'Cargo.lock'
       - 'rust-toolchain.toml'
@@ -96,7 +108,8 @@ jobs:
       - run: cargo test -p kindling-types --features ts-rs
       - name: Fail if bindings drifted
         run: |
-          if ! git diff --exit-code -- crates/kindling-types/bindings; then
+          git add -A -- crates/kindling-types/bindings
+          if ! git diff --cached --exit-code -- crates/kindling-types/bindings; then
             echo "::error::TypeScript bindings are out of date. Run: cargo test -p kindling-types --features ts-rs"
             exit 1
           fi
@@ -117,7 +130,11 @@ jobs:
       - run: node packages/kindling/scripts/sync-types.mjs
       - name: Fail if bindings or copied generated types drifted
         run: |
-          if ! git diff --exit-code -- \
+          git add -A -- \
+            crates/kindling-types/bindings \
+            packages/kindling/src/generated \
+            packages/kindling/schema
+          if ! git diff --cached --exit-code -- \
             crates/kindling-types/bindings \
             packages/kindling/src/generated \
             packages/kindling/schema; then
@@ -134,7 +151,10 @@ jobs:
         run: ./scripts/sync-vendored-schema.sh
       - name: Fail if vendored schema drifted
         run: |
-          if ! git diff --exit-code -- \
+          git add -A -- \
+            crates/kindling-store/schema \
+            crates/kindling-client/schema
+          if ! git diff --cached --exit-code -- \
             crates/kindling-store/schema \
             crates/kindling-client/schema; then
             echo "::error::Vendored schema copies are out of date. A change to the canonical schema/ was not re-synced. Run: ./scripts/sync-vendored-schema.sh"
