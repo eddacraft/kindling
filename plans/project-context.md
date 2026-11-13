@@ -32,6 +32,9 @@ Follow AGENTS.md and the repository branching/worktree guides for execution.
   incomplete item. The intent-event contract is blocked on GH-215.
 - Specs, execution plans and post-merge reviews are retained technical rationale;
   their dated checklists do not override the current module status.
+- Feature branches do not edit APS statuses or plan files; they list completed
+  and discovered work in the PR description. A separate **bookkeeping pass**,
+  in its own PR, updates statuses and plan files after work merges.
 
 ## Current delivery and validation
 
