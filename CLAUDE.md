@@ -136,3 +136,20 @@ The project vendors PocketFlow at `packages/kindling-adapter-pocketflow/vendor/p
 - Design patterns: Agent, Workflow, RAG, MapReduce
 
 The `.cursorrules` file in the vendor directory contains extensive PocketFlow guidance for agentic coding workflows.
+
+## Release documentation policy
+
+- `CHANGELOG.md`: user-visible features, behaviour changes, fixes, security
+  outcomes, deprecations, breaking changes and required upgrade actions.
+- `ENGINEERING-HISTORY.md`: implementation details, architecture, performance,
+  security analysis, schema/API contracts, operational and delivery work, with
+  PR/issue/ADR/APS references where available.
+- Update both only when a change warrants both audiences. Routine housekeeping
+  need not update either file. Never add unreleased claims for work not on `main`.
+- Use matching `## [Unreleased]` and version/date headings in both files. At
+  release time, promote the relevant entries in both files to the same version
+  and date. Preserve the old history without retroactive release-date changes.
+- APS tracks planned/completed work, ADRs explain decisions, Engineering History
+  records implemented engineering changes, and Changelog records user impact.
+- Validate structure locally with `python3 scripts/check-release-docs.py`;
+  release notes can be extracted with `python3 scripts/check-release-docs.py --notes-version X.Y.Z --notes-output /tmp/kindling-release-notes.md`.
