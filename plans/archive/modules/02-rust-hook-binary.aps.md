@@ -4,7 +4,7 @@
 | ---- | ------ | ---------- |
 | HOOK | @aneki | Superseded |
 
-> **Superseded by [`05-rust-port`](./05-rust-port.aps.md) on 2026-04-15.**
+> **Superseded by [`05-rust-port`](../../modules/05-rust-port.aps.md) on 2026-04-15.**
 > Hook work is absorbed into Phase 2 of module 05 (PORT-007..PORT-009).
 > See `plans/specs/2026-04-15-rust-port-design.md` for rationale.
 > This file stays as historical reference; do not pick up HOOK-\* tasks directly.
@@ -58,14 +58,14 @@ Replace the Node.js hook scripts with a single statically-linked Rust binary (`k
 - **Intent:** Rust workspace initialized with dependencies
 - **Expected Outcome:** `cargo build` succeeds with rusqlite (bundled), serde, serde_json, clap
 - **Validation:** `cargo build --release` completes
-- **Status:** Ready
+- **Status:** Superseded — absorbed into PORT work under D-004 (2026-04-15); not an executable backlog item. Previous status: Ready.
 
 ### HOOK-002: SQLite store layer
 
 - **Intent:** Rust equivalent of the TypeScript SQLite store
 - **Expected Outcome:** Can open database, run migrations, insert observations, attach to capsules, create/close capsules
 - **Validation:** `cargo test` passes store tests against a temp database
-- **Status:** Ready
+- **Status:** Superseded — absorbed into PORT work under D-004 (2026-04-15); not an executable backlog item. Previous status: Ready.
 - **Dependencies:** HOOK-001
 
 ### HOOK-003: Content filtering
@@ -73,7 +73,7 @@ Replace the Node.js hook scripts with a single statically-linked Rust binary (`k
 - **Intent:** Secret masking and content truncation matching Node.js behavior
 - **Expected Outcome:** API keys, tokens, and passwords are redacted; content truncated at limits; excluded paths filtered
 - **Validation:** `cargo test` passes filter tests with known secret patterns
-- **Status:** Ready
+- **Status:** Superseded — absorbed into PORT work under D-004 (2026-04-15); not an executable backlog item. Previous status: Ready.
 - **Dependencies:** HOOK-001
 
 ### HOOK-004: Hook handlers
@@ -81,7 +81,7 @@ Replace the Node.js hook scripts with a single statically-linked Rust binary (`k
 - **Intent:** All 7 hook types handled via stdin JSON
 - **Expected Outcome:** Binary reads Claude Code hook context from stdin, performs the correct DB operation, returns JSON response
 - **Validation:** Integration tests pipe JSON fixtures through the binary and verify DB state
-- **Status:** Ready
+- **Status:** Superseded — absorbed into PORT work under D-004 (2026-04-15); not an executable backlog item. Previous status: Ready.
 - **Dependencies:** HOOK-002, HOOK-003
 
 ### HOOK-005: Context injection
@@ -89,7 +89,7 @@ Replace the Node.js hook scripts with a single statically-linked Rust binary (`k
 - **Intent:** SessionStart and PreCompact hooks inject prior context
 - **Expected Outcome:** SessionStart returns pins + recent observations; PreCompact returns pins + latest summary
 - **Validation:** Integration test verifies injected context JSON structure
-- **Status:** Ready
+- **Status:** Superseded — absorbed into PORT work under D-004 (2026-04-15); not an executable backlog item. Previous status: Ready.
 - **Dependencies:** HOOK-004
 
 ### HOOK-006: Cross-platform CI builds
@@ -97,7 +97,7 @@ Replace the Node.js hook scripts with a single statically-linked Rust binary (`k
 - **Intent:** Binary builds for all target platforms
 - **Expected Outcome:** GitHub Actions produces release binaries for Linux (x86_64, aarch64, musl), macOS (x86_64, aarch64), Windows (x86_64)
 - **Validation:** CI matrix completes, artifacts downloadable
-- **Status:** Draft
+- **Status:** Superseded — absorbed into PORT work under D-004 (2026-04-15); not an executable backlog item. Previous status: Draft.
 - **Dependencies:** HOOK-004
 
 ### HOOK-007: Install script and plugin update
@@ -105,7 +105,7 @@ Replace the Node.js hook scripts with a single statically-linked Rust binary (`k
 - **Intent:** Users can install the binary and the plugin uses it
 - **Expected Outcome:** `curl -sSL install.kindling.dev | sh` installs the binary; plugin `hooks.json` updated to use it
 - **Validation:** Fresh install on Linux/macOS followed by Claude Code session with hooks firing
-- **Status:** Draft
+- **Status:** Superseded — absorbed into PORT work under D-004 (2026-04-15); not an executable backlog item. Previous status: Draft.
 - **Dependencies:** HOOK-006
 
 ### HOOK-008: Compatibility validation
@@ -113,5 +113,5 @@ Replace the Node.js hook scripts with a single statically-linked Rust binary (`k
 - **Intent:** Rust binary produces identical behavior to Node.js scripts
 - **Expected Outcome:** Same hook inputs produce same DB state and JSON outputs as the Node.js implementation
 - **Validation:** Snapshot tests comparing Node.js and Rust outputs for all hook types
-- **Status:** Draft
+- **Status:** Superseded — absorbed into PORT work under D-004 (2026-04-15); not an executable backlog item. Previous status: Draft.
 - **Dependencies:** HOOK-004

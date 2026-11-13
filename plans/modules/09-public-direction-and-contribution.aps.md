@@ -4,10 +4,12 @@
 | ------ | ------ | ----------- |
 | PUBDIR | @aneki | In Progress |
 
-**Last reviewed:** 2026-10-21 — PUBDIR-001/002 merged (PR #151) after operator
-acceptance. Created 2026-07-19 ahead of expected external attention to make
-kindling's direction, contribution boundaries, and available work legible
-without exposing the internal APS tree as a public task dump.
+**Last reviewed:** 2026-11-13. PUBDIR-001/002 are Complete: PR #151 is
+included in v0.4.0 and the public files are live on main. Their detail is in the
+[archive](../archive/modules/09-public-direction-and-contribution.aps.md) and
+[completed index](../completed.aps.md). PUBDIR-003..007 remain Draft: no
+ROADMAP.md, contributor issue forms or reviewed projection implementation exist.
+Dependencies on PUBDIR-001/002 are satisfied; later Draft dependencies remain.
 
 ## Purpose
 
@@ -109,46 +111,6 @@ invited.
 
 ## Work Items
 
-### PUBDIR-001: Establish the public vision and direction contract
-
-- **Status:** Merged — PR #151 (merged 2026-10-21) adds `VISION.md`, README
-  pointers, and corrects the `docs/use-cases.md` adapter table. The "time to
-  first recall" measure is kept as an outcome target although `install.sh`
-  depends on the v0.4.0 Release (ISS-003).
-- **Intent:** Give users and contributors a durable basis for judging whether
-  proposed work moves kindling towards its intended product.
-- **Expected Outcome:** A concise public vision defines the north star, product
-  principles, intended users, concrete success measures, non-goals, and the
-  boundary between standalone kindling and downstream products such as anvil.
-  README and public overview copy point to it without duplicating or weakening
-  the contract.
-- **Validation:** Public direction is consistent with `README.md`,
-  `docs/use-cases.md`, `docs/architecture.md`, `docs/integrations.md`, and live
-  supported journeys; `git diff --check` passes.
-- **Files:** `VISION.md`, `README.md`, selected public overview documents.
-- **Confidence:** high
-
-### PUBDIR-002: Define contribution acceptance lanes and checkpoints
-
-- **Status:** Merged — PR #151 replaces the `CONTRIBUTING.md` scope guardrails
-  with the three lanes, maintainer-led areas, and proposal evidence. States a
-  single maintainer with no guaranteed response time; security reports are the
-  exception and keep `SECURITY.md`'s acknowledgement aims (3 business days,
-  14-day updates; acknowledgement, not resolution).
-- **Intent:** Let contributors identify welcome work and avoid investing in
-  changes that conflict with kindling's boundaries or require a prior decision.
-- **Expected Outcome:** The contributor guide distinguishes welcome,
-  discuss-first, and not-the-direction work; explains maintainer-led security,
-  migration, API, and cross-repository changes; and gives proposal authors the
-  evidence expected before implementation begins.
-- **Validation:** `CONTRIBUTING.md` maps representative proposals unambiguously
-  to one lane and remains consistent with the public vision; `git diff --check`
-  passes.
-- **Dependencies:** PUBDIR-001
-- **Files:** `CONTRIBUTING.md`, `SECURITY.md` where reporting boundaries need
-  clarification.
-- **Confidence:** high
-
 ### PUBDIR-003: Publish a curated public roadmap
 
 - **Status:** Draft
@@ -160,8 +122,8 @@ invited.
   publishing the full plan tree as a promise.
 - **Validation:** Every roadmap claim traces to current APS or shipped product
   evidence; no Draft or maintainer-only work is presented as available;
-  `aps lint plans && git diff --check` passes.
-- **Dependencies:** PUBDIR-001
+  `aps lint && git diff --check` passes.
+- **Delivered dependencies:** PUBDIR-001 (Complete; [archive](../archive/modules/09-public-direction-and-contribution.aps.md)).
 - **Files:** `ROADMAP.md`, `README.md`.
 - **Confidence:** high
 
@@ -178,7 +140,7 @@ invited.
 - **Validation:** Repository issue forms validate, the live label set matches
   the documented contract, and `gh issue list --state open --json number,title,labels`
   shows no completed handoff presented as active work.
-- **Dependencies:** PUBDIR-002
+- **Delivered dependencies:** PUBDIR-002 (Complete; [archive](../archive/modules/09-public-direction-and-contribution.aps.md)).
 - **Files:** `.github/ISSUE_TEMPLATE/`, `CONTRIBUTING.md`.
 - **Confidence:** high
 
@@ -195,9 +157,10 @@ invited.
   proposed upstream to `anvil-plan-spec` rather than implemented by a private
   kindling parser.
 - **Validation:** Example eligible and ineligible items produce an unambiguous
-  expected projection; `aps lint plans` passes; the upstream APS proposal links
+  expected projection; `aps lint` passes; the upstream APS proposal links
   back to this consumer contract.
-- **Dependencies:** PUBDIR-002, PUBDIR-003
+- **Dependencies:** PUBDIR-003
+- **Delivered dependencies:** PUBDIR-002 (Complete; [archive](../archive/modules/09-public-direction-and-contribution.aps.md)).
 - **Files:** This module, APS project context or an accepted design record,
   upstream `anvil-plan-spec` plan/issue.
 - **Confidence:** medium
@@ -230,7 +193,8 @@ invited.
 - **Validation:** Fixture and sandbox-repository tests prove idempotent create,
   update, no-op, exclusion, rename, completion, and human-edited-body behaviour;
   a dry run against kindling reports only the deliberately published set.
-- **Dependencies:** PUBDIR-005, PUBDIR-006, upstream APS projection capability.
+- **Dependencies:** PUBDIR-005, PUBDIR-006
+- **Upstream requirement:** reviewed APS projection capability.
 - **Confidence:** medium
 
 ## Risks

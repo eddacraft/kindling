@@ -1,5 +1,8 @@
 # Kindling scoped-read index migration
 
+> Reconciled 2026-11-13: KINTEG-014 is delivered in v0.4.0/v0.4.1 (PR #143). This is implementation rationale, not a second active task list.
+> Current status and archive: [plan index](../index.aps.md).
+
 **Status:** Approved for KINTEG-014 by the 2026-08-03 implementation request.
 
 ## Evidence and decision

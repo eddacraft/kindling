@@ -1,5 +1,8 @@
 # Hearth Rearchitecture Plan
 
+> Reconciled 2026-11-13: Historical cross-repository design proposal, not current kindling execution authority. Its hybrid/npm, monorepo relocation and crate-layout statements do not override D-005/D-010 or the current Rust-canonical standalone repository. Retained for rationale; no restoration or delivery is inferred.
+> Current status and archive: [plan index](../index.aps.md).
+
 | Field     | Value                                                                         |
 | --------- | ----------------------------------------------------------------------------- |
 | Status    | Brainstorm / proposal — pre-ADR                                               |

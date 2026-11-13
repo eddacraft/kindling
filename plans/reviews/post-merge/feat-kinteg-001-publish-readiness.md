@@ -1,5 +1,9 @@
 # Post-merge: feat/kinteg-001-publish-readiness
 
+> Reconciled 2026-11-13: KINTEG-001 is Complete (crates.io 0.2.0, published 2026-06-23). Runtime publication followed at 0.3.0; 0.4.0/0.4.1 are live. PORT-011 is released in anvil v0.9.0-beta.
+> Current item records: [completed index](../../completed.aps.md).
+> Original checklists below are retained as dated handoff evidence.
+
 **Completed:** 2026-06-24 — KINTEG-001 Done (all seven workspace crates at 0.2.0 on crates.io).
 
 ## Credential-gated (maintainer)

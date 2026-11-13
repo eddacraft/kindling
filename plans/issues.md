@@ -1,33 +1,67 @@
 # Issues & Questions Tracker
 
-> Development-time discoveries that emerge while building. Not a bug tracker replacement — a lightweight log for planning-level concerns that need visibility.
-
----
+Development-time planning discoveries; GitHub owns routine bugs. Reconciled
+2026-11-13 against source, publication evidence and the current workspace.
 
 ## Issues
 
-<!--
-Issues are problems discovered during development.
-ID format: ISS-NNN (e.g., ISS-001)
-Status: Open | Resolved | Deferred | Won't Fix
-Severity: Critical | High | Medium | Low
+### ISS-004: Thin-client and adapter tests leak daemons
 
-Example:
+| Field      | Value                       |
+| ---------- | --------------------------- |
+| Status     | Open                        |
+| Severity   | Low                         |
+| Discovered | C2 (VSIX smoke, 2026-10-21) |
+| Module     | 05-rust-port                |
+
+**Context:** After a local `pnpm run test`, about 30 `kindling serve`
+processes (`--kindling-home /tmp/kindling-{thin,oc,pf,occmd}-*`) were still
+running from the thin-client, opencode and pocketflow suites.
+
+**Impact:** Local test runs pile up daemons and temp directories. Test teardown
+should stop each spawned daemon and remove its temporary home.
+
+**Reconciliation (2026-11-13):** Remains Open. The thin-client afterEach removes
+temporary homes but does not stop the auto-spawned daemon. No new leak test was
+run during this documentation cleanup.
+
+### ISS-005: Intent-event completion claim outlived its implementation
+
+| Field      | Value                          |
+| ---------- | ------------------------------ |
+| Status     | Open                           |
+| Severity   | Medium                         |
+| Discovered | APS reconciliation, 2026-11-13 |
+| Module     | 07-intent-capture-events       |
+
+**Context:** KINTENT-001..006 were merged in the retired TypeScript engine, but
+the current Rust CLI and thin client have no append-only intent-event contract.
+The module is Blocked. [GH-215](https://github.com/eddacraft/kindling/issues/215)
+owns the restore-or-retire decision and migration guidance. This reconciliation
+neither restores the feature nor treats historical merges as a shipped surface.
+
+## Questions
+
+No new product decision is made by the cleanup. The GH-215 and deferred
+PORT-020 1.0.0 decisions remain with the maintainer.
+
+## Resolved
+
 ### ISS-001: API rate limits lower than expected
 
-| Field | Value |
-|-------|-------|
-| Status | Open |
-| Severity | Medium |
+| Field      | Value    |
+| ---------- | -------- |
+| Status     | Open     |
+| Severity   | Medium   |
 | Discovered | AUTH-002 |
-| Module | AUTH |
+| Module     | AUTH     |
 
 **Context:** During load testing, discovered the API rate-limits at 100 req/min, not 1000 as documented.
 
 **Impact:** Will need retry logic or batching for bulk operations.
 -->
 
-### ISS-001: Plugin test glob required on Node 26
+### ISS-002: Workspace project count exceeds pre-release estimate
 
 | Field      | Value                  |
 | ---------- | ---------------------- |
@@ -36,18 +70,12 @@ Example:
 | Discovered | release-prep preflight |
 | Module     | 08-conversion-surface  |
 
-**Context:** `node --test test/` fails on Node 26 (`MODULE_NOT_FOUND`); the glob `test/*.test.js` works and preserves skip-when-no-binary behaviour.
-
-### ISS-002: Workspace project count exceeds pre-release estimate
-
-| Field      | Value                  |
-| ---------- | ---------------------- |
-| Status     | Open                   |
-| Severity   | Low                    |
-| Discovered | release-prep preflight |
-| Module     | 08-conversion-surface  |
-
 **Context:** After merging conversion surface, `pnpm install` reports 7 workspace projects (4 packages + vscode adapter + plugin + `examples/adapter-minimal`), not the 5 estimated in the release plan. All install cleanly with `--frozen-lockfile`.
+
+**Resolution (2026-11-13):** `pnpm -r list --depth -1 --json` lists seven
+projects including the root, four packages, the plugin and the minimal example.
+This is the current workspace inventory; the release plan's old estimate is not
+an installation defect.
 
 ### ISS-003: No GitHub Release published since v0.1.2
 
@@ -77,71 +105,6 @@ Release closes all of this in one go (runbook section 4).
 (fixed in #160), so the tap PR was opened by hand (eddacraft/homebrew-tap#1).
 The remaining release work is tracked under C12.
 
-### ISS-004: Thin-client and adapter tests leak daemons
-
-| Field      | Value                       |
-| ---------- | --------------------------- |
-| Status     | Open                        |
-| Severity   | Low                         |
-| Discovered | C2 (VSIX smoke, 2026-10-21) |
-| Module     | 05-rust-port                |
-
-**Context:** After a local `pnpm run test`, about 30 `kindling serve`
-processes (`--kindling-home /tmp/kindling-{thin,oc,pf,occmd}-*`) were still
-running from the thin-client, opencode and pocketflow suites.
-
-**Impact:** Local test runs pile up daemons and temp directories. Test teardown
-should stop each spawned daemon and remove its temporary home.
-
----
-
-## Questions
-
-<!--
-Questions are unknowns that emerged during development.
-ID format: Q-NNN (e.g., Q-001)
-Status: Open | Answered | Deferred
-Priority: High | Medium | Low
-
-Example:
-### Q-001: Should retry logic live in the client or transport layer?
-
-| Field | Value |
-|-------|-------|
-| Status | Open |
-| Priority | Medium |
-| Discovered | AUTH-002 |
-| Assigned | @username |
-
-**Context:** Found we need retry logic for rate limits. Unclear where this belongs architecturally.
-
-**Options considered:**
-1. Client layer — simpler, but each client reimplements
-2. Transport layer — centralized, but may hide failures
--->
-
-_(No questions yet)_
-
----
-
-## Resolved
-
-<!--
-Move resolved issues and answered questions here.
-Keep for 1-2 sprints as reference, then archive or delete.
--->
-
-_(Nothing resolved yet)_
-
----
-
-## Quick Reference
-
-| ID Type  | Format  | Example |
-| -------- | ------- | ------- |
-| Issue    | ISS-NNN | ISS-001 |
-| Question | Q-NNN   | Q-001   |
-
-**Severities:** Critical > High > Medium > Low
-
-**Reference from other docs:** `See ISS-001` or `Related: ISS-001, Q-002`
+**Reconciliation (2026-11-13):** v0.4.1 is now latest, with binaries and VSIX;
+homebrew-tap#1 is merged. Remaining acceptance belongs to C0/C2/C12, not this
+resolved no-release issue.

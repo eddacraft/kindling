@@ -4,11 +4,11 @@
 | ---- | ------ | ----------- |
 | CONV | @aneki | In Progress |
 
-**Last reviewed:** 2026-10-22 (v0.4.0 on GitHub Releases and crates.io; curl, cargo and brew installs verified; C12 waits on the tap PR merge and the VSIX smoke test; C14 drafted)
+**Last reviewed:** 2026-11-13 (v0.4.1 is the latest published release; C1/C3/C4 archived; C0/C2/C12 retain unmet acceptance).
 
 ## Purpose
 
-Public visitors and non-Anvil users need a clear path to try, understand, and adopt kindling without Claude Code or anvil. The conversion surface branch (`feat/conversion-surface`) is merging to main; remaining gaps are release ops, CLI depth, distribution polish, and docs sync.
+Public visitors and non-Anvil users need a clear path to try, understand, and adopt kindling without Claude Code or anvil. The conversion implementation is released. Remaining gaps are release acceptance, CLI depth, distribution polish, and docs sync.
 
 Execution plan: [../execution/2026-06-22-conversion-surface-delivery.md](../execution/2026-06-22-conversion-surface-delivery.md).
 
@@ -46,16 +46,22 @@ Execution plan: [../execution/2026-06-22-conversion-surface-delivery.md](../exec
 - [x] Execution plan written
 - [x] At least one task defined
 
+## Delivery boundary
+
+C1/C3/C4 are Complete and indexed in [completed.aps.md](../completed.aps.md);
+their details are in the [archive](../archive/modules/08-conversion-surface.aps.md).
+C0's merge and binary release are delivered, but the execution checklist still
+owes a recorded/embedded demo and verified external docs publication. C2's VSIX
+and docs are released; a Cursor/Windsurf install smoke receipt is missing.
+C12 remains In Progress until the remaining install/editor checks are supplied.
+
 ## Work Items
 
 | ID  | Title                               | Wave | Status      | Branch (suggested)                        |
 | --- | ----------------------------------- | ---- | ----------- | ----------------------------------------- |
-| C0  | Merge conversion surface + release  | 0    | Merged      | `feat/conversion-surface`                 |
+| C0  | Merge conversion surface + release  | 0    | In Progress | `feat/conversion-surface`                 |
 | C12 | Post-release verification           | 0    | In Progress | —                                         |
-| C1  | install.sh demo prompt              | 1    | Merged      | `feat/install-demo-prompt` (#152)         |
 | C2  | VSIX + Cursor/Windsurf docs         | 1    | Merged      | `feat/vscode-vsix-and-cursor-docs` (#155) |
-| C3  | Workspace auto-detect (search)      | 1    | Merged      | `feat/cli-repo-autodetect` (#154)         |
-| C4  | kindling stats                      | 1    | Merged      | `feat/cli-stats` (#153)                   |
 | C5  | kindling wrap                       | 2    | Draft       | `feat/cli-wrap`                           |
 | C6  | kindling tui                        | 2    | Draft       | `feat/cli-tui`                            |
 | C7  | Search filters                      | 2    | Draft       | `feat/cli-search-filters`                 |
@@ -66,7 +72,10 @@ Execution plan: [../execution/2026-06-22-conversion-surface-delivery.md](../exec
 | C13 | OpenCode plugin via `kindling init` | 2    | Draft       | `feat/opencode-plugin`                    |
 | C14 | crates.io trusted publishing        | 3    | Draft       | `ci/crates-trusted-publishing`            |
 
-### C12 findings (2026-10-19)
+### Historical C12 findings (2026-10-19)
+
+The findings and progress below are dated evidence; the current reconciliation
+above and below supersedes their pending-release and pending-tap statements.
 
 Checked against the registries and the GitHub API from the release-prep branch:
 
@@ -88,7 +97,7 @@ Checked against the registries and the GitHub API from the release-prep branch:
 
 Re-run the Task 0.2 checklist once the v0.4.0 GitHub Release is published.
 
-### C12 progress (2026-10-22)
+### Historical C12 progress (2026-10-22)
 
 - The v0.4.0 GitHub Release was published on 2026-10-21, and
   `releases/latest` resolves to v0.4.0. All 7 binary archives and
@@ -114,6 +123,25 @@ Re-run the Task 0.2 checklist once the v0.4.0 GitHub Release is published.
   tap's `main`), the Cursor/Windsurf VSIX smoke test, and removing the unused
   `NPM_TOKEN` secret.
 
+### C12 reconciliation (2026-11-13)
+
+- Latest published GitHub Release is [v0.4.1](https://github.com/eddacraft/kindling/releases/tag/v0.4.1)
+  (2026-11-10), with seven binary archives, a VSIX and eight SHA256 sidecars.
+  v0.4.0 remains published. Assets do not prove every native install journey.
+- [homebrew-tap#1](https://github.com/eddacraft/homebrew-tap/pull/1) merged on
+  2026-10-22. Remove that merge from the outstanding checklist; a fresh install
+  from tap main and the macOS/Linux matrix still need receipts.
+- crates.io carries all eight publishable workspace crates at 0.4.1. Runtime
+  publication is no longer pending. npm remains retired; current deprecation
+  notices were read back, not changed, in this reconciliation.
+- The release workflows for both v0.4.0 and v0.4.1 conclude failure even though
+  their binary and VSIX assets are present. Do not call release automation green;
+  Homebrew automation fixes after v0.4.1 are merged, unreleased maintenance.
+- Still owed: native install coverage in PORT-010/014, fresh Claude Code session
+  coverage in PORT-015, the Cursor/Windsurf VSIX smoke receipt, the demo embed,
+  external docs publication evidence, and confirmation that unused NPM_TOKEN
+  was removed. Secret values were not inspected and no release action was taken.
+
 ### C14: crates.io trusted publishing (Draft)
 
 Publish the crates from `release.yml` via crates.io Trusted Publishing (OIDC)
@@ -125,27 +153,12 @@ Yanking existing versions does not change owners or the publisher record, so
 this is purely forward-looking. Also covers `eddacraft-tui` and `aps-cli`,
 which are in the same position.
 
-### Wave 1 notes (2026-10-21)
+### C2 release and acceptance
 
-- **C1** (PR #152): `install.sh` offers `kindling demo --reset` after setup. It
-  skips the prompt when no terminal is available and honours
-  `KINDLING_NO_DEMO=1`. A real `curl | sh` run needs a published Rust release
-  (ISS-003).
-- **C2** (PR #155): `pnpm --filter @eddacraft/kindling-adapter-vscode run package`
-  builds `kindling-<version>.vsix`; `release.yml` attaches it on published
-  releases only. Unproven until a real release runs; a manual Cursor/Windsurf
-  install smoke test is still owed.
-- **C3** (PR #154): `search` defaults `repoId` to the git root, `--repo` wins,
-  `--all-repos` widens. Scope extended to `log` and `capsule open` so
-  CLI-logged data is findable. On Windows the detected root uses native
-  separators to match hook-captured `repoId`; hook project routing is
-  unchanged. Only the pure separator function is tested on Windows (CI has no
-  Windows run of the `kindling` crate).
-- **C4** (PR #153): `kindling stats [--json]` via
-  `SqliteKindlingStore::memory_stats` / `KindlingService::stats`. In-process
-  only (no daemon endpoint); reusable by C6.
-- Found while testing: the thin-client and adapter test suites leave
-  `kindling serve` daemons running (ISS-004).
+PR #155 is an ancestor of v0.4.0. Both v0.4.0 and v0.4.1 have the packaged
+VSIX and checksum attached; Cursor/Windsurf installation remains unverified.
+This is Merged with released implementation, pending the manual acceptance
+receipt. Thin-client/adapter daemon leaks remain tracked as ISS-004.
 
 ### C13: OpenCode plugin bundled and installed by `kindling init --opencode` (Draft)
 
@@ -164,7 +177,7 @@ which are in the same position.
   OpenCode runs plugins on. Done when a fresh project captures an OpenCode
   session into `kindling search` with only the binary installed.
 - **Status:** Draft. Not started; captured by D-010.
-- **Dependencies:** C0; PORT-019 (adapter over the thin client, Merged).
+- **Dependencies:** C0; PORT-019 (adapter over the thin client, Complete in the PORT archive).
 
 ## Dependencies
 

@@ -1,8 +1,24 @@
 # Intent Capture Events (kindling)
 
-| ID      | Owner  | Status |
-| ------- | ------ | ------ |
-| KINTENT | @aneki | Done   |
+| ID      | Owner  | Status  |
+| ------- | ------ | ------- |
+| KINTENT | @aneki | Blocked |
+
+**Last reviewed:** 2026-11-13.
+
+## Availability and reconciliation
+
+**Blocked:** the old TypeScript intent implementation was removed by PR #105.
+The published v0.4.0/v0.4.1 Rust CLI and thin client do not implement this
+append-only intent contract. PocketFlow's intent-name inference is a different
+feature. Historical merge receipts below do not establish current availability.
+[GH-215](https://github.com/eddacraft/kindling/issues/215) owns the decision to
+restore the contract or retire it with migration guidance. No implementation is
+authorised by this reconciliation. The six items remain active and blocked;
+none is counted in the completed archive. The old pnpm commands below target
+removed packages and are historical, not runnable acceptance commands. After
+GH-215 is decided, replace them with validation for the selected supported
+implementation, including corrupt-chain, trailing-line, calendar and export-order cases.
 
 ## Purpose
 
@@ -104,7 +120,8 @@ interface IntentEvent {
 - **Intent:** Establish a durable, versioned capture contract.
 - **Expected Outcome:** Shared schema + type definitions in core package.
 - **Validation:** `pnpm -r test --filter "*kindling-core*" -- --testNamePattern="IntentEvent schema"`
-- **Status:** Merged (PR #59, merged 2026-06-11)
+- **Status:** Blocked — current implementation absent; resolve GH-215 before implementation or retirement.
+- **Historical status:** Merged (PR #59, merged 2026-06-11)
 
 ### KINTENT-002: Implement hook emitters for high-signal moments
 
@@ -112,7 +129,8 @@ interface IntentEvent {
 - **Expected Outcome:** Emitters wired for session start, prompt submit, constraint/task updates, checkpoint creation.
 - **Validation:** `pnpm test -- --testNamePattern="intent emitter"`
 - **Dependencies:** KINTENT-001
-- **Status:** Merged (PR #61, merged 2026-06-13)
+- **Status:** Blocked — current implementation absent; resolve GH-215 before implementation or retirement.
+- **Historical status:** Merged (PR #61, merged 2026-06-13)
 - **Notes:** `IntentEmitter` in `kindling-core` (`src/intent/emitter.ts`) exposes typed
   methods for the five high-signal moments; each shapes the `event_type`, merges base
   context/actor with per-call overrides, and appends via `IntentStore`. Mechanism only —
@@ -124,7 +142,8 @@ interface IntentEvent {
 - **Expected Outcome:** JSONL-backed log with rolling integrity hash and monotonic sequencing.
 - **Validation:** `pnpm test -- --testNamePattern="intent store integrity"`
 - **Dependencies:** KINTENT-001
-- **Status:** Merged (PR #61, merged 2026-06-13)
+- **Status:** Blocked — current implementation absent; resolve GH-215 before implementation or retirement.
+- **Historical status:** Merged (PR #61, merged 2026-06-13)
 - **Notes:** `IntentStore` in `kindling-core` (`src/intent/store.ts`) owns `sequence`
   (monotonic from 0) and `provenance.integrity_hash` (un-keyed SHA-256 chain over a
   key-sorted canonical JSON of each event). `verify()` detects payload tampering, broken
@@ -139,7 +158,8 @@ interface IntentEvent {
 - **Expected Outcome:** Configurable redaction on known sensitive paths before persistence/export.
 - **Validation:** `pnpm test -- --testNamePattern="intent redaction"`
 - **Dependencies:** KINTENT-001
-- **Status:** Merged (PR #67, merged 2026-06-18)
+- **Status:** Blocked — current implementation absent; resolve GH-215 before implementation or retirement.
+- **Historical status:** Merged (PR #67, merged 2026-06-18)
 - **Notes:** `IntentRedactor` in `kindling-core` (`src/intent/redaction.ts`) is a
   configurable transform applied before persistence/export. Two modes: **value
   patterns** mask only the matched substring (default set covers Anthropic/OpenAI
@@ -162,7 +182,8 @@ interface IntentEvent {
 - **Expected Outcome:** `kindling intent export` outputs signed/hashed JSONL bundle with metadata manifest.
 - **Validation:** `pnpm test -- --testNamePattern="intent export"`
 - **Dependencies:** KINTENT-002, KINTENT-003, KINTENT-004
-- **Status:** Merged (PR #68, merged 2026-06-18)
+- **Status:** Blocked — current implementation absent; resolve GH-215 before implementation or retirement.
+- **Historical status:** Merged (PR #68, merged 2026-06-18)
 - **Notes:** Export seals a sequence range of persisted (already-redacted) intent
   events into a portable, signed bundle for anvil ingestion. The store's hash
   chain is un-keyed (tamper-_evident_); export adds the keyed authentication the
@@ -186,7 +207,8 @@ interface IntentEvent {
 - **Expected Outcome:** `kindling intent status` shows emitter health, last event timestamp, backlog, and integrity state.
 - **Validation:** `pnpm test -- --testNamePattern="intent status"`
 - **Dependencies:** KINTENT-002, KINTENT-003
-- **Status:** Merged (PR #74, merged 2026-06-18)
+- **Status:** Blocked — current implementation absent; resolve GH-215 before implementation or retirement.
+- **Historical status:** Merged (PR #74, merged 2026-06-18)
 - **Notes:** `computeIntentStatus` + `formatIntentStatus` in `kindling-core`
   (`src/intent/status.ts`) derive a point-in-time capture health report. The
   report combines the four required signals into one `IntentStatusReport`:

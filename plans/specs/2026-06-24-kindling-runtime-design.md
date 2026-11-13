@@ -1,8 +1,11 @@
 # kindling-runtime — Anvil-First Integration Facade
 
+> Reconciled 2026-11-13: Implemented by KINTEG-008, PR #129; kindling-runtime has been published since 0.3.0 and is available at 0.4.1. API sketches below are historical; current source and the active module own later contracts.
+> Current status and archive: [plan index](../index.aps.md).
+
 | Field      | Value                                                    |
 | ---------- | -------------------------------------------------------- |
-| Status     | Proposed                                                 |
+| Status     | Implemented                                              |
 | Owner      | @aneki                                                   |
 | Created    | 2026-06-24                                               |
 | APS Module | `plans/modules/06-downstream-integration-surface.aps.md` |
