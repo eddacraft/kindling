@@ -846,3 +846,62 @@ fn search_outside_git_applies_no_repo_scope() {
     assert_eq!(candidate_contents(&v).len(), 2);
     assert!(v["provenance"]["scopeIds"].get("repoId").is_none());
 }
+
+// --- C5: kindling wrap (command capture with exit code) ----------------------
+
+#[test]
+fn wrap_logs_command_observation_with_exit_code() {
+    let env = CliEnv::new();
+    let db = env.db();
+
+    // Transparent mode relays the child's stdout.
+    let out = env.run(&["wrap", "--db", &db, "--", "echo", "hello"]);
+    assert_success(&out);
+    assert!(stdout(&out).contains("hello"));
+
+    // The run is recorded as a command observation with exitCode 0.
+    let search = env.run_db(&["search", "hello", "--json"]);
+    assert_success(&search);
+    let v = json_stdout(&search);
+    let cands = v["candidates"].as_array().expect("candidates");
+    assert!(!cands.is_empty(), "expected a match for 'hello': {v}");
+    let entity = &cands[0]["entity"];
+    assert_eq!(entity["kind"], json!("command"));
+    assert_eq!(entity["content"], json!("echo hello"));
+    assert_eq!(entity["provenance"]["source"], json!("cli"));
+    assert_eq!(entity["provenance"]["exitCode"], json!(0));
+    assert!(entity["provenance"]["stdout"]
+        .as_str()
+        .unwrap()
+        .contains("hello"));
+}
+
+#[test]
+fn wrap_propagates_child_exit_code() {
+    let env = CliEnv::new();
+    let db = env.db();
+    let out = env.run(&["wrap", "--db", &db, "--", "sh", "-c", "exit 7"]);
+    assert_eq!(out.status.code(), Some(7));
+}
+
+#[test]
+fn wrap_json_reports_observation_and_exit_code() {
+    let env = CliEnv::new();
+    let db = env.db();
+    let out = env.run(&[
+        "wrap",
+        "--db",
+        &db,
+        "--json",
+        "--",
+        "sh",
+        "-c",
+        "echo hi; exit 3",
+    ]);
+    // wrap exits with the child's code even in --json mode.
+    assert_eq!(out.status.code(), Some(3));
+    let v = json_stdout(&out);
+    assert_eq!(v["kind"], json!("command"));
+    assert_eq!(v["provenance"]["exitCode"], json!(3));
+    assert_eq!(v["provenance"]["stdout"], json!("hi\n"));
+}
