@@ -111,15 +111,17 @@ The TypeScript packages are ESM-only (`"type": "module"`) with `.js` extensions 
 
 Planned work lives in APS specs under `plans/` (see `plans/aps-rules.md` for the format and `plans/project-context.md` for kindling-specific context). Before writing code:
 
-1. **Find authority.** The change needs a work item with status `Ready` in `plans/modules/*.aps.md`, or a GitHub issue. Check that it isn't already claimed: no open PR referencing the work item ID or issue, and the work item status is not `In Progress`.
+1. **Find authority.** The change needs a work item with status `Ready` in `plans/modules/*.aps.md`, or a GitHub issue. Check that it isn't already claimed: no open PR referencing the work item ID or issue. The work item's status is not a reliable signal, because statuses are only updated in a later bookkeeping pass.
 2. **Open an issue first only when needed:**
    - the work is in the "Discuss first" lane of [CONTRIBUTING.md](CONTRIBUTING.md#discuss-first) (schema, public API, ranking, retention/redaction, new adapters, new CLI commands, heavy dependencies). Wait for a maintainer to agree the approach before opening a PR.
    - no Ready work item exists. Propose it in an issue (or add a `Draft` work item) rather than inventing scope.
 
    Do not create a GitHub issue that only mirrors an existing Ready work item.
 
-3. **Claim with a draft PR.** Branch from `main`, and make the first commit set the work item status to `In Progress`. Push and open a **draft** PR against `main` straight away. The draft PR is the claim. Its body must include the work item ID (e.g. `PORT-011`) and/or `Closes #N`. Trivial fixes with neither should say why in a `No APS item:` line.
-4. **Finish.** Mark the PR ready for review once checks pass, and update the work item status per the session-end ritual in `plans/aps-rules.md`.
+3. **Claim with a draft PR.** Branch from `main`, push, and open a **draft** PR against `main` straight away. The draft PR is the claim. Its body must include the work item ID (e.g. `PORT-011`) and/or `Closes #N`. Trivial fixes with neither should say why in a `No APS item:` line.
+4. **Finish.** Mark the PR ready for review once checks pass.
+
+**Do not change APS statuses on a feature branch.** Leave `Status:` fields and the "What's Next" list in `plans/` alone, and note discovered work in the PR description instead of adding Draft items. A separate bookkeeping pass, in its own PR, updates statuses and plan files after work merges, so feature PRs don't churn or conflict on the plan files.
 
 A claim is stale if its draft PR has had no activity for 14 days. Ask on the PR before taking the work over.
 
