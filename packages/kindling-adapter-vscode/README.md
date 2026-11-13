@@ -80,6 +80,41 @@ Open the Command Palette and run any of the titles above.
 - **Selection logging**: manual capture of selected text as a `message` observation
 - **Terminal commands**: optional via `EditorSessionManager.onTerminalCommand` (not wired by default)
 
+## Capture terminal commands with `kindling wrap`
+
+The VS Code API has no native exit-code hook for terminal commands, so the
+adapter cannot capture them automatically. Use `kindling wrap` to run a command
+through the CLI and record it as a `command` observation while preserving its
+exit code:
+
+```bash
+kindling wrap -- npm test
+```
+
+`wrap` runs the command, relays its output, records the command line plus exit
+code and truncated stdout/stderr in memory, and exits with the command's own
+exit code. Find it later with `kindling search "test" --kind command`.
+
+Wire it into `tasks.json` so every task run is captured:
+
+```jsonc
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "test (captured)",
+      "type": "shell",
+      "command": "kindling wrap -- npm test",
+      "problemMatcher": []
+    }
+  ]
+}
+```
+
+See [`examples/tasks.json`](./examples/tasks.json) for a ready-to-copy task.
+`kindling wrap` must be on the `PATH` the editor sees (see
+[Prerequisite](#prerequisite-the-kindling-binary)).
+
 ## Programmatic Usage
 
 ```typescript

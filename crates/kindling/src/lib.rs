@@ -23,7 +23,7 @@ mod output;
 pub use cli::{
     BrowseArgs, CapsuleCloseArgs, CapsuleCommand, CapsuleOpenArgs, Cli, Command, CommonOpts,
     DemoArgs, ExportArgs, ForgetArgs, ImportArgs, InitArgs, ListArgs, LogArgs, PinArgs, SearchArgs,
-    ServeArgs, SpoolCommand, SpoolStatusArgs, StatsArgs, StatusArgs, TuiArgs, UnpinArgs,
+    ServeArgs, SpoolCommand, SpoolStatusArgs, StatsArgs, StatusArgs, TuiArgs, UnpinArgs, WrapArgs,
 };
 
 use std::path::PathBuf;
@@ -122,7 +122,7 @@ pub fn cli_main() -> i32 {
 pub fn run(cli: Cli) -> i32 {
     let as_json = json_flag(&cli.command);
     match dispatch(cli) {
-        Ok(()) => 0,
+        Ok(code) => code,
         Err(err) => {
             output::print_error(&err.to_string(), as_json);
             1
@@ -151,35 +151,37 @@ fn json_flag(command: &Command) -> bool {
         Command::Demo(a) => a.common.json,
         Command::Browse(a) => a.common.json,
         Command::Tui(a) => a.common.json,
+        Command::Wrap(a) => a.common.json,
         Command::Spool(SpoolCommand::Status(a)) => a.json,
     }
 }
 
-fn dispatch(cli: Cli) -> CliResult {
+fn dispatch(cli: Cli) -> Result<i32, CliError> {
     let via_daemon = cli.via_daemon;
     match cli.command {
-        Command::Init(args) => commands::init::run(args),
-        Command::Log(args) => commands::log::run(args, via_daemon),
+        Command::Wrap(args) => commands::wrap::run(args, via_daemon),
+        Command::Init(args) => commands::init::run(args).map(|()| 0),
+        Command::Log(args) => commands::log::run(args, via_daemon).map(|()| 0),
         Command::Capsule(CapsuleCommand::Open(args)) => {
-            commands::capsule::run_open(args, via_daemon)
+            commands::capsule::run_open(args, via_daemon).map(|()| 0)
         }
         Command::Capsule(CapsuleCommand::Close(args)) => {
-            commands::capsule::run_close(args, via_daemon)
+            commands::capsule::run_close(args, via_daemon).map(|()| 0)
         }
-        Command::Status(args) => commands::status::run(args),
-        Command::Stats(args) => commands::stats::run(args),
-        Command::Search(args) => commands::search::run(args, via_daemon),
-        Command::List(args) => commands::list::run(args),
-        Command::Pin(args) => commands::pin::run_pin(args, via_daemon),
-        Command::Unpin(args) => commands::pin::run_unpin(args, via_daemon),
-        Command::Forget(args) => commands::forget::run(args, via_daemon),
-        Command::Export(args) => commands::export::run_export(args, via_daemon),
-        Command::Import(args) => commands::export::run_import(args, via_daemon),
-        Command::Serve(args) => commands::serve::run(args),
-        Command::Demo(args) => commands::demo::run(args),
-        Command::Browse(args) => commands::browse::run(args),
-        Command::Tui(args) => commands::tui::run(args),
-        Command::Spool(SpoolCommand::Status(args)) => commands::spool::run_status(args),
+        Command::Status(args) => commands::status::run(args).map(|()| 0),
+        Command::Stats(args) => commands::stats::run(args).map(|()| 0),
+        Command::Search(args) => commands::search::run(args, via_daemon).map(|()| 0),
+        Command::List(args) => commands::list::run(args).map(|()| 0),
+        Command::Pin(args) => commands::pin::run_pin(args, via_daemon).map(|()| 0),
+        Command::Unpin(args) => commands::pin::run_unpin(args, via_daemon).map(|()| 0),
+        Command::Forget(args) => commands::forget::run(args, via_daemon).map(|()| 0),
+        Command::Export(args) => commands::export::run_export(args, via_daemon).map(|()| 0),
+        Command::Import(args) => commands::export::run_import(args, via_daemon).map(|()| 0),
+        Command::Serve(args) => commands::serve::run(args).map(|()| 0),
+        Command::Demo(args) => commands::demo::run(args).map(|()| 0),
+        Command::Browse(args) => commands::browse::run(args).map(|()| 0),
+        Command::Tui(args) => commands::tui::run(args).map(|()| 0),
+        Command::Spool(SpoolCommand::Status(args)) => commands::spool::run_status(args).map(|()| 0),
     }
 }
 

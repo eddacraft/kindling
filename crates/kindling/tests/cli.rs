@@ -847,6 +847,175 @@ fn search_outside_git_applies_no_repo_scope() {
     assert!(v["provenance"]["scopeIds"].get("repoId").is_none());
 }
 
+// --- C5: kindling wrap (command capture with exit code) ----------------------
+
+#[test]
+fn wrap_logs_command_observation_with_exit_code() {
+    let env = CliEnv::new();
+    let db = env.db();
+
+    // Transparent mode relays the child's stdout.
+    let out = env.run(&["wrap", "--db", &db, "--", "echo", "hello"]);
+    assert_success(&out);
+    assert!(stdout(&out).contains("hello"));
+
+    // The run is recorded as a command observation with exitCode 0.
+    let search = env.run_db(&["search", "hello", "--json"]);
+    assert_success(&search);
+    let v = json_stdout(&search);
+    let cands = v["candidates"].as_array().expect("candidates");
+    assert!(!cands.is_empty(), "expected a match for 'hello': {v}");
+    let entity = &cands[0]["entity"];
+    assert_eq!(entity["kind"], json!("command"));
+    assert_eq!(entity["content"], json!("echo hello"));
+    assert_eq!(entity["provenance"]["source"], json!("cli"));
+    assert_eq!(entity["provenance"]["exitCode"], json!(0));
+    assert!(entity["provenance"]["stdout"]
+        .as_str()
+        .unwrap()
+        .contains("hello"));
+}
+
+#[test]
+fn wrap_propagates_child_exit_code() {
+    let env = CliEnv::new();
+    let db = env.db();
+    let out = env.run(&["wrap", "--db", &db, "--", "sh", "-c", "exit 7"]);
+    assert_eq!(out.status.code(), Some(7));
+}
+
+#[test]
+fn wrap_json_reports_observation_and_exit_code() {
+    let env = CliEnv::new();
+    let db = env.db();
+    let out = env.run(&[
+        "wrap",
+        "--db",
+        &db,
+        "--json",
+        "--",
+        "sh",
+        "-c",
+        "echo hi; exit 3",
+    ]);
+    // wrap exits with the child's code even in --json mode.
+    assert_eq!(out.status.code(), Some(3));
+    let v = json_stdout(&out);
+    assert_eq!(v["kind"], json!("command"));
+    assert_eq!(v["provenance"]["exitCode"], json!(3));
+    assert_eq!(v["provenance"]["stdout"], json!("hi\n"));
+}
+
+#[test]
+fn wrap_relays_full_output_but_bounds_capture() {
+    let env = CliEnv::new();
+    let db = env.db();
+    let out = env.run(&[
+        "wrap",
+        "--db",
+        &db,
+        "--",
+        "sh",
+        "-c",
+        "head -c 3000 /dev/zero | tr '\\0' 'a'",
+    ]);
+    assert_success(&out);
+    assert_eq!(stdout(&out).len(), 3000, "relay must forward full output");
+
+    // The stored capture is bounded and truncated, unlike the relay.
+    let search = env.run_db(&["search", "head", "--json"]);
+    assert_success(&search);
+    let cap = json_stdout(&search)["candidates"][0]["entity"]["provenance"]["stdout"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert!(cap.len() < 3000, "capture must be bounded: {cap}");
+    assert!(cap.ends_with("..."), "capture should be truncated: {cap}");
+}
+// --- C7: search filters (--kind, --after, --before) -------------------------
+
+#[test]
+fn search_kind_filter_restricts_to_matching_kind() {
+    let env = CliEnv::new();
+    assert_success(&env.run_db(&["log", "alpha message", "--kind", "message"]));
+    assert_success(&env.run_db(&["log", "alpha command", "--kind", "command"]));
+
+    // Without --kind: both candidates match "alpha".
+    let all = env.run_db(&["search", "alpha", "--json"]);
+    assert_success(&all);
+    assert_eq!(candidate_contents(&json_stdout(&all)).len(), 2);
+
+    // With --kind command: only the command observation.
+    let cmd = env.run_db(&["search", "alpha", "--kind", "command", "--json"]);
+    assert_success(&cmd);
+    assert_eq!(
+        candidate_contents(&json_stdout(&cmd)),
+        vec!["alpha command".to_string()]
+    );
+
+    // With --kind error: no matches.
+    let err = env.run_db(&["search", "alpha", "--kind", "error", "--json"]);
+    assert_success(&err);
+    assert_eq!(candidate_contents(&json_stdout(&err)).len(), 0);
+}
+
+#[test]
+fn search_after_before_epoch_ms_filters() {
+    let env = CliEnv::new();
+    assert_success(&env.run_db(&["log", "timely", "--kind", "message"]));
+
+    let after = env.run_db(&["search", "timely", "--after", "0", "--json"]);
+    assert_success(&after);
+    assert_eq!(candidate_contents(&json_stdout(&after)).len(), 1);
+
+    let before = env.run_db(&["search", "timely", "--before", "0", "--json"]);
+    assert_success(&before);
+    assert_eq!(candidate_contents(&json_stdout(&before)).len(), 0);
+}
+
+#[test]
+fn search_after_relative_time() {
+    let env = CliEnv::new();
+    assert_success(&env.run_db(&["log", "recent thing", "--kind", "message"]));
+
+    let after = env.run_db(&["search", "recent", "--after", "1 week ago", "--json"]);
+    assert_success(&after);
+    assert_eq!(candidate_contents(&json_stdout(&after)).len(), 1);
+
+    let before = env.run_db(&["search", "recent", "--before", "1 week ago", "--json"]);
+    assert_success(&before);
+    assert_eq!(candidate_contents(&json_stdout(&before)).len(), 0);
+}
+
+#[test]
+fn search_kind_filter_applies_before_max_limit() {
+    let env = CliEnv::new();
+    // Three command observations (oldest), then fifteen message observations
+    // (newest). Without filtering before the limit, `--max 3` would return the
+    // three newest messages and `--kind command` would drop them all.
+    for i in 0..3 {
+        assert_success(&env.run_db(&["log", &format!("common cmd {i}"), "--kind", "command"]));
+    }
+    for i in 0..15 {
+        assert_success(&env.run_db(&["log", &format!("common noise {i}"), "--kind", "message"]));
+    }
+
+    let out = env.run_db(&[
+        "search", "common", "--kind", "command", "--max", "3", "--json",
+    ]);
+    assert_success(&out);
+    let v = json_stdout(&out);
+    let contents = candidate_contents(&v);
+    assert_eq!(
+        contents.len(),
+        3,
+        "expected 3 command matches: {contents:?}"
+    );
+    assert!(contents.iter().all(|c| c.contains("common cmd")));
+    // Provenance reflects the filtered, re-limited result.
+    assert_eq!(v["provenance"]["returnedCandidates"], json!(3));
+}
+
 // --- C6: kindling tui -------------------------------------------------------
 
 #[test]

@@ -91,6 +91,9 @@ pub enum Command {
     /// Open an interactive terminal browser for memory.
     Tui(TuiArgs),
 
+    /// Run a command and capture it as a command observation.
+    Wrap(WrapArgs),
+
     /// Inspect the durable-emit spool (pending count and live counters).
     #[command(subcommand)]
     Spool(SpoolCommand),
@@ -123,6 +126,28 @@ pub struct LogArgs {
     /// Observation kind (default: message).
     #[arg(long, value_name = "kind", default_value = "message")]
     pub kind: String,
+
+    /// Session scope ID.
+    #[arg(long, value_name = "id")]
+    pub session: Option<String>,
+
+    /// Repository scope ID (default: the enclosing git repository root).
+    #[arg(long, value_name = "id")]
+    pub repo: Option<String>,
+
+    /// Attach to existing capsule.
+    #[arg(long, value_name = "id")]
+    pub capsule: Option<String>,
+
+    #[command(flatten)]
+    pub common: CommonOpts,
+}
+
+#[derive(Debug, Args)]
+pub struct WrapArgs {
+    /// Command and arguments to run (everything after `--`).
+    #[arg(trailing_var_arg = true, required = true, value_name = "command")]
+    pub command: Vec<String>,
 
     /// Session scope ID.
     #[arg(long, value_name = "id")]
@@ -209,6 +234,18 @@ pub struct SearchArgs {
     /// Maximum results to return.
     #[arg(long, value_name = "n", default_value_t = 10)]
     pub max: u32,
+
+    /// Only show observations of this kind (e.g. error, command, message).
+    #[arg(long, value_name = "kind")]
+    pub kind: Option<String>,
+
+    /// Only show items at or after this time (epoch ms, or "<N> <unit> ago").
+    #[arg(long, value_name = "time")]
+    pub after: Option<String>,
+
+    /// Only show items before this time (epoch ms, or "<N> <unit> ago").
+    #[arg(long, value_name = "time")]
+    pub before: Option<String>,
 
     #[command(flatten)]
     pub common: CommonOpts,
