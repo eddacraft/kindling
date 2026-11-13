@@ -88,6 +88,9 @@ pub enum Command {
     /// Open a local HTML viewer for memory in the database.
     Browse(BrowseArgs),
 
+    /// Run a command and capture it as a command observation.
+    Wrap(WrapArgs),
+
     /// Inspect the durable-emit spool (pending count and live counters).
     #[command(subcommand)]
     Spool(SpoolCommand),
@@ -120,6 +123,28 @@ pub struct LogArgs {
     /// Observation kind (default: message).
     #[arg(long, value_name = "kind", default_value = "message")]
     pub kind: String,
+
+    /// Session scope ID.
+    #[arg(long, value_name = "id")]
+    pub session: Option<String>,
+
+    /// Repository scope ID (default: the enclosing git repository root).
+    #[arg(long, value_name = "id")]
+    pub repo: Option<String>,
+
+    /// Attach to existing capsule.
+    #[arg(long, value_name = "id")]
+    pub capsule: Option<String>,
+
+    #[command(flatten)]
+    pub common: CommonOpts,
+}
+
+#[derive(Debug, Args)]
+pub struct WrapArgs {
+    /// Command and arguments to run (everything after `--`).
+    #[arg(trailing_var_arg = true, required = true, value_name = "command")]
+    pub command: Vec<String>,
 
     /// Session scope ID.
     #[arg(long, value_name = "id")]
