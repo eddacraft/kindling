@@ -6,7 +6,7 @@ import re
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-HEADING = re.compile(r"^## \\[([^\\]]+)\\](?: - (\\d{4}-\\d{2}-\\d{2}))?\\s*$", re.M)
+HEADING = re.compile(r"^## \[([^\]]+)\](?: - (\d{4}-\d{2}-\d{2}))?\s*$", re.M)
 LINKS = {
     "CHANGELOG.md": "ENGINEERING-HISTORY.md",
     "ENGINEERING-HISTORY.md": "CHANGELOG.md",
@@ -33,7 +33,7 @@ def main():
             errors.append(f"{name}: first version heading must be [Unreleased]")
         if len(names) != len(set(names)):
             errors.append(f"{name}: duplicate version heading")
-        if not re.search(r"\\]\(\\./"+re.escape(other)+r"\\)", text):
+        if not re.search(r"\]\(\./"+re.escape(other)+r"\)", text):
             errors.append(f"{name}: missing cross-link to {other}")
         for v,date,_ in entries:
             if v != "Unreleased" and not date:
@@ -53,7 +53,7 @@ def main():
         elif not args.notes_output:
             errors.append("--notes-output required with --notes-version")
         elif not errors:
-            args.notes_output.write_text(section+"\\n", encoding="utf-8")
+            args.notes_output.write_text(section+"\n", encoding="utf-8")
     if errors:
         for e in errors:
             print("ERROR:",e,file=sys.stderr)
