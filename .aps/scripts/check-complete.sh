@@ -3,12 +3,14 @@
 # Blocks session end when a work item or action plan went In Progress after
 # the session started and that status is not committed.
 #
+# kindling updates APS statuses only in a separate bookkeeping pass, never on
+# feature branches (see "Picking Up Work" in AGENTS.md). So an uncommitted
+# In Progress edit is either a feature branch touching a status it should
+# leave alone, or a bookkeeping pass that has not committed yet.
+#
 # These are not flagged:
-#   - items already In Progress in the session's baseline commit (e.g. a claim
-#     made on the branch before this session)
-#   - In Progress statuses that are committed. On a feature branch the claim
-#     commit sets the item to In Progress on purpose and it stays there until
-#     the work merges.
+#   - items already In Progress in the session's baseline commit
+#   - In Progress statuses that are committed
 #
 # The baseline is the HEAD commit recorded by init-session.sh in
 # .claude/.aps-session-baseline. Without a valid baseline, any uncommitted
@@ -163,10 +165,10 @@ if [ "$INCOMPLETE" -gt 0 ]; then
     echo "Session incomplete. $INCOMPLETE item(s) went In Progress after this session started and are not committed:"
     printf '%s' "$REPORT"
     echo ""
-    echo "Before ending this session, either:"
-    echo "  1. Complete the items or explicitly mark them Blocked, or"
-    echo "  2. Commit the In Progress status (e.g. the claim commit on a feature branch)"
-    echo "Add any discovered work as Draft items."
+    echo "APS statuses are updated only in the bookkeeping pass, not on feature branches."
+    echo "  - On a feature branch: revert these status edits and list the work in the"
+    echo "    PR description instead."
+    echo "  - In a bookkeeping pass: commit the status changes."
     echo ""
     echo "The baseline is per checkout, so in a checkout shared with another session"
     echo "these edits may be theirs. Leave them alone and work in your own worktree."
