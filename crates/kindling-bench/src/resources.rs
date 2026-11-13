@@ -168,6 +168,19 @@ impl ResourceSampler {
     }
 }
 
+impl Drop for ResourceSampler {
+    fn drop(&mut self) {
+        // Cancellation-safe cleanup: error or early-return paths can drop a
+        // sampler without calling `finish`. Signal the polling thread to exit
+        // and join it so it does not keep running detached past the sampler's
+        // lifetime.
+        self.stop.store(true, Ordering::Relaxed);
+        if let Some(handle) = self.handle.take() {
+            let _ = handle.join();
+        }
+    }
+}
+
 fn option_max(left: Option<u64>, right: Option<u64>) -> Option<u64> {
     match (left, right) {
         (Some(left), Some(right)) => Some(left.max(right)),
