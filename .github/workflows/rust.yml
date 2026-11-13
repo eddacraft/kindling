@@ -28,6 +28,10 @@ on:
       - 'rust-toolchain.toml'
       - 'install.sh'
       - '.github/workflows/rust.yml'
+      # Markdown is not read by any job here (no doctests embed it, the plugin
+      # tests do not load commands/*.md), so markdown-only changes skip this
+      # workflow. Must stay last: negations only exclude earlier matches.
+      - '!**/*.md'
   pull_request:
     branches: [main]
     paths:
@@ -55,6 +59,10 @@ on:
       - 'rust-toolchain.toml'
       - 'install.sh'
       - '.github/workflows/rust.yml'
+      # Markdown is not read by any job here (no doctests embed it, the plugin
+      # tests do not load commands/*.md), so markdown-only changes skip this
+      # workflow. Must stay last: negations only exclude earlier matches.
+      - '!**/*.md'
 
 concurrency:
   group: rust-${{ github.workflow }}-${{ github.ref }}

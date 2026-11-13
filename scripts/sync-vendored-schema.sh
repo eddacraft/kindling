@@ -12,9 +12,10 @@
 # Usage:
 #   scripts/sync-vendored-schema.sh
 #
-# CI (the `vendored-schema` job in .github/workflows/rust.yml) runs this and then
-# `git diff --exit-code` over the vendored copies; a canonical schema change that
-# was not re-synced (leaving a dirty tree) fails the build.
+# CI (the `vendored-schema` job in .github/workflows/rust.yml) runs this, stages
+# the vendored copies, then runs `git diff --cached --exit-code` over them (so a
+# newly created file counts as drift too); a canonical schema change that was
+# not re-synced fails the build.
 #
 # POSIX sh, shellcheck-clean. Safe to re-run (idempotent).
 
