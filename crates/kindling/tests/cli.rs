@@ -846,3 +846,29 @@ fn search_outside_git_applies_no_repo_scope() {
     assert_eq!(candidate_contents(&v).len(), 2);
     assert!(v["provenance"]["scopeIds"].get("repoId").is_none());
 }
+
+// --- C6: kindling tui -------------------------------------------------------
+
+#[test]
+fn tui_with_empty_db_prints_hint() {
+    let env = CliEnv::new();
+    let out = env.run_db(&["tui"]);
+    assert_success(&out);
+    assert!(stdout(&out).contains("No memory to browse"));
+}
+
+#[test]
+fn tui_without_terminal_errors_cleanly() {
+    let env = CliEnv::new();
+    assert_success(&env.run_db(&["log", "hello", "--kind", "message"]));
+
+    // Captured (non-TTY) stdout makes the TUI refuse, with a clean error
+    // rather than a panic.
+    let out = env.run_db(&["tui"]);
+    assert!(!out.status.success());
+    assert!(
+        support::stderr(&out).contains("interactive terminal"),
+        "stderr: {}",
+        support::stderr(&out)
+    );
+}
