@@ -35,6 +35,13 @@ kindling/
 > this repository and survive only as deprecated 0.1.x versions on npm. New
 > feature work targets the Rust crates.
 
+## Developer docs
+
+- [CONTEXT.md](CONTEXT.md) — the domain vocabulary. Use these terms in code, issues and PRs.
+- [docs/architecture.md](docs/architecture.md) — how the crates and the daemon fit together.
+- [docs/development.md](docs/development.md) — generated files and CI drift gates, test suites, invariants, and step-by-step recipes for common changes.
+- [docs/README.md](docs/README.md) — index of everything else.
+
 ## Getting Started
 
 ### Prerequisites

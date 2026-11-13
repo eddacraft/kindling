@@ -1,5 +1,9 @@
 # Query Result Caching Implementation Plan
 
+> **Historical.** This plan targets the retired Node.js/TypeScript engine (pre-D-005).
+> It is kept for reference and does not describe the current Rust engine. See
+> [docs/architecture.md](../architecture.md) for the current design.
+
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Cache frequently repeated retrieval queries with a short TTL to avoid redundant DB round-trips during rapid sequential hook invocations (e.g., multiple tool calls in the same session triggering the same FTS search).
