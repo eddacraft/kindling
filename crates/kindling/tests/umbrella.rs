@@ -451,12 +451,11 @@ impl Daemon {
             .stderr(Stdio::piped())
             .spawn()
             .expect("spawn umbrella");
-        child
-            .stdin
-            .take()
-            .expect("child stdin")
-            .write_all(stdin_json.as_bytes())
-            .expect("write stdin");
+        if let Some(mut stdin) = child.stdin.take() {
+            // A hook type that returns early (e.g. an unknown type) may exit
+            // before reading stdin; a broken pipe here is not a test failure.
+            let _ = stdin.write_all(stdin_json.as_bytes());
+        }
         child.wait_with_output().expect("await umbrella")
     }
 }
