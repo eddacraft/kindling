@@ -129,12 +129,15 @@ pub async fn run_group(
 
 fn run_groups_isolated(profile: &Profile) -> Result<Vec<WorkloadGroup>, BoxError> {
     let exe = std::env::current_exe()?;
+    // Pass the full profile (not just its name) so a customized profile is
+    // honoured by each child instead of being reconstructed as a preset.
+    let profile_json = serde_json::to_string(profile)?;
     let mut groups = Vec::with_capacity(GROUP_NAMES.len());
     for group in GROUP_NAMES {
         let output = Command::new(&exe)
             .args([
-                "--profile",
-                profile.name,
+                "--profile-json",
+                &profile_json,
                 "--only-group",
                 group,
                 "--measurement-scope",

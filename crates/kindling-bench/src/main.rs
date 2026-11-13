@@ -7,6 +7,7 @@ use kindling_bench::workloads::{self, MeasurementMode};
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let mut args = std::env::args().skip(1);
     let mut profile_name = "smoke".to_string();
+    let mut profile_json: Option<String> = None;
     let mut pretty = false;
     let mut only_group: Option<String> = None;
     let mut mode = MeasurementMode::InProcess;
@@ -14,6 +15,9 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         match arg.as_str() {
             "--profile" => {
                 profile_name = args.next().ok_or("--profile requires a value")?;
+            }
+            "--profile-json" => {
+                profile_json = Some(args.next().ok_or("--profile-json requires a value")?);
             }
             "--pretty" => pretty = true,
             "--only-group" => {
@@ -48,8 +52,11 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
             unknown => return Err(format!("unknown argument: {unknown}").into()),
         }
     }
-    let profile = Profile::from_name(&profile_name)
-        .ok_or_else(|| format!("unknown profile: {profile_name}"))?;
+    let profile = match profile_json {
+        Some(json) => serde_json::from_str(&json)?,
+        None => Profile::from_name(&profile_name)
+            .ok_or_else(|| format!("unknown profile: {profile_name}"))?,
+    };
 
     if let Some(group) = only_group {
         // Child entrypoint: one group, labelled with the requested scope.
