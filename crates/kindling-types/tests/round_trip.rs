@@ -232,3 +232,135 @@ fn validation_error_omits_value_when_none() {
         "value must be absent, got: {json}"
     );
 }
+
+#[test]
+fn observation_input_round_trip() {
+    let i: ObservationInput = round_trip("observation_input.json");
+    assert_eq!(i.kind, ObservationKind::Message);
+    assert_eq!(i.content, "the quick brown fox");
+    assert_eq!(i.id.as_deref(), Some("01J8XS7OBSERVATION0000000009"));
+    assert_eq!(i.provenance.as_ref().unwrap()["source"], json!("test"));
+    assert_eq!(i.ts, Some(1_746_662_400_000));
+    assert_eq!(i.redacted, Some(false));
+}
+
+#[test]
+fn observation_input_omits_absent_optionals() {
+    let v = serde_json::to_value(ObservationInput {
+        id: None,
+        kind: ObservationKind::Message,
+        content: "x".into(),
+        provenance: None,
+        ts: None,
+        scope_ids: ScopeIds::default(),
+        redacted: None,
+    })
+    .unwrap();
+    let obj = v.as_object().unwrap();
+    for absent in ["id", "provenance", "ts", "redacted"] {
+        assert!(
+            !obj.contains_key(absent),
+            "{absent} must be omitted when None: {obj:?}"
+        );
+    }
+    assert_eq!(obj["kind"], json!("message"));
+    assert_eq!(obj["scopeIds"], json!({}));
+}
+
+#[test]
+fn capsule_input_round_trip() {
+    let i: CapsuleInput = round_trip("capsule_input.json");
+    assert_eq!(i.kind, CapsuleType::Session);
+    assert_eq!(i.intent, "Fix authentication bug");
+    assert_eq!(i.status, Some(CapsuleStatus::Open));
+    assert_eq!(
+        i.observation_ids,
+        Some(vec!["01J8XS7OBSERVATION0000000001".to_string()])
+    );
+    assert_eq!(
+        i.summary_id.as_deref(),
+        Some("01J8XS7SUMMARY00000000000001")
+    );
+}
+
+#[test]
+fn capsule_input_type_field_uses_keyword_name() {
+    let v = serde_json::to_value(CapsuleInput {
+        id: None,
+        kind: CapsuleType::Session,
+        intent: "x".into(),
+        status: None,
+        opened_at: None,
+        closed_at: None,
+        scope_ids: ScopeIds::default(),
+        observation_ids: None,
+        summary_id: None,
+    })
+    .unwrap();
+    assert!(v.get("type").is_some(), "expected 'type' key, got {v}");
+    assert!(v.get("kind").is_none());
+}
+
+#[test]
+fn pin_input_round_trip() {
+    let i: PinInput = round_trip("pin_input.json");
+    assert_eq!(i.target_type, PinTargetType::Observation);
+    assert_eq!(i.target_id, "01J8XS7OBSERVATION0000000001");
+    assert_eq!(i.reason.as_deref(), Some("keep this"));
+    assert_eq!(i.expires_at, Some(1_746_748_800_000));
+}
+
+#[test]
+fn summary_input_round_trip() {
+    let i: SummaryInput = round_trip("summary_input.json");
+    assert_eq!(i.capsule_id, "01J8XS7CAPSULE0000000000002");
+    assert_eq!(i.confidence, 0.9);
+    assert_eq!(
+        i.evidence_refs,
+        vec!["01J8XS7OBSERVATION0000000003".to_string()]
+    );
+}
+
+#[test]
+fn list_observations_request_round_trip() {
+    let r: ListObservationsRequest = round_trip("list_observations_request.json");
+    assert_eq!(
+        r.kinds,
+        vec![ObservationKind::Message, ObservationKind::Command]
+    );
+    assert_eq!(r.since, Some(1_746_662_400_000));
+    assert_eq!(r.until, Some(1_746_748_800_000));
+    assert_eq!(r.limit, Some(100));
+    assert_eq!(r.cursor.as_deref(), Some("opaque-cursor-token"));
+    assert_eq!(r.include_redacted, Some(false));
+}
+
+#[test]
+fn list_observations_result_round_trip() {
+    let r: ListObservationsResult = round_trip("list_observations_result.json");
+    assert_eq!(r.observations.len(), 1);
+    assert_eq!(r.observations[0].kind, ObservationKind::ToolCall);
+    assert_eq!(r.next_cursor.as_deref(), Some("opaque-cursor-token"));
+}
+
+#[test]
+fn retrieve_options_round_trip() {
+    let o: RetrieveOptions = round_trip("retrieve_options.json");
+    assert_eq!(o.query, "brown fox");
+    assert_eq!(o.token_budget, Some(2000));
+    assert_eq!(o.max_candidates, Some(10));
+    assert_eq!(o.include_redacted, Some(false));
+}
+
+#[test]
+fn redaction_evidence_round_trip() {
+    let e: RedactionEvidence = round_trip("redaction_evidence.json");
+    assert_eq!(e.count, 2);
+    assert_eq!(
+        e.classes,
+        vec![
+            "credentialAssignment".to_string(),
+            "bearerToken".to_string()
+        ]
+    );
+}

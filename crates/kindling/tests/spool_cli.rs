@@ -169,6 +169,10 @@ async fn spool_status_cli_reads_sidecar_after_real_flush() {
         first["lastFlushTimeMs"].is_number(),
         "flush timestamp: {first:#}"
     );
+    assert!(
+        first.get("lastError").is_some(),
+        "lastError must be present after a clean flush: {first:#}"
+    );
     assert!(first["lastError"].is_null());
     assert!(
         first["replayAttempts"].as_u64().unwrap_or(0) >= 1,

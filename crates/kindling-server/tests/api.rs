@@ -406,6 +406,145 @@ async fn per_project_isolation() {
     assert!(!candidates.is_empty(), "project A should see its own data");
 }
 
+/// ID-based mutations must be isolated per project too, not just retrieval.
+/// Forgetting an observation, unpinning a pin, or closing a capsule under
+/// project B's header must not touch the entities project A owns.
+#[tokio::test]
+async fn id_based_mutations_are_isolated_across_projects() {
+    let daemon = TestDaemon::start().await;
+    let mut c = daemon.connect().await;
+
+    // Seed project A: an observation, a pin on it, and an open session capsule.
+    let obs = c
+        .send(
+            "POST",
+            "/v1/observations",
+            Some(PROJECT_A),
+            Some(json!({
+                "kind": "message",
+                "content": "cross project needle",
+                "scopeIds": { "sessionId": "iso" },
+            })),
+        )
+        .await;
+    assert_eq!(obs.status, StatusCode::CREATED);
+    let obs_id = obs.json()["id"].as_str().unwrap().to_string();
+
+    let pin = c
+        .send(
+            "POST",
+            "/v1/pins",
+            Some(PROJECT_A),
+            Some(json!({
+                "targetType": "observation",
+                "targetId": obs_id,
+                "scopeIds": { "sessionId": "iso" },
+            })),
+        )
+        .await;
+    assert_eq!(pin.status, StatusCode::CREATED);
+    let pin_id = pin.json()["id"].as_str().unwrap().to_string();
+
+    let cap = c
+        .send(
+            "POST",
+            "/v1/capsules",
+            Some(PROJECT_A),
+            Some(json!({
+                "kind": "session",
+                "intent": "isolation",
+                "scopeIds": { "sessionId": "iso" },
+            })),
+        )
+        .await;
+    assert_eq!(cap.status, StatusCode::CREATED);
+    let cap_id = cap.json()["id"].as_str().unwrap().to_string();
+
+    // Mutations issued under PROJECT_B must not succeed against A's entities.
+    let forget = c
+        .send(
+            "POST",
+            &format!("/v1/observations/{obs_id}/forget"),
+            Some(PROJECT_B),
+            None,
+        )
+        .await;
+    assert_ne!(
+        forget.status,
+        StatusCode::NO_CONTENT,
+        "cross-project forget must not succeed"
+    );
+
+    let unpin = c
+        .send(
+            "DELETE",
+            &format!("/v1/pins/{pin_id}"),
+            Some(PROJECT_B),
+            None,
+        )
+        .await;
+    assert_ne!(
+        unpin.status,
+        StatusCode::NO_CONTENT,
+        "cross-project unpin must not succeed"
+    );
+
+    let close = c
+        .send(
+            "PATCH",
+            &format!("/v1/capsules/{cap_id}/close"),
+            Some(PROJECT_B),
+            Some(json!({})),
+        )
+        .await;
+    assert_ne!(
+        close.status,
+        StatusCode::OK,
+        "cross-project close must not succeed"
+    );
+
+    // PROJECT_A still sees its data intact: the pinned observation is not
+    // redacted (i.e. not forgotten), the pin is still present, and the capsule
+    // is still open.
+    let retrieve = c
+        .send(
+            "POST",
+            "/v1/retrieve",
+            Some(PROJECT_A),
+            Some(json!({
+                "query": "needle",
+                "scopeIds": { "sessionId": "iso" },
+            })),
+        )
+        .await;
+    assert_eq!(retrieve.status, StatusCode::OK);
+    let body = retrieve.json();
+    let pins = body["pins"].as_array().unwrap();
+    let pin_target = pins
+        .iter()
+        .find(|p| p["pin"]["id"] == pin_id)
+        .unwrap_or_else(|| panic!("pin must still be present: {body:#}"));
+    assert_eq!(pin_target["target"]["id"], obs_id);
+    assert_eq!(
+        pin_target["target"]["content"], "cross project needle",
+        "observation must not be forgotten: {body:#}"
+    );
+    assert_eq!(pin_target["target"]["redacted"], false);
+
+    let open = c
+        .send(
+            "GET",
+            "/v1/capsules/open?sessionId=iso",
+            Some(PROJECT_A),
+            None,
+        )
+        .await;
+    assert_eq!(open.status, StatusCode::OK);
+    let cap_body = open.json();
+    assert_eq!(cap_body["id"], cap_id);
+    assert_eq!(cap_body["status"], "open");
+}
+
 #[tokio::test]
 async fn missing_project_header_is_bad_request() {
     let daemon = TestDaemon::start().await;

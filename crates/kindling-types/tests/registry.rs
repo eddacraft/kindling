@@ -27,24 +27,32 @@ fn supported_kind_names_lists_all_nine_variants_in_order() {
 #[test]
 fn kind_registry_covers_every_variant_with_required_fields() {
     let registry = kind_registry();
-    assert_eq!(registry.len(), 9);
 
-    for (entry, expected_name) in registry.iter().zip(EXPECTED_KINDS.iter()) {
-        assert_eq!(&entry.kind, expected_name);
+    // Exhaustive in BOTH directions: derive the expected set from the enum
+    // itself, so an extra registry entry (or a missing variant) cannot be
+    // masked by a positional zip over a hand-maintained list.
+    assert_eq!(registry.len(), ObservationKind::ALL.len());
+    let expected: Vec<&str> = ObservationKind::ALL.iter().map(|k| k.wire_name()).collect();
+    let actual: Vec<&str> = registry.iter().map(|e| e.kind.as_str()).collect();
+    assert_eq!(
+        actual, expected,
+        "registry must list every kind in enum order"
+    );
+
+    for entry in &registry {
         assert!(
             !entry.required_fields.is_empty(),
-            "kind {expected_name} must list required fields"
+            "kind {} must list required fields",
+            entry.kind
         );
         for base in kindling_types::OBSERVATION_REQUIRED_FIELDS {
             assert!(
                 entry.required_fields.iter().any(|f| f == base),
-                "kind {expected_name} missing base field {base}"
+                "kind {} missing base field {base}",
+                entry.kind
             );
         }
     }
-
-    let kinds: Vec<&str> = registry.iter().map(|e| e.kind.as_str()).collect();
-    assert_eq!(kinds, EXPECTED_KINDS);
 }
 
 #[test]

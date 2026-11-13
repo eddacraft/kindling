@@ -1,0 +1,13 @@
+{
+  "id": "01J8XS7OBSERVATION0000000009",
+  "kind": "message",
+  "content": "the quick brown fox",
+  "provenance": {
+    "source": "test"
+  },
+  "ts": 1746662400000,
+  "scopeIds": {
+    "sessionId": "01J8XS7ABCDEF0123456789ABC"
+  },
+  "redacted": false
+}

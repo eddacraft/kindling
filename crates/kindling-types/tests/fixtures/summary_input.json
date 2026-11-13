@@ -1,0 +1,10 @@
+{
+  "id": "01J8XS7SUMMARY00000000000002",
+  "capsuleId": "01J8XS7CAPSULE0000000000002",
+  "content": "Identified missing token rotation.",
+  "confidence": 0.9,
+  "createdAt": 1746662460000,
+  "evidenceRefs": [
+    "01J8XS7OBSERVATION0000000003"
+  ]
+}
