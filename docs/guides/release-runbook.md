@@ -12,7 +12,7 @@ kindling is Rust-canonical. A release is a **GitHub Release** plus a
    attaches the editor extension VSIX (`kindling-<version>.vsix` plus its
    `.sha256`), and opens the Homebrew tap PR. The install script
    (`install.sh`) downloads from these assets.
-2. **crates.io:** the seven Rust crates in `crates/` (the engine). Published
+2. **crates.io:** the eight published Rust crates in `crates/` (the engine; `kindling-bench` is `publish = false`). Published
    manually with `scripts/publish.sh` (credential-gated). See
    [crates.io release](#cratesio-release) below.
 
@@ -72,7 +72,9 @@ Sanity assertions before promoting:
 - Root `Cargo.toml` workspace version matches the tag you intend to push.
 - `packages/kindling-adapter-vscode/package.json` version matches the same tag
   (the VSIX is named from it).
-- `CHANGELOG.md` has notes for this release.
+- `CHANGELOG.md` has user-facing notes for this release and
+  `ENGINEERING-HISTORY.md` has the matching technical history.
+- `python3 scripts/check-release-docs.py --release-version X.Y.Z` succeeds.
 - README install instructions (the install script, `cargo install eddacraft-kindling`, Homebrew) still work.
 
 ## 2. Stabilise the release
@@ -86,7 +88,7 @@ release directly from `main`. For anything larger, cut a short-lived
 Use this when the change set is small, reviewable, and already stable on `main`.
 
 1. Ensure `main` is green on CI.
-2. Ensure the version bump and changelog are already merged to `main`.
+2. Ensure the version bump, changelog and engineering history are merged to `main`.
 3. Tag and create the GitHub Release.
 
 ### Option B: stabilise on `release/*` (non-trivial releases)
@@ -118,12 +120,14 @@ Do version bumps on a release-prep branch targeting `main`.
    `version = "..."` dependency pins), then refresh `Cargo.lock`.
 2. Bump root `package.json` and every `packages/*/package.json` to the same
    value (the VSIX version comes from the editor extension's manifest).
-3. Update `CHANGELOG.md` with release notes.
+3. Promote the `Unreleased` sections in `CHANGELOG.md` and
+   `ENGINEERING-HISTORY.md` to the same version/date, leaving fresh `Unreleased`
+   headings in both. Run `python3 scripts/check-release-docs.py --release-version X.Y.Z`.
 4. Update README install snippets if any pin a version.
 5. Commit on the release-prep branch:
 
    ```bash
-   git add Cargo.toml Cargo.lock crates/*/Cargo.toml package.json packages/*/package.json CHANGELOG.md README.md
+   git add Cargo.toml Cargo.lock crates/*/Cargo.toml package.json packages/*/package.json CHANGELOG.md ENGINEERING-HISTORY.md README.md
    git commit -m "chore(release): prepare vX.Y.Z"
    ```
 
@@ -143,9 +147,11 @@ git push origin vX.Y.Z
 Then create the GitHub Release:
 
 ```bash
+python3 scripts/check-release-docs.py --release-version X.Y.Z \
+  --notes-version X.Y.Z --notes-output /tmp/kindling-release-notes.md &&
 gh release create vX.Y.Z \
   --title "vX.Y.Z" \
-  --notes-from-tag \
+  --notes-file /tmp/kindling-release-notes.md \
   --target main
 ```
 
@@ -190,7 +196,8 @@ Prerequisites:
 crates.io requires each crate's dependencies to be published first, so the
 script publishes in topological order (leaves first, the `kindling` binary
 last): `kindling-types` → `kindling-store` → `kindling-provider` →
-`kindling-service` → `kindling-server` → `kindling-client` → `eddacraft-kindling`.
+`kindling-service` → `kindling-server` → `kindling-client` → `kindling-runtime` →
+`eddacraft-kindling`.
 `kindling-client` carries a versioned dev-dependency on `kindling-server`, so the
 server must already be on crates.io when the client publishes — this is why the
 server precedes the client (the order encoded in `scripts/publish.sh`).
@@ -271,3 +278,10 @@ locally with the preflight command above.
 - [Branching Strategy](branching-strategy.md)
 - [Worktree Policy](worktree-policy.md)
 - [Distribution channels](../../packaging/README.md)
+
+### Release documentation
+
+See [Engineering History](../../ENGINEERING-HISTORY.md) for technical
+implementation and release evidence; see [Changelog](../../CHANGELOG.md) for
+customer- and integrator-facing release notes. Do not publish internal-only
+engineering entries as user-facing GitHub Release notes.

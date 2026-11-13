@@ -35,6 +35,13 @@ kindling/
 > this repository and survive only as deprecated 0.1.x versions on npm. New
 > feature work targets the Rust crates.
 
+## Developer docs
+
+- [CONTEXT.md](CONTEXT.md) — the domain vocabulary. Use these terms in code, issues and PRs.
+- [docs/architecture.md](docs/architecture.md) — how the crates and the daemon fit together.
+- [docs/development.md](docs/development.md) — generated files and CI drift gates, test suites, invariants, and step-by-step recipes for common changes.
+- [docs/README.md](docs/README.md) — index of everything else.
+
 ## Getting Started
 
 ### Prerequisites
@@ -124,6 +131,19 @@ See the detailed guides for the full policy:
 - [`docs/guides/branching-strategy.md`](docs/guides/branching-strategy.md)
 - [`docs/guides/worktree-policy.md`](docs/guides/worktree-policy.md)
 - [`docs/guides/release-runbook.md`](docs/guides/release-runbook.md)
+
+## Release documentation
+
+- Update [CHANGELOG.md](CHANGELOG.md) when users or integrators need to know
+  about a change. Include migration steps for breaking changes.
+- Update [ENGINEERING-HISTORY.md](ENGINEERING-HISTORY.md) when maintainers need
+  a record of an engineering change. Link to supporting PRs, issues, ADRs, or
+  APS work items.
+- Put entries under `Unreleased` in the record or records they apply to. Run
+  `python3 scripts/check-release-docs.py` after editing either file.
+
+See the [release runbook](docs/guides/release-runbook.md) for versioning both
+records and generating GitHub Release notes.
 
 ## Pull Request Process
 

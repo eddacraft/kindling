@@ -8,6 +8,16 @@ kindling is a local memory and continuity engine for AI-assisted development. It
 
 **kindling is Rust-canonical.** The engine is a Cargo workspace in `crates/`; the binary is `kindling` (published as the `eddacraft-kindling` crate — the bare `kindling` name is taken on crates.io). The TypeScript `@eddacraft/kindling` package (`packages/kindling`) is a thin HTTP-over-UDS client for that binary. kindling no longer publishes to npm (D-010): it ships as the binary (cargo, Homebrew, install.sh), the crates on crates.io, and GitHub Release assets. The older TypeScript implementation packages were removed; they, and the 0.1.x `@eddacraft/kindling` and adapter versions, live on only as deprecated npm versions.
 
+## Developer docs
+
+- `CONTEXT.md` — domain vocabulary (observation, capsule, pin, scope, project, spool, …). Use these terms.
+- `docs/architecture.md` — crate topology, daemon model, v1 API, data flow.
+- `docs/development.md` — repo map, generated files + CI drift gates, test suites, invariants, change recipes (new observation kind, schema migration, v1 endpoint, CLI subcommand, hook changes).
+- `docs/README.md` — index of all docs (reference vs. guides vs. historical).
+- `schema/README.md` — schema contract and migration procedure.
+
+Keep these in sync when you change what they describe (crates, endpoints, CLI verbs, schema version, kinds).
+
 ## Commands
 
 ```bash
@@ -32,17 +42,17 @@ pnpm run lint
 
 ```
 eddacraft-kindling   → the `kindling` CLI binary + Claude Code hooks (lib + bin)
-kindling-client      → daemon-backed Rust SDK (HTTP/1 over UDS); default for integrations
-kindling-runtime     → embeddable facade: in-process daemon + client + durable spool
+kindling-client      → daemon-backed Rust SDK (HTTP/1 over UDS); default for integrations; opt-in `spool` (durable emit)
+kindling-runtime     → facade for Rust downstreams: attach-or-start daemon (in-process) + spooled client
 kindling-service     → in-process orchestration (embedded, zero-IPC)
 kindling-server      → daemon runtime (`kindling serve`); per-project routing
 kindling-store       → SQLite persistence (FTS5 + WAL); schema in `schema/`
 kindling-provider    → deterministic local retrieval (FTS5 BM25 + recency)
 kindling-types       → shared domain types (+ optional ts-rs bindings)
-kindling-bench       → latency, throughput, and resource benchmarks (not published)
+kindling-bench       → private benchmark/resource-profile harness (not published)
 ```
 
-Dependency flow: `types ← store ← provider`; `service → types,store,provider`; `server → types,store,service`; `client → types`; `runtime → types,client,server`; the binary → all. Most integrations use `kindling-client` (daemon) or `kindling-service` (embedded). The daemon makes concurrent multi-tool access safe.
+Dependency flow: `types ← store ← provider`; `service → types,store,provider`; `server → types,store,service`; `client → types`; `runtime → types, client (optional), server (optional)`; the binary → all. Most integrations use `kindling-client` (daemon) or `kindling-service` (embedded). The daemon makes concurrent multi-tool access safe.
 
 ### TypeScript packages (`packages/`)
 
@@ -142,6 +152,22 @@ See the detailed guides for the full policy:
 - `docs/guides/release-runbook.md`
 
 Never push directly to `main` — always use pull requests.
+
+## Release Documentation
+
+- Record user-visible changes, security outcomes, deprecations, and required
+  upgrade actions in [CHANGELOG.md](CHANGELOG.md).
+- Record implementation, architecture, performance, security analysis, and
+  schema or API details in [ENGINEERING-HISTORY.md](ENGINEERING-HISTORY.md).
+  Link to relevant PRs, issues, ADRs, and APS work items where available.
+- Add entries under `Unreleased` for changes landing on `main` with the PR or
+  already present there. Update both records when the change affects both
+  audiences. Routine housekeeping can go undocumented.
+- Keep the `Unreleased` and version/date headings aligned across both files.
+  Preserve historical dates. Run `python3 scripts/check-release-docs.py` after
+  editing either record.
+- Follow the [release runbook](docs/guides/release-runbook.md) to promote the
+  entries and generate GitHub Release notes from the changelog.
 
 ## PocketFlow (Vendored)
 

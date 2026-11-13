@@ -1,0 +1,29 @@
+name: Release documentation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'CHANGELOG.md'
+      - 'ENGINEERING-HISTORY.md'
+      - 'scripts/check-release-docs.py'
+      - '.github/workflows/release-docs.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'CHANGELOG.md'
+      - 'ENGINEERING-HISTORY.md'
+      - 'scripts/check-release-docs.py'
+      - '.github/workflows/release-docs.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate release documentation
+        run: python3 scripts/check-release-docs.py
