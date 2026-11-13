@@ -25,6 +25,9 @@ use tokio::process::Command;
 /// the daemon routes to a single deterministic per-project DB.
 const REPO_ROOT: &str = "/tmp/kindling-hook-e2e/repo";
 const SESSION: &str = "sess-e2e";
+/// Bound for a single hook dispatch. A hung hook must fail the test with a
+/// bounded error, not stall the suite.
+const HOOK_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// A running in-process daemon on a temp socket with a temp kindling home.
 struct Daemon {
@@ -77,6 +80,8 @@ impl Daemon {
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
+            // Kill the child on drop so a timed-out hook is cleaned up, not leaked.
+            .kill_on_drop(true)
             .spawn()
             .expect("spawn kindling-hook");
 
@@ -89,7 +94,10 @@ impl Daemon {
             // Drop closes stdin so the binary's read_to_end completes.
         }
 
-        let output = child.wait_with_output().await.expect("await hook");
+        let output = tokio::time::timeout(HOOK_TIMEOUT, child.wait_with_output())
+            .await
+            .unwrap_or_else(|_| panic!("hook {hook_type} timed out after {HOOK_TIMEOUT:?}"))
+            .expect("await hook");
         let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
         (output.status.success(), stdout)
     }

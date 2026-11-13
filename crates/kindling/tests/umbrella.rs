@@ -22,6 +22,9 @@ use tempfile::TempDir;
 /// DB).
 const REPO_ROOT: &str = "/tmp/kindling-umbrella-e2e/repo";
 const SESSION: &str = "sess-umbrella";
+/// Bound for a single hook dispatch. A hung hook must fail the suite with a
+/// bounded error, not stall it.
+const HOOK_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Path to the umbrella binary under test.
 fn kindling_bin() -> &'static str {
@@ -146,6 +149,25 @@ fn hook_subcommand_bad_type_exits_zero_and_logs() {
     let daemon = Daemon::start();
     let out = daemon.run_umbrella(kindling_bin(), &["hook", "not-a-hook"], "{}");
     assert!(out.status.success(), "bad hook type must still exit 0");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("[kindling]") && stderr.contains("error:"),
+        "expected a Node-format error log on stderr, got {stderr:?}"
+    );
+}
+
+/// Malformed stdin on the live hook path: exit 0, nothing on stdout (the hook
+/// protocol channel must stay clean), and a Node-format diagnostic on stderr.
+#[test]
+fn hook_subcommand_malformed_stdin_exits_zero_and_logs() {
+    let daemon = Daemon::start();
+    let out = daemon.run_umbrella(kindling_bin(), &["hook", "post-tool-use"], "{ not json");
+    assert!(out.status.success(), "malformed stdin must still exit 0");
+    assert!(
+        out.stdout.is_empty(),
+        "malformed stdin must print nothing to stdout, got {:?}",
+        String::from_utf8_lossy(&out.stdout)
+    );
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
         stderr.contains("[kindling]") && stderr.contains("error:"),
@@ -456,7 +478,9 @@ impl Daemon {
             // before reading stdin; a broken pipe here is not a test failure.
             let _ = stdin.write_all(stdin_json.as_bytes());
         }
-        child.wait_with_output().expect("await umbrella")
+        wait_with_output_timeout(&mut child, HOOK_TIMEOUT).unwrap_or_else(|| {
+            panic!("umbrella hook {bin} {args:?} timed out after {HOOK_TIMEOUT:?}")
+        })
     }
 }
 
@@ -525,6 +549,80 @@ fn symlink_or_copy(target: &Path, link: &Path) {
         let perms = std::fs::Permissions::from_mode(0o755);
         std::fs::set_permissions(link, perms).expect("chmod drop-in copy");
     }
+}
+
+/// Wait for `child` to exit within `timeout`, capturing stdout/stderr. Returns
+/// `None` on timeout, after killing the child.
+fn wait_with_output_timeout(
+    child: &mut std::process::Child,
+    timeout: Duration,
+) -> Option<std::process::Output> {
+    use std::io::Read;
+    let start = std::time::Instant::now();
+    loop {
+        match child.try_wait().expect("try_wait") {
+            Some(status) => {
+                let mut stdout = Vec::new();
+                let mut stderr = Vec::new();
+                if let Some(mut p) = child.stdout.take() {
+                    p.read_to_end(&mut stdout).expect("read stdout");
+                }
+                if let Some(mut p) = child.stderr.take() {
+                    p.read_to_end(&mut stderr).expect("read stderr");
+                }
+                return Some(std::process::Output {
+                    status,
+                    stdout,
+                    stderr,
+                });
+            }
+            None => {
+                if start.elapsed() > timeout {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return None;
+                }
+                std::thread::sleep(Duration::from_millis(20));
+            }
+        }
+    }
+}
+
+/// A deliberately stalled child is killed within the timeout bound rather than
+/// stalling the suite.
+#[test]
+fn wait_with_output_timeout_kills_a_stalled_child() {
+    let home = tempfile::tempdir().unwrap();
+    let socket = home.path().join("k.sock");
+    let mut child = Command::new(kindling_bin())
+        .args([
+            "serve",
+            "--socket",
+            socket.to_string_lossy().as_ref(),
+            "--kindling-home",
+            home.path().to_string_lossy().as_ref(),
+            "--idle-timeout",
+            "3600",
+        ])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn stalled serve");
+
+    let start = std::time::Instant::now();
+    assert!(
+        wait_with_output_timeout(&mut child, Duration::from_secs(2)).is_none(),
+        "a serve that never idle-shuts-down should time out"
+    );
+    assert!(
+        start.elapsed() < Duration::from_secs(10),
+        "timeout must be bounded, took {:?}",
+        start.elapsed()
+    );
+    assert!(
+        child.try_wait().expect("try_wait").is_some(),
+        "stalled child should be killed and reaped"
+    );
 }
 
 /// Wait for a child to exit within `timeout`, returning its status (or `None`
