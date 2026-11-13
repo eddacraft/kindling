@@ -153,6 +153,22 @@ See the detailed guides for the full policy:
 
 Never push directly to `main` — always use pull requests.
 
+## Release Documentation
+
+- Record user-visible changes, security outcomes, deprecations, and required
+  upgrade actions in [CHANGELOG.md](CHANGELOG.md).
+- Record implementation, architecture, performance, security analysis, and
+  schema or API details in [ENGINEERING-HISTORY.md](ENGINEERING-HISTORY.md).
+  Link to relevant PRs, issues, ADRs, and APS work items where available.
+- Add entries under `Unreleased` for changes landing on `main` with the PR or
+  already present there. Update both records when the change affects both
+  audiences. Routine housekeeping can go undocumented.
+- Keep the `Unreleased` and version/date headings aligned across both files.
+  Preserve historical dates. Run `python3 scripts/check-release-docs.py` after
+  editing either record.
+- Follow the [release runbook](docs/guides/release-runbook.md) to promote the
+  entries and generate GitHub Release notes from the changelog.
+
 ## PocketFlow (Vendored)
 
 The project vendors PocketFlow at `packages/kindling-adapter-pocketflow/vendor/pocketflow/`. Key concepts:
