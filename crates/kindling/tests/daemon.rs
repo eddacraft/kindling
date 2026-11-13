@@ -177,6 +177,7 @@ fn via_daemon_with_db_is_rejected() {
         vec!["--via-daemon", "pin", "observation", "obs_1", "--db", &db],
         vec!["--via-daemon", "unpin", "pin_1", "--db", &db],
         vec!["--via-daemon", "forget", "obs_1", "--db", &db],
+        vec!["--via-daemon", "wrap", "--db", &db, "--", "echo", "hi"],
     ];
 
     for args in invocations {
