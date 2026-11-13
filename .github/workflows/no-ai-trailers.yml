@@ -36,19 +36,37 @@ jobs:
 
           range="$BASE..$HEAD"
           fail=0
+
+          # Enumerate the PR's commits up front. A failed `git log` (e.g. an
+          # invalid range) must fail the scan rather than silently yield an
+          # empty loop and a false pass, so don't feed the loop from process
+          # substitution.
+          if ! commits="$(git log --format='%H' "$range")"; then
+            echo "::error::could not enumerate commits in $range"
+            exit 1
+          fi
+
           while IFS= read -r sha; do
             [ -z "$sha" ] && continue
             body=$(git log -1 --format='%B' "$sha" | tr '[:upper:]' '[:lower:]')
             for p in "${patterns[@]}"; do
-              if printf '%s' "$body" | grep -qE "$p"; then
+              # Here-string, not a pipe: `grep -q` exits as soon as it matches,
+              # which would SIGPIPE an upstream `printf` and, under pipefail,
+              # turn a real match into a false pass.
+              if grep -qE "$p" <<< "$body"; then
                 echo "::error::commit $sha leaks AI provenance — matches: $p"
                 fail=1
               fi
             done
-          done < <(git log --format='%H' "$range")
+          done <<< "$commits"
+
+          count="$(git rev-list --count "$range")" || {
+            echo "::error::could not count commits in $range"
+            exit 1
+          }
 
           if [ "$fail" -ne 0 ]; then
             echo "::error::Reword the offending commits before merging."
             exit 1
           fi
-          echo "no AI provenance leaks found in $(git rev-list --count "$range") commits"
+          echo "no AI provenance leaks found in $count commits"
