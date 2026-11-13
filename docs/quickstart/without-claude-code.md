@@ -76,6 +76,19 @@ An explicit `--repo` always wins over auto-detection, and `--repo` and
 in the text output and recorded in `provenance.scopeIds` in the `--json`
 output.
 
+Narrow results with kind and time filters:
+
+```bash
+kindling search "JWT" --kind error          # only error observations
+kindling search "JWT" --after "1 week ago"  # from the last week
+kindling search "JWT" --kind command --after 1700000000000
+```
+
+`--kind` restricts results to observations of that kind (summaries are
+excluded). `--after` and `--before` bound the observation timestamp and accept
+either epoch milliseconds or a relative `<N> <unit> ago` phrase (for example
+`30 minutes ago`, `2 days ago`, `1 week ago`).
+
 ## Browse in a local viewer
 
 Export your database to a self-contained HTML page and inspect it offline:

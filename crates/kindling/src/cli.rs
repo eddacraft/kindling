@@ -232,6 +232,18 @@ pub struct SearchArgs {
     #[arg(long, value_name = "n", default_value_t = 10)]
     pub max: u32,
 
+    /// Only show observations of this kind (e.g. error, command, message).
+    #[arg(long, value_name = "kind")]
+    pub kind: Option<String>,
+
+    /// Only show items at or after this time (epoch ms, or "<N> <unit> ago").
+    #[arg(long, value_name = "time")]
+    pub after: Option<String>,
+
+    /// Only show items before this time (epoch ms, or "<N> <unit> ago").
+    #[arg(long, value_name = "time")]
+    pub before: Option<String>,
+
     #[command(flatten)]
     pub common: CommonOpts,
 }
