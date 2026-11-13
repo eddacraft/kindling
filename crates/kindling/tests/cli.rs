@@ -932,3 +932,86 @@ fn wrap_relays_full_output_but_bounds_capture() {
     assert!(cap.len() < 3000, "capture must be bounded: {cap}");
     assert!(cap.ends_with("..."), "capture should be truncated: {cap}");
 }
+// --- C7: search filters (--kind, --after, --before) -------------------------
+
+#[test]
+fn search_kind_filter_restricts_to_matching_kind() {
+    let env = CliEnv::new();
+    assert_success(&env.run_db(&["log", "alpha message", "--kind", "message"]));
+    assert_success(&env.run_db(&["log", "alpha command", "--kind", "command"]));
+
+    // Without --kind: both candidates match "alpha".
+    let all = env.run_db(&["search", "alpha", "--json"]);
+    assert_success(&all);
+    assert_eq!(candidate_contents(&json_stdout(&all)).len(), 2);
+
+    // With --kind command: only the command observation.
+    let cmd = env.run_db(&["search", "alpha", "--kind", "command", "--json"]);
+    assert_success(&cmd);
+    assert_eq!(
+        candidate_contents(&json_stdout(&cmd)),
+        vec!["alpha command".to_string()]
+    );
+
+    // With --kind error: no matches.
+    let err = env.run_db(&["search", "alpha", "--kind", "error", "--json"]);
+    assert_success(&err);
+    assert_eq!(candidate_contents(&json_stdout(&err)).len(), 0);
+}
+
+#[test]
+fn search_after_before_epoch_ms_filters() {
+    let env = CliEnv::new();
+    assert_success(&env.run_db(&["log", "timely", "--kind", "message"]));
+
+    let after = env.run_db(&["search", "timely", "--after", "0", "--json"]);
+    assert_success(&after);
+    assert_eq!(candidate_contents(&json_stdout(&after)).len(), 1);
+
+    let before = env.run_db(&["search", "timely", "--before", "0", "--json"]);
+    assert_success(&before);
+    assert_eq!(candidate_contents(&json_stdout(&before)).len(), 0);
+}
+
+#[test]
+fn search_after_relative_time() {
+    let env = CliEnv::new();
+    assert_success(&env.run_db(&["log", "recent thing", "--kind", "message"]));
+
+    let after = env.run_db(&["search", "recent", "--after", "1 week ago", "--json"]);
+    assert_success(&after);
+    assert_eq!(candidate_contents(&json_stdout(&after)).len(), 1);
+
+    let before = env.run_db(&["search", "recent", "--before", "1 week ago", "--json"]);
+    assert_success(&before);
+    assert_eq!(candidate_contents(&json_stdout(&before)).len(), 0);
+}
+
+#[test]
+fn search_kind_filter_applies_before_max_limit() {
+    let env = CliEnv::new();
+    // Three command observations (oldest), then fifteen message observations
+    // (newest). Without filtering before the limit, `--max 3` would return the
+    // three newest messages and `--kind command` would drop them all.
+    for i in 0..3 {
+        assert_success(&env.run_db(&["log", &format!("common cmd {i}"), "--kind", "command"]));
+    }
+    for i in 0..15 {
+        assert_success(&env.run_db(&["log", &format!("common noise {i}"), "--kind", "message"]));
+    }
+
+    let out = env.run_db(&[
+        "search", "common", "--kind", "command", "--max", "3", "--json",
+    ]);
+    assert_success(&out);
+    let v = json_stdout(&out);
+    let contents = candidate_contents(&v);
+    assert_eq!(
+        contents.len(),
+        3,
+        "expected 3 command matches: {contents:?}"
+    );
+    assert!(contents.iter().all(|c| c.contains("common cmd")));
+    // Provenance reflects the filtered, re-limited result.
+    assert_eq!(v["provenance"]["returnedCandidates"], json!(3));
+}
