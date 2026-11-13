@@ -1,5 +1,9 @@
 # Selective FTS Indexing Implementation Plan
 
+> **Historical.** This plan targets the retired Node.js/TypeScript engine (pre-D-005).
+> It is kept for reference and does not describe the current Rust engine. See
+> [docs/architecture.md](../architecture.md) for the current design.
+
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Truncate large observation content before FTS indexing to reduce index size and improve search speed without losing searchability.

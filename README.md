@@ -271,8 +271,11 @@ docs/                 architecture, data model, retrieval contract, guides, ADRs
 scripts/              release, publishing, schema sync, demo recording
 ```
 
-Start with [`docs/architecture.md`](docs/architecture.md),
-[`docs/data-model.md`](docs/data-model.md), and
+Start with [`CONTEXT.md`](CONTEXT.md) (vocabulary),
+[`docs/architecture.md`](docs/architecture.md), and
+[`docs/development.md`](docs/development.md) (drift gates, invariants, change
+recipes). [`docs/README.md`](docs/README.md) indexes the rest, including
+[`docs/data-model.md`](docs/data-model.md) and
 [`docs/retrieval-contract.md`](docs/retrieval-contract.md).
 
 ### Checks before you push

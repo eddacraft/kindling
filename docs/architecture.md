@@ -4,7 +4,7 @@
 
 kindling is a local-first memory and continuity engine for AI-assisted development. It captures observations from development sessions, organizes them into capsules (bounded units of meaning), and provides deterministic, explainable retrieval.
 
-kindling is Rust-canonical: the engine is a workspace of seven Rust crates, fronted by a local daemon (`kindling serve`) that speaks HTTP/1 over a Unix domain socket. The daemon makes concurrent multi-tool access safe — many adapters, hooks, and CLI invocations can talk to one engine without fighting over the database.
+kindling is Rust-canonical: the engine is a workspace of eight published Rust crates (plus a private benchmark crate), fronted by a local daemon (`kindling serve`) that speaks HTTP/1 over a Unix domain socket. The daemon makes concurrent multi-tool access safe — many adapters, hooks, and CLI invocations can talk to one engine without fighting over the database.
 
 > The canonical published docs live at **docs.eddacraft.ai/kindling**.
 >
@@ -18,7 +18,11 @@ The architecture is deliberately layered to separate concerns:
 - **Service** - domain logic and orchestration
 - **Server** - the daemon runtime (HTTP/1 over UDS)
 - **Client** - daemon-backed SDK
+- **Runtime** - embeddable facade (attach-or-start daemon + durable spool)
 - **Binary** - CLI, hooks, and `serve`
+
+> Domain vocabulary (observation, capsule, pin, scope, project, spool, …) is
+> defined in [CONTEXT.md](../CONTEXT.md). This document uses those terms.
 
 ## Design Principles
 
@@ -73,20 +77,25 @@ Two integration paths share the same core:
 
 - **Daemon path** (default) — `kindling-client` auto-spawns the daemon on first use and talks to `kindling-server` over UDS. Use this when more than one tool may touch memory concurrently.
 - **Embedded path** — `kindling-service` runs the engine in-process with zero IPC. Use this for single-owner, embedded scenarios.
+- **Runtime path** — `kindling-runtime` wraps the daemon path for Rust downstreams: it attaches to a daemon already on the socket, or starts `kindling-server` in-process on a tokio task, and makes spooled (durable) emit the primary API. No separate `kindling` install is required.
 
 ## Crates
 
-The workspace is versioned at `v0.1.0`.
+All published crates share the workspace version (see `Cargo.toml`, currently `0.4.1`).
 
-| Crate                | Layer         | Depends on             | Use when                                            |
-| -------------------- | ------------- | ---------------------- | --------------------------------------------------- |
-| `kindling-types`     | domain        | —                      | always (shared types)                               |
-| `kindling-store`     | storage       | types                  | direct persistence                                  |
-| `kindling-provider`  | retrieval     | types, store           | direct retrieval                                    |
-| `kindling-service`   | orchestration | types, store, provider | embedded, in-process                                |
-| `kindling-server`    | daemon        | types, store, service  | running the daemon                                  |
-| `kindling-client`    | SDK           | types                  | most integrations                                   |
-| `eddacraft-kindling` | binary        | all                    | CLI, hooks, `serve` (installed command: `kindling`) |
+| Crate                | Layer         | Depends on               | Use when                                            |
+| -------------------- | ------------- | ------------------------ | --------------------------------------------------- |
+| `kindling-types`     | domain        | —                        | always (shared types)                               |
+| `kindling-store`     | storage       | types                    | direct persistence                                  |
+| `kindling-provider`  | retrieval     | types, store             | direct retrieval                                    |
+| `kindling-service`   | orchestration | types, store, provider   | embedded, in-process                                |
+| `kindling-server`    | daemon        | types, store, service    | running the daemon                                  |
+| `kindling-client`    | SDK           | types                    | most integrations                                   |
+| `kindling-runtime`   | facade        | types, client, server¹   | Rust downstreams wanting one binary + daemon        |
+| `eddacraft-kindling` | binary        | all                      | CLI, hooks, `serve` (installed command: `kindling`) |
+| `kindling-bench`     | (private)     | client, runtime, service | performance and resource profiling                  |
+
+¹ `client` and `server` are optional, behind the `client`/`spool` and `embedded-daemon` features (all on by default).
 
 ### `kindling-types`
 
@@ -95,6 +104,7 @@ The workspace is versioned at `v0.1.0`.
 **Responsibilities:**
 
 - Define `Observation`, `ObservationKind`, `Capsule`, `CapsuleType`, `CapsuleStatus`, `ScopeIds`, summaries, and pins.
+- Define the retrieval and list request/response shapes, the capability handshake (`Capability`, kind registry), and redaction evidence.
 - Optional `ts-rs` feature generates checked-in TypeScript bindings under `crates/kindling-types/bindings/`. CI fails on drift.
 
 **Dependencies:** None.
@@ -106,8 +116,10 @@ The workspace is versioned at `v0.1.0`.
 **Responsibilities:**
 
 - FTS5 indexing with WAL mode for concurrent reads.
-- Schema v5, governed by the cross-language contract (`schema/schema.sql` + `schema/version.json`).
-- Per-project database under `~/.kindling/projects/<hash>/`.
+- Schema v6, governed by the cross-language contract (`schema/schema.sql` + `schema/version.json`).
+- Per-project database at `~/.kindling/projects/<hash>/kindling.db` (`KINDLING_DB_PATH` overrides).
+- Embeds a vendored copy of the schema contract (`crates/kindling-store/schema/`), kept in sync by `scripts/sync-vendored-schema.sh` and a CI drift gate.
+- Opens pre-existing databases at or above `minCompatible` and applies forward migrations in Rust.
 
 **Dependencies:** `kindling-types`.
 
@@ -120,6 +132,7 @@ The workspace is versioned at `v0.1.0`.
 - FTS5 BM25 relevance, normalized to `[0,1]` across entity types.
 - Recency scoring with a 30-day window.
 - Final score: `fts_relevance * 0.7 + recency * 0.3`, where `recency = MAX(0, 1 - age_ms/max_age_ms)`.
+- Hosts the retrieval **orchestrator** (`orchestrator.rs`), which assembles pins → current summary → ranked candidates. The service calls it.
 
 **Dependencies:** `kindling-types`, `kindling-store`.
 
@@ -130,8 +143,11 @@ The workspace is versioned at `v0.1.0`.
 **Responsibilities:**
 
 - Manage capsule lifecycle (open/close).
-- Append observations; **mask secrets at the service boundary on append**.
-- Orchestrate retrieval (combine pins, summary, and provider hits).
+- Append observations; **mask secrets at the service boundary on append** (`filter/`: secret masking, truncation, excluded paths) and return redaction evidence.
+- Deduplicate appends on observation id.
+- Drive retrieval (via the provider's orchestrator) and the exhaustive keyset-paginated list.
+- Assemble structured injection context for the `session-start` / `pre-compact` hooks (`context.rs`).
+- Export / import bundles (`export.rs`).
 
 **Dependencies:** `kindling-types`, `kindling-store`, `kindling-provider`.
 
@@ -143,27 +159,29 @@ The workspace is versioned at `v0.1.0`.
 
 **Responsibilities:**
 
-- HTTP/1 over UDS (TCP loopback fallback on Windows).
-- Per-project routing via the `X-Kindling-Project` header; one service instance cached per project.
-- PID lock, socket mode `0600`, idle shutdown (default 30 minutes).
+- HTTP/1 over UDS (TCP loopback fallback on Windows, with the ephemeral port published to a port file and a per-daemon bearer token required on every route except `/v1/health`).
+- Per-project routing via the `X-Kindling-Project` header; one service instance cached per project. The header is routing only, never authorization.
+- PID lock, socket mode `0600`, idle shutdown (default 30 minutes), cancellation-safe activity tracking.
+- Formats injection-context markdown (`inject.rs`) byte-for-byte compatible with the original Node hooks.
 
 **Dependencies:** `kindling-types`, `kindling-store`, `kindling-service`.
 
 **v1 endpoints** (camelCase JSON; `X-Kindling-Project` required on all data endpoints, not on health):
 
-| Method | Path                          | Purpose                              |
-| ------ | ----------------------------- | ------------------------------------ |
-| GET    | `/v1/health`                  | liveness (no project header)         |
-| POST   | `/v1/capsules`                | open a capsule                       |
-| GET    | `/v1/capsules/open?sessionId` | fetch the open capsule for a session |
-| PATCH  | `/v1/capsules/:id/close`      | close a capsule                      |
-| POST   | `/v1/observations`            | append an observation                |
-| POST   | `/v1/observations/:id/forget` | forget an observation                |
-| POST   | `/v1/retrieve`                | orchestrated retrieval               |
-| POST   | `/v1/pins`                    | create a pin                         |
-| DELETE | `/v1/pins/:id`                | remove a pin                         |
-| POST   | `/v1/context/session-start`   | session-start context                |
-| POST   | `/v1/context/pre-compact`     | pre-compact context                  |
+| Method | Path                          | Purpose                                             |
+| ------ | ----------------------------- | --------------------------------------------------- |
+| GET    | `/v1/health`                  | liveness + capability handshake (no project header) |
+| POST   | `/v1/capsules`                | open a capsule                                      |
+| GET    | `/v1/capsules/open?sessionId` | fetch the open capsule for a session                |
+| PATCH  | `/v1/capsules/:id/close`      | close a capsule                                     |
+| POST   | `/v1/observations`            | append an observation                               |
+| POST   | `/v1/observations/list`       | exhaustive keyset-paginated list                    |
+| POST   | `/v1/observations/:id/forget` | forget an observation                               |
+| POST   | `/v1/retrieve`                | orchestrated retrieval                              |
+| POST   | `/v1/pins`                    | create a pin                                        |
+| DELETE | `/v1/pins/:id`                | remove a pin                                        |
+| POST   | `/v1/context/session-start`   | session-start context                               |
+| POST   | `/v1/context/pre-compact`     | pre-compact context                                 |
 
 ### `kindling-client`
 
@@ -176,10 +194,29 @@ The workspace is versioned at `v0.1.0`.
 - Sends the `X-Kindling-Project` header for per-project routing.
 - Checks the daemon schema version on connect.
 - Re-exports domain types from `kindling-types`.
+- Optional `spool` feature: `SpooledClient` buffers appends to an NDJSON spool when the daemon is unreachable and drains on the next successful append or `flush()`; optional `max_bytes` / `max_age_ms` retention caps.
 
 **Dependencies:** `kindling-types`.
 
 **Use when:** Most integrations — anywhere concurrent multi-tool access is possible.
+
+### `kindling-runtime`
+
+**Purpose:** One-dependency integration facade for Rust downstreams (anvil first; D-008).
+
+**Responsibilities:**
+
+- Attach-or-start: build a client for the configured socket; spawn only if nothing answers.
+- `SpawnStrategy`: `Embedded` (in-process `kindling-server`, default), `External` (exec `kindling` on `PATH`), `AttachOnly`.
+- Expose `SpooledClient` as the primary write API and re-export `kindling_types` as `kindling_runtime::types`.
+
+**Dependencies:** `kindling-types`; optionally `kindling-client`, `kindling-server`.
+
+See [`crates/kindling-runtime/README.md`](../crates/kindling-runtime/README.md).
+
+### `kindling-bench` (private)
+
+Criterion workloads and resource profiles (startup, writes, concurrent writers, list pagination, retrieval, spool replay). `publish = false`; adds nothing to shipped crates. See [`crates/kindling-bench/README.md`](../crates/kindling-bench/README.md).
 
 ### `eddacraft-kindling` (binary)
 
@@ -207,6 +244,9 @@ kindling list
 kindling pin    | unpin
 kindling forget <observation-id>
 kindling export | import
+kindling demo   [--reset]
+kindling browse [--output <path>] [--no-open]
+kindling spool status --spool-path <path> [--json]
 kindling serve  [--socket ~/.kindling/kindling.sock]
                 [--idle-timeout 1800] [--daemonize] [--kindling-home <dir>]
 kindling hook   <type>
@@ -334,10 +374,10 @@ Round-trip guarantees: `export -> import -> export` produces identical data.
 
 ## Schema and Migrations
 
-kindling is at **schema v5**, governed by a **cross-language schema contract** so the Rust engine and any language bindings agree on the layout:
+kindling is at **schema v6**, governed by a **cross-language schema contract** so the Rust engine and any language bindings agree on the layout:
 
 - `schema/schema.sql` - canonical schema
-- `schema/version.json` - schema version (`5`)
+- `schema/version.json` - schema version (`6`, `minCompatible: 1`); `PRAGMA user_version` matches it
 - FTS5 tokenizer: `porter unicode61`
 
 **Tables:** `observations`, `capsules`, `capsule_observations`, `summaries`, `pins`, `observations_fts`, `summaries_fts`, `schema_migrations`.
@@ -348,13 +388,16 @@ Scope IDs are denormalized into columns on the relevant tables (see Scoping). Mi
 
 kindling reads its home directory and daemon settings from the environment and the `serve` flags:
 
-| Setting        | Default                        | Source                              |
-| -------------- | ------------------------------ | ----------------------------------- |
-| Home directory | `~/.kindling`                  | `KINDLING_HOME` / `--kindling-home` |
-| Per-project DB | `~/.kindling/projects/<hash>/` | derived from project                |
-| Socket         | `~/.kindling/kindling.sock`    | `kindling serve --socket`           |
-| Idle timeout   | `1800` seconds (30 min)        | `kindling serve --idle-timeout`     |
-| Daemonize      | off                            | `kindling serve --daemonize`        |
+| Setting                  | Default                                   | Source                                                      |
+| ------------------------ | ----------------------------------------- | ----------------------------------------------------------- |
+| Home directory           | `~/.kindling`                             | `--kindling-home`                                           |
+| Per-project DB           | `~/.kindling/projects/<hash>/kindling.db` | `KINDLING_DB_PATH` / `--db`; else derived from project root |
+| Project root             | git toplevel of cwd                       | `KINDLING_REPO_ROOT` (only if cwd is inside it)             |
+| Socket                   | `~/.kindling/kindling.sock`               | `kindling serve --socket`; hooks honour `KINDLING_SOCK`     |
+| Binary (TS client)       | `kindling` on `PATH`                      | `KINDLING_BIN`                                              |
+| Session-start recent cap | `10` observations                         | `KINDLING_MAX_CONTEXT` (hooks)                              |
+| Idle timeout             | `1800` seconds (30 min)                   | `kindling serve --idle-timeout`                             |
+| Daemonize                | off                                       | `kindling serve --daemonize`                                |
 
 On Windows the daemon falls back to TCP loopback in place of the UDS.
 
@@ -364,7 +407,7 @@ On Windows the daemon falls back to TCP loopback in place of the UDS.
 - **Governance workflows** - No approval, conflict resolution, lifecycle management
 - **Multi-user access control** - Local-first; single-user by default
 - **Cloud/remote modes** - The daemon is local-only (UDS, or loopback on Windows)
-- **Semantic retrieval** - FTS5 + recency only (no embeddings in v0.1)
+- **Semantic retrieval** - FTS5 + recency only (no embeddings)
 
 These concerns belong to downstream systems (e.g., Edda).
 
