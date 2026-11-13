@@ -29,8 +29,9 @@
   "license": "Apache-2.0",
   "engines": {
     "node": ">=24",
-    "pnpm": ">=8.0.0"
+    "pnpm": ">=10"
   },
+  "packageManager": "pnpm@10.34.9",
   "scripts": {
     "build": "pnpm -r run build",
     "test": "pnpm -r run test",
