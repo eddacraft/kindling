@@ -11,8 +11,9 @@
 //   node packages/kindling/scripts/sync-types.mjs
 //
 // CI (the `ts-generated-copy` gate in .github/workflows/rust.yml) re-runs the
-// ts-rs generation, runs this script, then `git diff --exit-code` over both the
-// bindings and the copied dir; drift fails the build.
+// ts-rs generation, runs this script, stages both the bindings and the copied
+// dir, then runs `git diff --cached --exit-code` over them (so a newly generated
+// file counts as drift too); drift fails the build.
 //
 // Idempotent: it mirrors the bindings tree, removing any stale files first.
 
