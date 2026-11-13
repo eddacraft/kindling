@@ -21,11 +21,20 @@ use crate::{build_client, open_service, runtime, CliError};
 const MAX_CAPTURE: usize = 2_000;
 
 pub fn run(args: WrapArgs, via_daemon: bool) -> Result<i32, CliError> {
-    let (code, stdout, stderr) = spawn_and_capture(&args.command)?;
-
     // Default the repo scope to the enclosing git root so `search` finds it.
     let repo = resolve_repo(args.repo.as_deref(), false);
     let scope = scope_from(args.session.as_deref(), repo.as_deref());
+
+    // Open the write target before running the child, so `--via-daemon --db`
+    // (or a DB open failure) is rejected up front — consistent with `log`,
+    // which never does side-effecting work before its write path is ready.
+    let backend = if via_daemon {
+        WriteBackend::Daemon(build_client(args.common.db.as_deref())?)
+    } else {
+        WriteBackend::Embedded(open_service(args.common.db.as_deref())?.0)
+    };
+
+    let (code, stdout, stderr) = spawn_and_capture(&args.command)?;
     let command_line = args.command.join(" ");
 
     let input = ObservationInput {
@@ -38,26 +47,27 @@ pub fn run(args: WrapArgs, via_daemon: bool) -> Result<i32, CliError> {
         redacted: Some(false),
     };
 
-    let observation = if via_daemon {
-        let client = build_client(args.common.db.as_deref())?;
-        runtime()?
-            .block_on(async {
-                client
-                    .append_observation(input, args.capsule.clone(), None)
-                    .await
-            })?
-            .observation
-    } else {
-        let (service, _db) = open_service(args.common.db.as_deref())?;
-        service
-            .append_observation(
-                input,
-                AppendObservationOptions {
-                    capsule_id: args.capsule.clone(),
-                    validate: true,
-                },
-            )?
-            .observation
+    let observation = match backend {
+        WriteBackend::Daemon(client) => {
+            runtime()?
+                .block_on(async move {
+                    client
+                        .append_observation(input, args.capsule.clone(), None)
+                        .await
+                })?
+                .observation
+        }
+        WriteBackend::Embedded(service) => {
+            service
+                .append_observation(
+                    input,
+                    AppendObservationOptions {
+                        capsule_id: args.capsule.clone(),
+                        validate: true,
+                    },
+                )?
+                .observation
+        }
     };
 
     if args.common.json {
@@ -77,6 +87,12 @@ pub fn run(args: WrapArgs, via_daemon: bool) -> Result<i32, CliError> {
     }
 
     Ok(code)
+}
+
+/// The write path selected by `--via-daemon`, opened before the child runs.
+enum WriteBackend {
+    Daemon(kindling_client::Client),
+    Embedded(kindling_service::KindlingService),
 }
 
 /// Spawn `argv`, capturing stdout/stderr and the exit status.
