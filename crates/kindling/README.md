@@ -50,6 +50,7 @@ Most users should start with the CLI and only move to the Rust SDK crates when b
 The `kindling` binary provides:
 
 - CLI commands for logging, searching, capsules, pins, export/import, status and stats.
+- An interactive memory browser via `kindling tui`, built with `eddacraft-tui`.
 - A daemon entry point via `kindling serve`.
 - Hook support for Claude Code session capture.
 - Local SQLite-backed project memory.

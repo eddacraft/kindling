@@ -1,4 +1,4 @@
-//! `tui` — interactive ratatui memory browser.
+//! `tui` — interactive memory browser built with eddacraft-tui.
 //!
 //! The filtering and ordering live in the pure, terminal-free [`MemoryIndex`]
 //! struct (unit-tested), so the TUI loop itself is a thin rendering layer that
@@ -7,20 +7,18 @@
 
 use std::collections::HashSet;
 
-use crossterm::{
-    event::{self, Event, KeyCode, KeyEventKind, KeyModifiers},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
+use eddacraft_tui::prelude::{
+    Action, Binding, Container, EddaCraftTheme, HelpBar, KeyHandler, TerminalGuard, TextInput,
+    TextInputState, Theme,
 };
 use kindling_service::KindlingService;
 use kindling_types::{ListObservationsRequest, Observation, PinTargetType, ScopeIds};
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
-    style::{Modifier, Style},
-    text::Span,
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
-    Terminal,
+    widgets::{Block, List, ListItem, ListState, Paragraph, Wrap},
+    Frame, Terminal,
 };
 
 use crate::cli::TuiArgs;
@@ -118,7 +116,7 @@ pub fn run(args: TuiArgs) -> CliResult {
 /// Run the interactive TUI, or error when the terminal cannot support it.
 fn run_interactive(index: &MemoryIndex) -> CliResult {
     use std::io::IsTerminal;
-    if !std::io::stdout().is_terminal() {
+    if !std::io::stdin().is_terminal() || !std::io::stdout().is_terminal() {
         return Err(CliError::Invalid(
             "kindling tui requires an interactive terminal; use `kindling browse` for a \
              non-interactive HTML viewer"
@@ -126,126 +124,204 @@ fn run_interactive(index: &MemoryIndex) -> CliResult {
         ));
     }
 
-    enable_raw_mode()?;
-    let mut stdout = std::io::stdout();
-    execute!(stdout, EnterAlternateScreen)?;
-    let backend = CrosstermBackend::new(stdout);
+    let guard = TerminalGuard::enter()?;
+    let backend = CrosstermBackend::new(std::io::stdout());
     let mut terminal = Terminal::new(backend)?;
-
     let result = event_loop(&mut terminal, index);
+    let restored = guard.leave();
+    result?;
+    restored?;
+    Ok(())
+}
 
-    // Always restore the terminal, even if the loop returned an error.
-    disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-    terminal.show_cursor()?;
+// Keep visible hints next to the actions consumed by BrowserState.
+const BINDINGS: &[Binding] = &[
+    Binding {
+        keys: "Esc/Ctrl-C",
+        action: Action::Quit,
+        label: "quit",
+    },
+    Binding {
+        keys: "↑/↓",
+        action: Action::Down,
+        label: "results",
+    },
+    Binding {
+        keys: "←/→",
+        action: Action::Right,
+        label: "edit",
+    },
+    Binding {
+        keys: "PgUp/PgDn",
+        action: Action::PageDown,
+        label: "preview",
+    },
+];
 
-    result
+struct BrowserState {
+    query: TextInputState,
+    results: ListState,
+    preview_scroll: u16,
+}
+
+impl Default for BrowserState {
+    fn default() -> Self {
+        Self {
+            query: TextInputState::default(),
+            results: ListState::default().with_selected(Some(0)),
+            preview_scroll: 0,
+        }
+    }
+}
+
+impl BrowserState {
+    /// Returns true when the user requests exit.
+    fn handle_key(&mut self, key: KeyEvent, index: &MemoryIndex) -> bool {
+        if key.kind != KeyEventKind::Press {
+            return false;
+        }
+        let mut edited = false;
+        let selected = self.results.selected();
+        let action = match key.code {
+            KeyCode::PageUp | KeyCode::PageDown => KeyHandler::map(key),
+            _ => KeyHandler::map_text_entry(key),
+        };
+        match action {
+            Action::Quit | Action::Back => return true,
+            Action::Character(c) => {
+                self.query.insert(c);
+                edited = true;
+            }
+            Action::Backspace => {
+                self.query.backspace();
+                edited = true;
+            }
+            Action::Delete => {
+                self.query.delete();
+                edited = true;
+            }
+            Action::Left => self.query.move_left(),
+            Action::Right => self.query.move_right(),
+            Action::Home => self.query.home(),
+            Action::End => self.query.end(),
+            Action::Up => self.results.select(selected_prev(
+                selected,
+                index.search(&self.query.value).len(),
+            )),
+            Action::Down => self.results.select(selected_next(
+                selected,
+                index.search(&self.query.value).len(),
+            )),
+            Action::PageUp => self.preview_scroll = self.preview_scroll.saturating_sub(5),
+            Action::PageDown => self.preview_scroll = self.preview_scroll.saturating_add(5),
+            _ => {}
+        }
+        if edited {
+            // Recompute after editing: deleting the final non-matching character
+            // must restore the preview and selection immediately.
+            self.results
+                .select(if index.search(&self.query.value).is_empty() {
+                    None
+                } else {
+                    Some(0)
+                });
+        }
+        if edited || selected != self.results.selected() {
+            self.preview_scroll = 0;
+        }
+        false
+    }
 }
 
 fn event_loop(
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     index: &MemoryIndex,
 ) -> CliResult {
-    let mut query = String::new();
-    let mut state = ListState::default();
-    state.select(Some(0));
-
+    let mut browser = BrowserState::default();
     loop {
-        let items = index.search(&query);
-        draw(terminal, index, &query, &items, &mut state)?;
-
+        terminal.draw(|frame| draw(frame, index, &mut browser))?;
         if let Event::Key(key) = event::read()? {
-            if key.kind != KeyEventKind::Press {
-                continue;
-            }
-            match key.code {
-                KeyCode::Esc => break,
-                KeyCode::Char('q') if !key.modifiers.contains(KeyModifiers::CONTROL) => break,
-                KeyCode::Char(c) => {
-                    query.push(c);
-                    state.select(if items.is_empty() { None } else { Some(0) });
-                }
-                KeyCode::Backspace => {
-                    query.pop();
-                    state.select(if items.is_empty() { None } else { Some(0) });
-                }
-                KeyCode::Up => state.select(selected_prev(state.selected(), items.len())),
-                KeyCode::Down => state.select(selected_next(state.selected(), items.len())),
-                _ => {}
+            if browser.handle_key(key, index) {
+                return Ok(());
             }
         }
     }
-    Ok(())
 }
 
-fn draw(
-    terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
-    index: &MemoryIndex,
-    query: &str,
-    items: &[&Observation],
-    state: &mut ListState,
-) -> Result<(), CliError> {
-    terminal.draw(|f| {
-        let chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints(vec![
-                Constraint::Length(3),
-                Constraint::Min(4),
-                Constraint::Length(10),
-            ])
-            .split(f.area());
+fn draw(frame: &mut Frame, index: &MemoryIndex, browser: &mut BrowserState) {
+    let theme = EddaCraftTheme;
+    let area = frame.area();
+    frame.render_widget(Block::default().style(theme.base()), area);
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),
+            Constraint::Min(0),
+            Constraint::Length(1),
+        ])
+        .split(area);
+    let search = TextInput::new(&theme)
+        .placeholder("Type to filter memory")
+        .block(Container::new(&theme).title("kindling · Search").to_block());
+    frame.render_stateful_widget(search, chunks[0], &mut browser.query);
 
-        let prompt = Span::styled(
-            format!("> {query}"),
-            Style::default().add_modifier(Modifier::BOLD),
-        );
-        let search = Paragraph::new(prompt).block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title("Search (type to filter, q to quit)"),
-        );
-        f.render_widget(search, chunks[0]);
-
-        let list_items: Vec<ListItem> = items
-            .iter()
-            .map(|o| {
-                let pin = if index.is_pinned(&o.id) { " [PIN]" } else { "" };
-                ListItem::new(format!(
-                    "{}  {}  {}{}",
-                    format_timestamp(o.ts),
-                    kind_str(o.kind),
-                    crate::output::truncate(&o.content, 60),
-                    pin,
-                ))
+    // Give long observations more room on wide terminals; stack on narrow ones.
+    let panes = Layout::default()
+        .direction(if area.width >= 100 {
+            Direction::Horizontal
+        } else {
+            Direction::Vertical
+        })
+        .constraints([Constraint::Percentage(45), Constraint::Percentage(55)])
+        .split(chunks[1]);
+    let items = index.search(&browser.query.value);
+    let list_items: Vec<ListItem> = items
+        .iter()
+        .map(|o| {
+            let pin = if index.is_pinned(&o.id) { " [PIN]" } else { "" };
+            ListItem::new(format!(
+                "{}  {}  {}{}",
+                format_timestamp(o.ts),
+                kind_str(o.kind),
+                crate::output::truncate(&o.content, 60),
+                pin,
+            ))
+            .style(if index.is_pinned(&o.id) {
+                theme.title()
+            } else {
+                theme.base()
             })
-            .collect();
-        let list = List::new(list_items)
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .title(format!("Results ({})", items.len())),
+        })
+        .collect();
+    let title = format!("Results ({})", items.len());
+    let list = List::new(list_items)
+        .block(Container::new(&theme).title(&title).to_block())
+        .highlight_style(theme.highlighted());
+    frame.render_stateful_widget(list, panes[0], &mut browser.results);
+
+    let preview = browser
+        .results
+        .selected()
+        .and_then(|i| items.get(i))
+        .map(|o| {
+            format!(
+                "kind: {}\nid:   {}\n\ntime: {}\n\n{}",
+                kind_str(o.kind),
+                o.id,
+                format_timestamp(o.ts),
+                o.content,
             )
-            .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
-        f.render_stateful_widget(list, chunks[1], state);
-
-        let preview = state
-            .selected()
-            .and_then(|i| items.get(i))
-            .map(|o| {
-                format!(
-                    "kind: {}\nid:   {}\n\ntime: {}\n\n{}",
-                    kind_str(o.kind),
-                    o.id,
-                    format_timestamp(o.ts),
-                    o.content,
-                )
-            })
-            .unwrap_or_else(|| "no selection".to_string());
-        let preview =
-            Paragraph::new(preview).block(Block::default().borders(Borders::ALL).title("Preview"));
-        f.render_widget(preview, chunks[2]);
-    })?;
-    Ok(())
+        })
+        .unwrap_or_else(|| "no selection".to_string());
+    frame.render_widget(
+        Paragraph::new(preview)
+            .style(theme.base())
+            .block(Container::new(&theme).title("Preview").to_block())
+            .wrap(Wrap { trim: false })
+            .scroll((browser.preview_scroll, 0)),
+        panes[1],
+    );
+    frame.render_widget(HelpBar::new(&theme).bindings(BINDINGS), chunks[2]);
 }
 
 fn kind_str(kind: kindling_types::ObservationKind) -> &'static str {
@@ -347,5 +423,85 @@ mod tests {
         assert_eq!(selected_next(Some(2), 3), Some(2));
         assert_eq!(selected_prev(Some(0), 3), Some(0));
         assert_eq!(selected_prev(Some(1), 3), Some(0));
+    }
+
+    #[test]
+    fn search_accepts_quit_and_navigation_letters() {
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+        let index = MemoryIndex::new(vec![obs("a", 1, "qhjkl query")], HashSet::new());
+        let mut browser = BrowserState::default();
+        for c in "qhjkl query".chars() {
+            assert!(
+                !browser.handle_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE), &index)
+            );
+        }
+        assert_eq!(browser.query.value, "qhjkl query");
+        assert_eq!(browser.results.selected(), Some(0));
+        assert!(browser.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE), &index));
+        assert!(browser.handle_key(
+            KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL),
+            &index
+        ));
+    }
+
+    #[test]
+    fn editing_search_restores_selection_after_no_matches() {
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+        let index = MemoryIndex::new(vec![obs("a", 1, "query")], HashSet::new());
+        let mut browser = BrowserState::default();
+        for code in [KeyCode::Char('z'), KeyCode::Backspace] {
+            browser.handle_key(KeyEvent::new(code, KeyModifiers::NONE), &index);
+            assert_eq!(
+                browser.results.selected(),
+                if browser.query.value.is_empty() {
+                    Some(0)
+                } else {
+                    None
+                }
+            );
+        }
+        for code in [
+            KeyCode::Char('q'),
+            KeyCode::Char('é'),
+            KeyCode::Left,
+            KeyCode::Delete,
+        ] {
+            browser.handle_key(KeyEvent::new(code, KeyModifiers::NONE), &index);
+        }
+        assert_eq!(browser.query.value, "q");
+        assert_eq!(browser.results.selected(), Some(0));
+    }
+
+    #[test]
+    fn changing_selection_resets_preview_scroll() {
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+        let index = MemoryIndex::new(vec![obs("a", 1, "a"), obs("b", 2, "b")], HashSet::new());
+        let mut browser = BrowserState::default();
+        browser.handle_key(KeyEvent::new(KeyCode::PageDown, KeyModifiers::NONE), &index);
+        assert!(browser.preview_scroll > 0);
+        browser.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE), &index);
+        assert_eq!(browser.preview_scroll, 0);
+        assert_eq!(browser.results.selected(), Some(1));
+    }
+
+    #[test]
+    fn browser_renders_wide_narrow_and_tiny_terminals() {
+        use ratatui::backend::TestBackend;
+        let index = MemoryIndex::new(vec![obs("a", 1, "query result")], HashSet::new());
+        for (width, height) in [(120, 30), (80, 24), (20, 6), (1, 1)] {
+            let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+            let mut browser = BrowserState::default();
+            terminal
+                .draw(|frame| draw(frame, &index, &mut browser))
+                .unwrap();
+            if width >= 80 {
+                let buffer = terminal.backend().buffer();
+                let text: String = buffer.content().iter().map(|cell| cell.symbol()).collect();
+                assert!(text.contains("Search"));
+                assert!(text.contains("Results (1)"));
+                assert!(text.contains("query result"));
+                assert!(text.contains("quit"));
+            }
+        }
     }
 }

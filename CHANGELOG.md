@@ -14,6 +14,10 @@ ended with v0.4.0.
 
 ## [Unreleased]
 
+### Added
+
+- `kindling tui` browses local memory with editable search, pins first, and a wrapped, scrollable preview. Panels adapt to terminal width; press Esc or Ctrl-C to quit.
+
 ### Fixed
 
 - Project-root overrides now reject sibling directories with similar path prefixes, preventing incorrect repository selection.
@@ -114,22 +118,26 @@ Kindling's engine moved to Rust, with an installable CLI, local daemon and Rust 
 ## [0.1.2] - 2026-02-16
 
 ### Changed
+
 - **Performance**: Denormalized scope ID columns replace `json_extract()` in queries (migration 004)
 - **Performance**: FTS scoring moved to SQL with CTE-based queries; BM25 normalization done cross-table in JS
 - **Performance**: Cached project root via `KINDLING_REPO_ROOT` env var in Claude Code hooks
 
 ### Fixed
+
 - Shell argument injection in Claude Code command wrappers (`$ARGUMENTS` now quoted)
 - Readonly export/import handles pre-migration-004 databases gracefully
 
 ## [0.1.1] - 2025-02-10
 
 ### Changed
+
 - Version bump for monorepo release consistency (no functional changes)
 
 ## [0.1.0] - 2025-02-09
 
 ### Added
+
 - Initial public release
 - Core domain model with observations, capsules, summaries, and pins
 - SQLite persistence with FTS5 full-text search
@@ -145,6 +153,7 @@ Kindling's engine moved to Rust, with an installable CLI, local daemon and Rust 
 - Test coverage across all packages
 
 ### Security
+
 - Automatic redaction of secrets in captured content
 - Configurable excluded file patterns for sensitive paths
 - Bounded output capture to prevent excessive storage
