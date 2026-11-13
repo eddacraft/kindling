@@ -1,5 +1,9 @@
 # Daemon / Persistent Service Mode Implementation Plan
 
+> **Historical.** This plan targets the retired Node.js/TypeScript engine (pre-D-005).
+> It is kept for reference and does not describe the current Rust engine. See
+> [docs/architecture.md](../architecture.md) for the current design.
+
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Eliminate Node.js cold-start overhead (~100-200ms per hook invocation) by running a persistent background service that keeps the SQLite database connection open and handles requests via a Unix domain socket.

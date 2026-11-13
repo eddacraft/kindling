@@ -1,6 +1,8 @@
 # kindling Schema Contract
 
-This directory contains the **cross-language SQLite schema contract** for kindling. Both the TypeScript store (`@eddacraft/kindling-store-sqlite`) and the Rust crate implement against the files here.
+This directory contains the **SQLite schema contract** for kindling: the canonical database layout. The Rust store (`kindling-store`) implements it, and any external tool that reads a kindling database can rely on it. The retired TypeScript store (`@eddacraft/kindling-store-sqlite`, now removed from this repo) was the original second implementation, which is why some comments still say "cross-language".
+
+`kindling-store` embeds a **vendored copy** of these files under `crates/kindling-store/schema/`, because `cargo publish` only packages files inside the crate directory. Run `scripts/sync-vendored-schema.sh` after every change here. The `vendored-schema` CI job fails when the copy drifts.
 
 ## Files
 
@@ -22,12 +24,14 @@ The value matches `version` in `version.json`. The TypeScript migration runner s
 
 ## How to add a migration
 
-1. Create `packages/kindling-store-sqlite/migrations/<NNN>_<name>.sql`.
-2. Include `PRAGMA user_version = <NNN>;` in the migration file.
-3. Register the migration in `packages/kindling-store-sqlite/src/db/migrate.ts`.
-4. Update `schema/schema.sql` to reflect the new DDL state (the file should always represent the schema **after** all migrations have run).
-5. Update `schema/version.json` — set `"version"` to `<NNN>`.
-6. If you changed the FTS tokenizer or removed/renamed columns, update `"minCompatible"` (see below).
+1. Update `schema/schema.sql` so that it describes the schema **after** every migration has run, which is what a fresh database gets. Bump `PRAGMA user_version = <N>;` and add a row to the `schema_migrations` seed.
+2. Update `schema/version.json`: set `"version"` to `<N>`. If the change is breaking (see below), also bump `"minCompatible"`.
+3. In `crates/kindling-store/src/db.rs`, add a forward migration (a `MIGRATION_<NNN>_<NAME>` SQL constant, run inside `BEGIN IMMEDIATE … COMMIT`) and apply it in `ensure_schema` for databases at the previous version. Keep it additive and idempotent.
+4. Run `scripts/sync-vendored-schema.sh` and commit the vendored copy.
+5. Add a test: `crates/kindling-store/tests/golden_file.rs` covers the fresh-database DDL, and the store integration tests cover upgrades from the previous version.
+6. If the change affects the wire types or the observation `kind` `CHECK` list, regenerate the bindings with `cargo test -p kindling-types --features ts-rs`.
+
+A schema bump is a public contract change. Open an issue first (see [CONTRIBUTING.md](../CONTRIBUTING.md#discuss-first)).
 
 ## Breaking changes
 
@@ -42,6 +46,10 @@ When making a breaking change, bump `minCompatible` in `version.json` to the mig
 
 ## How the Rust crate uses these files
 
-1. At **build time**, the Rust crate can embed `version.json` and assert it was compiled against the expected schema version.
-2. At **startup**, the crate reads `PRAGMA user_version` from the database and compares it to the embedded version. If the database version is below `minCompatible`, the crate returns an error.
-3. The DDL in `schema.sql` serves as the reference for Rust struct definitions and query construction.
+1. At **build time**, `kindling-store` embeds its vendored `schema.sql` and `version.json` with `include_str!`.
+2. When it **opens a database**:
+   - A fresh database gets `schema.sql` applied.
+   - An existing database whose `PRAGMA user_version` is `0` or below `minCompatible` is refused (`SchemaTooOld`).
+   - A database newer than the embedded version is refused (`SchemaTooNew`).
+   - A database at an older supported version is migrated forward.
+3. The daemon reports its schema version in the `/v1/health` capability handshake. Clients use that to detect skew.

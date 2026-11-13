@@ -1,5 +1,9 @@
 # Batch Pin Resolution Implementation Plan
 
+> **Historical.** This plan targets the retired Node.js/TypeScript engine (pre-D-005).
+> It is kept for reference and does not describe the current Rust engine. See
+> [docs/architecture.md](../architecture.md) for the current design.
+
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Replace N individual `getObservationById`/`getSummaryById` calls during pin resolution with a single batched `WHERE id IN (...)` query per entity type.

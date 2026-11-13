@@ -1,5 +1,7 @@
 # Data Model
 
+> Vocabulary is defined in [CONTEXT.md](../CONTEXT.md); this document gives field-level detail.
+
 ## Overview
 
 kindling's data model is designed for **local-first memory capture** with **deterministic retrieval**. Rust is the canonical implementation: the domain types live in the `kindling-types` crate and are serialized as **camelCase JSON**. The optional `ts-rs` feature emits checked-in TypeScript bindings under `crates/kindling-types/bindings/`, and CI fails if those bindings drift from the Rust definitions — this keeps cross-language type parity exact.
@@ -242,7 +244,7 @@ Pin (N) --------- (1) Observation | Summary
 
 ### Database Schema
 
-The **canonical schema** is `schema/schema.sql` (the DDL reflecting the state after all migrations) together with `schema/version.json` (currently **version 6**). Both the Rust store and the deprecated TypeScript store MUST produce an identical structure from a fresh database. The runtime version is also readable from any SQLite client via `PRAGMA user_version;`.
+The **canonical schema** is `schema/schema.sql` (the DDL reflecting the state after all migrations) together with `schema/version.json` (currently **version 6**). The Rust store (`kindling-store`) MUST produce exactly this structure from a fresh database. The runtime version is also readable from any SQLite client via `PRAGMA user_version;`.
 
 Key facts (authoritative source is `schema/schema.sql`):
 
@@ -424,7 +426,7 @@ unless `include_redacted` is set.
 ### Schema Versioning
 
 - Schema version tracked in `schema/version.json` (and `PRAGMA user_version`), with applied migrations recorded in the `schema_migrations` table
-- Current version is **5**; `minCompatible` is 1
+- Current version is **6**; `minCompatible` is 1
 - Migrations are additive only (no destructive changes)
 - Export bundles include version for forward compatibility (see below)
 
