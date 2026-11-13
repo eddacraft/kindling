@@ -11,6 +11,7 @@
   },
   "scripts": {
     "lint": "oxlint .",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "test:offline": "KINDLING_TEST_OFFLINE=1 node --test test/*.test.js"
   }
 }

@@ -49,7 +49,7 @@
     "check:fixtures": "node scripts/sync-fixtures.mjs --check",
     "copy:schema": "node -e \"require('node:fs').mkdirSync('dist/schema',{recursive:true});require('node:fs').copyFileSync('schema/version.json','dist/schema/version.json')\"",
     "build": "tsc --build && pnpm run copy:schema",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
     "test:watch": "vitest",
     "type-check": "tsc --noEmit",
     "lint": "oxlint .",

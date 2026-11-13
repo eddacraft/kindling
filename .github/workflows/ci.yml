@@ -45,3 +45,5 @@ jobs:
 
       - name: Test
         run: pnpm run test
+        env:
+          KINDLING_TEST_OFFLINE: '1'

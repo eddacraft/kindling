@@ -3,8 +3,9 @@
  *
  * These scripts shell out to the `kindling` binary, so the tests need a built
  * binary. Point `KINDLING_BIN` at it (e.g. the Rust workspace's
- * `target/debug/kindling`). When the binary is absent the whole suite is
- * skipped, so `pnpm -r test` never hard-fails on machines without it.
+ * `target/debug/kindling`). When the binary is absent the daemon-backed tests
+ * fail loudly (rather than silently skip), so `pnpm test` reports the gap;
+ * set `KINDLING_TEST_OFFLINE=1` (or run `pnpm test:offline`) to skip them.
  *
  * Each test seeds observations via `kindling log ... --db <tmp>` and then runs
  * the `/memory` scripts against the same temp DB (via `KINDLING_DB_PATH`),
@@ -32,6 +33,20 @@ function resolveBin() {
 }
 
 const KINDLING_BIN = resolveBin();
+const OFFLINE = process.env.KINDLING_TEST_OFFLINE === '1';
+
+// The daemon-backed /memory tests are the point of this suite: a missing
+// binary must be reported, not silently skipped. `pnpm test:offline` (or
+// KINDLING_TEST_OFFLINE=1) is the explicit opt-out.
+if (!KINDLING_BIN && !OFFLINE) {
+  test('daemon-backed /memory tests require a built binary', () => {
+    assert.fail(
+      'KINDLING_BIN not set or binary missing. Run `cargo build` and set ' +
+        'KINDLING_BIN, or run `pnpm test:offline` to skip the /memory tests.',
+    );
+  });
+}
+
 const skip = KINDLING_BIN
   ? false
   : 'KINDLING_BIN not set or binary missing — skipping /memory command tests';
@@ -461,9 +476,7 @@ test('memory-forget treats a prefix as ambiguous when matches span list pages', 
   }
 
   function matchIndices(rows, prefix) {
-    return rows
-      .map((o, i) => (String(o.id).startsWith(prefix) ? i : -1))
-      .filter((i) => i >= 0);
+    return rows.map((o, i) => (String(o.id).startsWith(prefix) ? i : -1)).filter((i) => i >= 0);
   }
 
   let obs = listed();
