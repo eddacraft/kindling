@@ -24,6 +24,23 @@ const KNOWN_STATUSES: &[&str] = &["Supported", "Planned", "Via CLI only"];
 /// journey — through the daemon where the integration uses one.
 const EVIDENCE: &[(&str, &[(&str, &str)])] = &[
     (
+        "Embedded Rust runtime",
+        &[
+            (
+                "crates/kindling-runtime/tests/runtime.rs",
+                "fn cold_embedded_start_spawns_and_health_ok",
+            ),
+            (
+                "crates/kindling-runtime/tests/runtime.rs",
+                "fn embedded_attaches_to_existing_daemon_without_spawning",
+            ),
+            (
+                "crates/kindling-runtime/tests/runtime.rs",
+                "fn spool_buffers_while_offline_then_drains_on_flush",
+            ),
+        ],
+    ),
+    (
         "Plain CLI",
         &[
             (
