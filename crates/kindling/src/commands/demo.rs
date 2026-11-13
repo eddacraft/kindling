@@ -102,11 +102,56 @@ pub fn run(args: DemoArgs) -> CliResult {
     Ok(())
 }
 
+/// Quote a database path for a POSIX shell (`sh`/`bash`/`zsh`).
+///
+/// The demo recipes are copied by hand, so the path must survive a shell
+/// word-splitting pass verbatim. Single quotes make every character literal
+/// except `'` itself, so embedded single quotes are rewritten as the shell
+/// sequence `'\''` (close quote, escaped quote, reopen quote). Always quoting
+/// keeps paths with spaces, apostrophes or metacharacters (`$`, `;`, `` ` ``,
+/// `*`, …) literal without having to enumerate them.
+///
+/// This targets POSIX shells. On Windows the recipes are not quoted for
+/// `cmd.exe`/PowerShell, which treat `'` as an ordinary character rather than a
+/// grouping delimiter; run them through a POSIX shell (Git Bash, WSL) there.
 fn shell_quote(path: &Path) -> String {
-    let s = path.to_string_lossy();
-    if s.contains(' ') {
-        format!("'{s}'")
-    } else {
-        s.into_owned()
+    format!("'{}'", path.to_string_lossy().replace('\'', "'\\''"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::shell_quote;
+    use std::path::Path;
+
+    #[test]
+    fn quotes_a_plain_path() {
+        assert_eq!(
+            shell_quote(Path::new("/home/user/kindling.db")),
+            "'/home/user/kindling.db'"
+        );
+    }
+
+    #[test]
+    fn quotes_paths_with_spaces() {
+        assert_eq!(
+            shell_quote(Path::new("/tmp/kindling home/demo.db")),
+            "'/tmp/kindling home/demo.db'"
+        );
+    }
+
+    #[test]
+    fn escapes_embedded_single_quotes() {
+        assert_eq!(
+            shell_quote(Path::new("/tmp/o'brien/demo.db")),
+            "'/tmp/o'\\''brien/demo.db'"
+        );
+    }
+
+    #[test]
+    fn quotes_shell_metacharacters_literally() {
+        assert_eq!(
+            shell_quote(Path::new("/tmp/db $HOME;$(id)/demo.db")),
+            "'/tmp/db $HOME;$(id)/demo.db'"
+        );
     }
 }
