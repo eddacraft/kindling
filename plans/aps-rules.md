@@ -2,8 +2,6 @@
 
 > This file guides AI agents working with APS specs in this repository.
 > Keep it in `plans/` so agents discover it when exploring the planning directory.
-> **APS-managed** — safe to update via `aps update`. Project-specific context
-> lives in `plans/project-context.md` (user-owned, never overwritten).
 
 ## Core Principle
 
@@ -17,6 +15,38 @@
 | Module    | Bounded work area   | Interfaces, work items, boundaries | Code snippets          |
 | Work Item | Execution authority | Outcome, validation command        | How to implement       |
 | Action    | Checkpoint          | Observable state                   | Implementation steps   |
+
+## Module Types: Vertical and Conductor
+
+Most modules are **vertical** — they own a single domain (auth, billing, ui)
+and all its work items end-to-end. This is the default; omit any type marker.
+
+A **conductor** (crosscutting) module coordinates work _across_ vertical
+modules — release cuts, security audits, perf budgets, migration waves. It
+references work items other modules own, and "done" means the concern is
+addressed for this slice, not that a feature is built. Mark it with a `Type`
+column in the metadata table:
+
+```markdown
+| ID  | Type      | Owner     | Priority | Status   |
+| --- | --------- | --------- | -------- | -------- |
+| REL | Conductor | @username | medium   | Complete |
+```
+
+- Keep `ID` as the first column; `Type` goes after it. Vertical modules leave
+  the column out.
+- A module is **not** a conductor just because it is _about_ a crosscutting
+  topic — only if coordinating other modules' work _is_ the work. When in
+  doubt, prefer vertical.
+- Conductors may use `Recurring` as a status when the concern never naturally
+  completes (perf budget, ongoing security posture).
+- `aps lint` validates cross-module references in a conductor's `## Coordinated
+  Modules` / `## Cross-Module Work Items` sections (W002) and checks that
+  modules listed under a `### Conductor / Crosscutting` index subsection carry
+  `Type: Conductor` (W006).
+
+Full guidance and a worked example: `docs/conductor-modules.md`. Template:
+`templates/conductor.template.md`.
 
 ## Actions: The Lean Rule
 
@@ -43,7 +73,7 @@ Actions translate work item intent into **observable checkpoints**. They are NOT
 ### Anti-Patterns (NEVER do this)
 
 ```markdown
-# BAD: Implementation tutorial disguised as action
+# ❌ BAD: Implementation tutorial disguised as action
 
 ### 1. Create authentication middleware
 
@@ -57,7 +87,7 @@ Actions translate work item intent into **observable checkpoints**. They are NOT
 ```
 
 ```markdown
-# GOOD: Observable checkpoint only
+# ✅ GOOD: Observable checkpoint only
 
 ### 1. Create authentication middleware
 
@@ -82,16 +112,36 @@ Work items are **execution authority** — permission to make changes.
 - **Expected Outcome:** Testable/observable result
 - **Validation:** Command to verify completion
 
+### Status Vocabulary
+
+Canonical values: `Draft`, `Ready`, `In Progress`, `Complete`, `Blocked`.
+
+Accepted aliases (tools normalize these internally; do not rewrite your files):
+
+- `Proposed` → `Draft` (not yet actionable)
+- `Done` → `Complete` (terminal / compacted items)
+
+Terminal compaction may also use `Merged`, `Released`, or `Shipped`; lint treats
+them like `Complete`/`Done` for required-field exemptions.
+
+Flow: `Draft` → `Ready` → `In Progress` → `Complete`. Only `aps start` and
+`aps complete` change status; edit manually to reset or block.
+
 ### Optional Fields
 
 - **Scope/Non-scope:** What will and won't change
 - **Dependencies:** Other work item IDs that must complete first
 - **Confidence:** low/medium/high
 - **Files:** Best-effort list (not exhaustive)
+- **Model:** AI model that should execute the item (e.g. `claude-opus-5`) —
+  optional but preferred; inherits the module table's `Model` column
+- **Reasoning:** `low | medium | high | max` — optional but preferred; inherits
+  the module table's `Reasoning` column. `aps lint` warns (W023) on any other
+  value; `Model` is never vocabulary-checked (identifiers are harness-specific)
 
 ### Work Item Anti-Patterns
 
-| Don't                                      | Do                                    |
+| ❌ Don't                                   | ✅ Do                                 |
 | ------------------------------------------ | ------------------------------------- |
 | "Implement JWT auth using jsonwebtoken"    | "Add token-based authentication"      |
 | "Create UserService class with methods..." | "User operations are encapsulated"    |
@@ -134,7 +184,20 @@ Actions support optional execution metadata:
 
 - Simple work items (< 4 actions)
 - All actions modify the same files
-- Actions are inherently sequential (schema -> migration -> seed)
+- Actions are inherently sequential (schema → migration → seed)
+
+### Anti-Pattern
+
+```markdown
+# ❌ BAD: Everything in one wave to look fast
+
+## Waves
+
+| Wave | Actions | Gate |
+| 1 | 1, 2, 3, 4, 5 | All pass |
+```
+
+If all actions are truly independent, they probably belong in separate work items.
 
 ## Naming Conventions
 
@@ -151,7 +214,7 @@ modules/
 ```
 
 - Use zero-padded numbers (`01-`, `02-`, not `1-`, `2-`)
-- Order matches dependency flow (foundational -> dependent)
+- Order matches dependency flow (foundational → dependent)
 - Order should reflect the Modules table in `index.aps.md`
 
 ### Work Item IDs
@@ -179,27 +242,27 @@ Work items use the module's ID prefix: `AUTH-001`, `AUTH-002`, `CORE-001`, etc.
 ## File Locations
 
 ```text
+designs/                       # Technical designs (optional, project root)
+└── YYYY-MM-DD-slug.design.md  # Architecture/approach documents
+
 plans/
-├── aps-rules.md           # This file (APS-managed agent guidance)
-├── project-context.md     # Project-specific context (user-owned)
+├── aps-rules.md           # This file (agent guidance)
 ├── index.aps.md           # Root plan
-├── issues.md              # Development-time discoveries
+├── issues.md              # Development-time discoveries (issues & questions, create manually)
 ├── modules/               # Module specs (numbered by dependency order)
 │   ├── 01-core.aps.md
 │   └── 02-auth.aps.md
 ├── execution/                 # Action plans
 │   ├── [WORK-ITEM-ID].actions.md  # Per-work-item (complex projects)
 │   └── [MODULE].actions.md        # Per-module (simple projects)
-├── decisions/             # ADRs (optional)
-│   └── [NNN]-[title].md
-└── designs/               # Technical designs (optional)
-    └── YYYY-MM-DD-slug.design.md
+└── decisions/             # ADRs (optional)
+    └── [NNN]-[title].md
 ```
 
 ## Design Documents
 
-Design docs live in `plans/designs/`. They capture architectural thinking
-**before** committing to modules and work items.
+Design docs live in `designs/` at the project root. They capture architectural
+thinking **before** committing to modules and work items.
 
 ### When to Create
 
@@ -216,7 +279,7 @@ Design docs live in `plans/designs/`. They capture architectural thinking
 
 ### Naming
 
-`plans/designs/YYYY-MM-DD-slug.design.md` — date-prefixed, descriptive slug.
+`designs/YYYY-MM-DD-slug.design.md` — date-prefixed, descriptive slug.
 
 ### Linking
 
@@ -225,8 +288,11 @@ Reference designs from the Index or Module metadata:
 ```markdown
 ## Designs
 
-- [Auth Architecture](designs/2025-01-05-auth-architecture.design.md)
+- [Auth Architecture](../designs/2025-01-05-auth-architecture.design.md)
 ```
+
+A design can cover one module or span multiple — the `Modules` field in the
+design's metadata table links to the relevant module files.
 
 ### Accept-Then-Normalise
 
@@ -261,8 +327,6 @@ If no Ready work item exists:
 - OR if trivial fix, note in session end summary
 
 ### Session End Ritual
-
-In kindling, steps 1–4 belong to the **bookkeeping pass**, not to feature branches. A feature branch leaves APS statuses and plan files alone and lists completed and discovered work in its PR description. A separate bookkeeping pass, in its own PR, applies them after work merges.
 
 After completing work:
 
