@@ -1,0 +1,9 @@
+{
+  "query": "brown fox",
+  "scopeIds": {
+    "sessionId": "01J8XS7ABCDEF0123456789ABC"
+  },
+  "tokenBudget": 2000,
+  "maxCandidates": 10,
+  "includeRedacted": false
+}

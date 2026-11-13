@@ -244,20 +244,22 @@ fn serve_binds_and_idle_shuts_down() {
     let home = tempfile::tempdir().unwrap();
     let socket = home.path().join("k.sock");
 
-    let mut child = Command::new(kindling_bin())
-        .args([
-            "serve",
-            "--socket",
-            socket.to_string_lossy().as_ref(),
-            "--kindling-home",
-            home.path().to_string_lossy().as_ref(),
-            "--idle-timeout",
-            "1",
-        ])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn kindling serve");
+    let mut child = ChildGuard::new(
+        Command::new(kindling_bin())
+            .args([
+                "serve",
+                "--socket",
+                socket.to_string_lossy().as_ref(),
+                "--kindling-home",
+                home.path().to_string_lossy().as_ref(),
+                "--idle-timeout",
+                "1",
+            ])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("spawn kindling serve"),
+    );
 
     let mut bound = false;
     for _ in 0..400 {
@@ -269,7 +271,7 @@ fn serve_binds_and_idle_shuts_down() {
     }
     assert!(bound, "daemon never bound the socket");
 
-    let status = wait_with_timeout(&mut child, Duration::from_secs(10));
+    let status = wait_with_timeout(child.as_mut(), Duration::from_secs(10));
     assert!(status.is_some(), "serve did not idle-shut-down in time");
     assert!(status.unwrap().success(), "serve exited non-zero");
 }
@@ -285,21 +287,23 @@ fn serve_daemonize_flag_binds_silently() {
     let home = tempfile::tempdir().unwrap();
     let socket = home.path().join("k.sock");
 
-    let child = Command::new(kindling_bin())
-        .args([
-            "serve",
-            "--daemonize",
-            "--socket",
-            socket.to_string_lossy().as_ref(),
-            "--kindling-home",
-            home.path().to_string_lossy().as_ref(),
-            "--idle-timeout",
-            "1",
-        ])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn kindling serve --daemonize");
+    let child = ChildGuard::new(
+        Command::new(kindling_bin())
+            .args([
+                "serve",
+                "--daemonize",
+                "--socket",
+                socket.to_string_lossy().as_ref(),
+                "--kindling-home",
+                home.path().to_string_lossy().as_ref(),
+                "--idle-timeout",
+                "1",
+            ])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("spawn kindling serve --daemonize"),
+    );
 
     let mut bound = false;
     for _ in 0..400 {
@@ -311,7 +315,10 @@ fn serve_daemonize_flag_binds_silently() {
     }
     assert!(bound, "daemon never bound the socket under --daemonize");
 
-    let out = child.wait_with_output().expect("wait for daemonized serve");
+    let out = child
+        .into_child()
+        .wait_with_output()
+        .expect("wait for daemonized serve");
     assert!(out.status.success(), "daemonized serve exited non-zero");
     assert!(
         out.stdout.is_empty(),
@@ -508,22 +515,57 @@ fn wait_for_socket(socket_path: &Path) {
     panic!("daemon socket never appeared: {}", socket_path.display());
 }
 
-/// Symlink `target` → `link`. On platforms/filesystems where symlinking the
-/// CARGO_BIN_EXE is unavailable, fall back to a hard copy (argv[0]'s basename is
-/// still `kindling-hook`, which is all the drop-in check needs).
+/// Symlink `target` → `link`. On Unix this MUST produce a real symlink — a
+/// fall-back to a hard copy would silently stop testing the symlink drop-in
+/// path. On non-Unix (Windows) symlinks need privileges, so fall back to a copy.
 fn symlink_or_copy(target: &Path, link: &Path) {
     #[cfg(unix)]
     {
-        if std::os::unix::fs::symlink(target, link).is_ok() {
-            return;
-        }
+        std::os::unix::fs::symlink(target, link).expect("symlink umbrella binary for drop-in test");
+        assert!(
+            std::fs::symlink_metadata(link)
+                .map(|m| m.file_type().is_symlink())
+                .unwrap_or(false),
+            "drop-in link must be a symlink, not a copy: {}",
+            link.display()
+        );
     }
-    std::fs::copy(target, link).expect("copy umbrella binary for drop-in test");
-    #[cfg(unix)]
+    #[cfg(not(unix))]
     {
-        use std::os::unix::fs::PermissionsExt;
-        let perms = std::fs::Permissions::from_mode(0o755);
-        std::fs::set_permissions(link, perms).expect("chmod drop-in copy");
+        std::fs::copy(target, link).expect("copy umbrella binary for drop-in test");
+    }
+}
+
+/// A `Child` that is killed and reaped on drop if it is still running, so an
+/// early assertion failure (e.g. socket readiness) cannot leak a live daemon.
+struct ChildGuard {
+    child: Option<std::process::Child>,
+}
+
+impl ChildGuard {
+    fn new(child: std::process::Child) -> Self {
+        Self { child: Some(child) }
+    }
+
+    fn as_mut(&mut self) -> &mut std::process::Child {
+        self.child.as_mut().expect("child already taken")
+    }
+
+    /// Take ownership of the child, disarming the drop-kill. The caller is now
+    /// responsible for waiting on (or reaping) it.
+    fn into_child(mut self) -> std::process::Child {
+        self.child.take().expect("child already taken")
+    }
+}
+
+impl Drop for ChildGuard {
+    fn drop(&mut self) {
+        if let Some(mut child) = self.child.take() {
+            if let Ok(None) = child.try_wait() {
+                let _ = child.kill();
+                let _ = child.wait();
+            }
+        }
     }
 }
 

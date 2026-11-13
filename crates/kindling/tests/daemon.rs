@@ -23,20 +23,22 @@ fn serve_binds_and_idle_shuts_down() {
     let socket = home.path().join("k.sock");
 
     let bin = env!("CARGO_BIN_EXE_kindling");
-    let mut child = Command::new(bin)
-        .args([
-            "serve",
-            "--socket",
-            socket.to_string_lossy().as_ref(),
-            "--kindling-home",
-            home.path().to_string_lossy().as_ref(),
-            "--idle-timeout",
-            "1",
-        ])
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-        .expect("spawn serve");
+    let mut child = ChildGuard::new(
+        Command::new(bin)
+            .args([
+                "serve",
+                "--socket",
+                socket.to_string_lossy().as_ref(),
+                "--kindling-home",
+                home.path().to_string_lossy().as_ref(),
+                "--idle-timeout",
+                "1",
+            ])
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .expect("spawn serve"),
+    );
 
     // Wait for the socket to appear (daemon bound).
     let mut bound = false;
@@ -50,7 +52,7 @@ fn serve_binds_and_idle_shuts_down() {
     assert!(bound, "daemon never bound the socket");
 
     // It should idle-shut-down on its own (idle timeout 1s) within a bound.
-    let status = wait_with_timeout(&mut child, Duration::from_secs(10));
+    let status = wait_with_timeout(child.as_mut(), Duration::from_secs(10));
     assert!(status.is_some(), "serve did not idle-shut-down in time");
     assert!(status.unwrap().success(), "serve exited non-zero");
 }
@@ -193,6 +195,31 @@ fn via_daemon_with_db_is_rejected() {
             err.contains("--db") && err.contains("--via-daemon"),
             "error for {args:?} should mention both --db and --via-daemon, got: {err}"
         );
+    }
+}
+
+/// A `Child` that is killed and reaped on drop if it is still running, so an
+/// early assertion failure (e.g. socket readiness) cannot leak a live daemon.
+struct ChildGuard {
+    child: std::process::Child,
+}
+
+impl ChildGuard {
+    fn new(child: std::process::Child) -> Self {
+        Self { child }
+    }
+
+    fn as_mut(&mut self) -> &mut std::process::Child {
+        &mut self.child
+    }
+}
+
+impl Drop for ChildGuard {
+    fn drop(&mut self) {
+        if let Ok(None) = self.child.try_wait() {
+            let _ = self.child.kill();
+            let _ = self.child.wait();
+        }
     }
 }
 

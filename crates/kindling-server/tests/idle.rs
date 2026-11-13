@@ -25,17 +25,17 @@ async fn shuts_down_after_idle_with_no_requests() {
 async fn early_request_keeps_alive_then_shuts_down() {
     let daemon = TestDaemon::start_with_idle(Duration::from_millis(250)).await;
 
-    // Make an early request that pushes last-activity past the first interval.
+    // Make an early request that touches last-activity.
     {
         let mut c = daemon.connect().await;
         let resp = c.send("GET", "/v1/health", None, None).await;
         assert_eq!(resp.status, StatusCode::OK);
     }
 
-    // It must still be alive shortly after the request (not yet idle for 250ms).
-    tokio::time::sleep(Duration::from_millis(120)).await;
+    // Sleep partway through the first idle interval.
+    tokio::time::sleep(Duration::from_millis(150)).await;
 
-    // One more request to reset the idle clock again.
+    // A second request resets the idle clock (deadline moves to ~400ms).
     {
         let mut c = daemon.connect().await;
         let resp = c
@@ -48,6 +48,14 @@ async fn early_request_keeps_alive_then_shuts_down() {
             .await;
         assert_eq!(resp.status, StatusCode::CREATED);
     }
+
+    // Sleep PAST the original idle timeout (250ms) — to ~300ms — and confirm
+    // the keepalive held: the daemon must still be up.
+    tokio::time::sleep(Duration::from_millis(150)).await;
+    assert!(
+        !daemon.is_finished(),
+        "daemon must stay alive across the original idle deadline after keepalive requests"
+    );
 
     // After going quiet, it should still shut down within a generous window.
     let result = tokio::time::timeout(Duration::from_secs(3), daemon.join()).await;

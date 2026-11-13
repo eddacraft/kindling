@@ -1,0 +1,14 @@
+{
+  "scopeIds": {
+    "sessionId": "01J8XS7ABCDEF0123456789ABC"
+  },
+  "kinds": [
+    "message",
+    "command"
+  ],
+  "since": 1746662400000,
+  "until": 1746748800000,
+  "limit": 100,
+  "cursor": "opaque-cursor-token",
+  "includeRedacted": false
+}
