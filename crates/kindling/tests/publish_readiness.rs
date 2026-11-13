@@ -120,16 +120,19 @@ fn spool_module_lives_only_under_kindling_client() {
 }
 
 #[test]
-fn changelog_and_client_readme_note_spool_inside_client() {
+fn engineering_history_and_client_readme_note_spool_inside_client() {
     let root = workspace_root();
-    let changelog = read(root.join("CHANGELOG.md"));
-    let section = changelog
+    // The `SpooledClient` is an implementation detail, so after the CHANGELOG /
+    // ENGINEERING-HISTORY split it lives in ENGINEERING-HISTORY.md; CHANGELOG.md
+    // keeps the user-facing summary ("durable observation spooling").
+    let history = read(root.join("ENGINEERING-HISTORY.md"));
+    let section = history
         .split("## [0.2.0]")
         .nth(1)
-        .expect("CHANGELOG must have a [0.2.0] section");
+        .expect("ENGINEERING-HISTORY must have a [0.2.0] section");
     assert!(
         section.contains("SpooledClient") && section.contains("kindling-client"),
-        "CHANGELOG [0.2.0] must describe SpooledClient on kindling-client"
+        "ENGINEERING-HISTORY [0.2.0] must describe SpooledClient on kindling-client"
     );
     let section_flat: String = section.split_whitespace().collect::<Vec<_>>().join(" ");
     let legacy = legacy_standalone_spool_crate();
@@ -137,7 +140,7 @@ fn changelog_and_client_readme_note_spool_inside_client() {
         section_flat.contains("no standalone")
             && section_flat.contains(&legacy)
             && section_flat.contains("crate"),
-        "CHANGELOG must state there is no standalone spool crate"
+        "ENGINEERING-HISTORY must state there is no standalone spool crate"
     );
 
     let readme = read(root.join("crates/kindling-client/README.md"));
