@@ -905,3 +905,30 @@ fn wrap_json_reports_observation_and_exit_code() {
     assert_eq!(v["provenance"]["exitCode"], json!(3));
     assert_eq!(v["provenance"]["stdout"], json!("hi\n"));
 }
+
+#[test]
+fn wrap_relays_full_output_but_bounds_capture() {
+    let env = CliEnv::new();
+    let db = env.db();
+    let out = env.run(&[
+        "wrap",
+        "--db",
+        &db,
+        "--",
+        "sh",
+        "-c",
+        "head -c 3000 /dev/zero | tr '\\0' 'a'",
+    ]);
+    assert_success(&out);
+    assert_eq!(stdout(&out).len(), 3000, "relay must forward full output");
+
+    // The stored capture is bounded and truncated, unlike the relay.
+    let search = env.run_db(&["search", "head", "--json"]);
+    assert_success(&search);
+    let cap = json_stdout(&search)["candidates"][0]["entity"]["provenance"]["stdout"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert!(cap.len() < 3000, "capture must be bounded: {cap}");
+    assert!(cap.ends_with("..."), "capture should be truncated: {cap}");
+}
