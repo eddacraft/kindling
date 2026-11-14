@@ -60,9 +60,14 @@ const SESSION_HEADER: &str =
 /// Format the SessionStart `additionalContext`, or `None` when there is nothing
 /// to inject (matching the Node hook's "only if ≥1 item" gate).
 ///
-/// `offset_seconds` is the UTC offset to render observation timestamps in (use
-/// [`local_offset_seconds`] for the live daemon; a fixed value in tests).
-pub fn format_session_start(ctx: &SessionStartContext, offset_seconds: i32) -> Option<String> {
+/// `offset_of` resolves the UTC offset to render each observation timestamp in,
+/// and is called once per observation so a batch spanning a DST transition
+/// renders each instant in the offset that was in effect then (use
+/// [`local_offset_seconds`] for the live daemon; a fixed closure in tests).
+pub fn format_session_start(
+    ctx: &SessionStartContext,
+    offset_of: impl Fn(i64) -> i32,
+) -> Option<String> {
     let mut items: Vec<String> = Vec::new();
 
     if !ctx.pins.is_empty() {
@@ -77,7 +82,7 @@ pub fn format_session_start(ctx: &SessionStartContext, offset_seconds: i32) -> O
         for obs in &ctx.recent {
             // `new Date(obs.ts).toLocaleString()`; Node guards `obs.ts ? … : ''`.
             let ts = if obs.ts != 0 {
-                format_local_datetime(obs.ts, offset_seconds)
+                format_local_datetime(obs.ts, offset_of(obs.ts))
             } else {
                 String::new()
             };
@@ -241,6 +246,7 @@ mod tests {
     // ---- date formatter (the parity anchor) --------------------------------
 
     const NY_EST: i32 = -5 * 3600; // America/New_York, standard time (Nov).
+    const NY_EDT: i32 = -4 * 3600; // America/New_York, daylight time (Jul).
     const UTC: i32 = 0;
     const IST: i32 = 5 * 3600 + 30 * 60; // Asia/Kolkata, +05:30.
 
@@ -370,7 +376,7 @@ mod tests {
                 ),
             ],
         };
-        let out = format_session_start(&ctx, NY_EST).expect("non-empty");
+        let out = format_session_start(&ctx, |_| NY_EST).expect("non-empty");
         let expected = "# Prior Context (from Kindling)\n\n\
 The following is prior session context for this project:\n\
 ## Pinned Items\n\
@@ -388,11 +394,44 @@ The following is prior session context for this project:\n\
             pins: vec![],
             recent: vec![obs(ObservationKind::Error, "boom", 1_700_049_600_000)],
         };
-        let out = format_session_start(&ctx, UTC).expect("non-empty");
+        let out = format_session_start(&ctx, |_| UTC).expect("non-empty");
         let expected = "# Prior Context (from Kindling)\n\n\
 The following is prior session context for this project:\n\
 ## Recent Activity\n\
 - [11/15/2023, 12:00:00 PM] error: boom";
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn session_start_resolves_each_observation_in_its_own_dst_offset() {
+        // One batch with a summer observation (EDT, UTC-4) and a winter one
+        // (EST, UTC-5). Resolving a single offset at request time would render
+        // one of these an hour off.
+        let summer_ms = epoch_ms_utc(2023, 7, 1, 12, 0, 0); // noon UTC → 8 AM EDT
+        let winter_ms = epoch_ms_utc(2023, 1, 1, 12, 0, 0); // noon UTC → 7 AM EST
+        let ctx = SessionStartContext {
+            pins: vec![],
+            recent: vec![
+                obs(ObservationKind::Message, "summer", summer_ms),
+                obs(ObservationKind::Message, "winter", winter_ms),
+            ],
+        };
+
+        // EDT roughly March–November; EST otherwise.
+        let offset_of = |ts: i64| {
+            if ts >= epoch_ms_utc(2023, 3, 1, 0, 0, 0) && ts < epoch_ms_utc(2023, 11, 1, 0, 0, 0) {
+                NY_EDT
+            } else {
+                NY_EST
+            }
+        };
+        let out = format_session_start(&ctx, offset_of).expect("non-empty");
+
+        let expected = "# Prior Context (from Kindling)\n\n\
+The following is prior session context for this project:\n\
+## Recent Activity\n\
+- [7/1/2023, 8:00:00 AM] message: summer\n\
+- [1/1/2023, 7:00:00 AM] message: winter";
         assert_eq!(out, expected);
     }
 
@@ -402,7 +441,7 @@ The following is prior session context for this project:\n\
             pins: vec![],
             recent: vec![obs(ObservationKind::Message, "hi", 0)],
         };
-        let out = format_session_start(&ctx, UTC).expect("non-empty");
+        let out = format_session_start(&ctx, |_| UTC).expect("non-empty");
         assert!(
             out.ends_with("## Recent Activity\n- [] message: hi"),
             "{out}"
@@ -415,7 +454,7 @@ The following is prior session context for this project:\n\
             pins: vec![],
             recent: vec![],
         };
-        assert!(format_session_start(&ctx, UTC).is_none());
+        assert!(format_session_start(&ctx, |_| UTC).is_none());
     }
 
     #[test]

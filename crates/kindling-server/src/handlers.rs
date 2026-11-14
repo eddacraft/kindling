@@ -279,10 +279,9 @@ pub async fn session_start_context(
         let guard = svc.lock().expect("service mutex poisoned");
         guard.session_start_context_at(&req.scope_ids, max_results, now)?
     };
-    // Resolve the local offset once, at the request instant, so every timestamp
-    // in this batch renders in a single consistent zone.
-    let offset = local_offset_seconds(now);
-    let additional = format_session_start(&ctx, offset);
+    // Resolve the local offset at each observation's instant so every timestamp
+    // renders in the DST offset that was in effect then, not at request time.
+    let additional = format_session_start(&ctx, local_offset_seconds);
     Ok(Json(json!({ "additionalContext": additional })))
 }
 
