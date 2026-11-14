@@ -636,21 +636,23 @@ async fn session_start_context_exact_markdown() {
     let scope = json!({ "repoId": PROJECT_A });
 
     // The daemon renders timestamps in the *host* local zone (matching the Node
-    // hook). Rather than mutate the process `TZ` (forbidden: unsafe + races), we
-    // compute the expected dates with the same public formatter + offset the
-    // daemon uses, so the assertion is host-independent.
+    // hook), resolving the offset at each observation's instant. Rather than
+    // mutate the process `TZ` (forbidden: unsafe + races), we compute the
+    // expected dates with the same public formatter + per-instant offset, so the
+    // assertion is host-independent and DST-correct.
     // Distinct timestamps so `ORDER BY ts DESC` is unambiguous: c < a < b.
     let ts_c = 1_700_000_000_000_i64; // pinned message
     let ts_a = 1_700_000_001_000_i64; // git status
     let ts_b = 1_700_049_600_000_i64; // ran tests (newest)
-    let now_ms = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_millis() as i64;
-    let offset = kindling_server::inject::local_offset_seconds(now_ms);
-    let date_c = kindling_server::inject::format_local_datetime(ts_c, offset);
-    let date_a = kindling_server::inject::format_local_datetime(ts_a, offset);
-    let date_b = kindling_server::inject::format_local_datetime(ts_b, offset);
+    let date_of = |ts: i64| {
+        kindling_server::inject::format_local_datetime(
+            ts,
+            kindling_server::inject::local_offset_seconds(ts),
+        )
+    };
+    let date_c = date_of(ts_c);
+    let date_a = date_of(ts_a);
+    let date_b = date_of(ts_b);
 
     for (content, ts) in [("git status", ts_a), ("ran tests", ts_b)] {
         let resp = c
