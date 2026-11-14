@@ -146,6 +146,12 @@ Then update the schema version in `architecture.md`.
 5. Update the subcommand list in [architecture.md](architecture.md#eddacraft-kindling-binary)
    and `crates/kindling/README.md`.
 
+The terminal UI uses `eddacraft-tui`, the canonical TUI library for eddacraft
+products. Reuse its widgets, theme, keyboard handling and lifecycle guard when
+adding terminal surfaces; keep direct ratatui/crossterm dependencies aligned
+with the shared library. Browser interaction and rendering tests run without a
+terminal in `commands::tui::tests`.
+
 ### Change hook behaviour
 
 The Rust hooks (`crates/kindling/src/hook/`) replaced Node hooks and must stay

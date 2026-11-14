@@ -17,6 +17,7 @@ pub mod serve;
 pub mod spool;
 pub mod stats;
 pub mod status;
+pub mod tui;
 pub mod wrap;
 
 use kindling_types::ScopeIds;

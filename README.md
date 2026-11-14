@@ -112,6 +112,7 @@ Search returns three tiers: **pins** (always first), **current summary**, then *
 kindling init                              # create the database (--claude-code to check hooks)
 kindling demo                              # load sample memory (own DB; pass --db to search it)
 kindling browse                            # open HTML viewer
+kindling tui                               # browse memory in the terminal
 kindling log "root cause: cache eviction"
 kindling search "authentication error"     # scoped to the current git repo
 kindling search "authentication error" --all-repos
@@ -124,6 +125,12 @@ kindling capsule open --intent "debug leak"
 kindling export ./backup.json              # and: kindling import ./backup.json
 kindling serve                             # daemon (clients auto-spawn it)
 ```
+
+`kindling tui` opens the terminal browser; `kindling browse` opens the HTML viewer.
+In the terminal, type to filter, use Up/Down to select observations, Left/Right
+and Home/End to edit the query, and Page Up/Page Down to scroll the preview.
+Press Esc or Ctrl-C to quit. To browse the sample memory, run
+`kindling tui --db ~/.kindling/demo/kindling.db` after `kindling demo`.
 
 Full CLI reference: [docs.eddacraft.ai/kindling/reference/cli](https://docs.eddacraft.ai/kindling/reference/cli)
 

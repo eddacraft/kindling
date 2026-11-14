@@ -23,7 +23,7 @@ mod output;
 pub use cli::{
     BrowseArgs, CapsuleCloseArgs, CapsuleCommand, CapsuleOpenArgs, Cli, Command, CommonOpts,
     DemoArgs, ExportArgs, ForgetArgs, ImportArgs, InitArgs, ListArgs, LogArgs, PinArgs, SearchArgs,
-    ServeArgs, SpoolCommand, SpoolStatusArgs, StatsArgs, StatusArgs, UnpinArgs, WrapArgs,
+    ServeArgs, SpoolCommand, SpoolStatusArgs, StatsArgs, StatusArgs, TuiArgs, UnpinArgs, WrapArgs,
 };
 
 use std::path::PathBuf;
@@ -150,6 +150,7 @@ fn json_flag(command: &Command) -> bool {
         Command::Serve(_) => false,
         Command::Demo(a) => a.common.json,
         Command::Browse(a) => a.common.json,
+        Command::Tui(a) => a.common.json,
         Command::Wrap(a) => a.common.json,
         Command::Spool(SpoolCommand::Status(a)) => a.json,
     }
@@ -179,6 +180,7 @@ fn dispatch(cli: Cli) -> Result<i32, CliError> {
         Command::Serve(args) => commands::serve::run(args).map(|()| 0),
         Command::Demo(args) => commands::demo::run(args).map(|()| 0),
         Command::Browse(args) => commands::browse::run(args).map(|()| 0),
+        Command::Tui(args) => commands::tui::run(args).map(|()| 0),
         Command::Spool(SpoolCommand::Status(args)) => commands::spool::run_status(args).map(|()| 0),
     }
 }

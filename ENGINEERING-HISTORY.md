@@ -13,6 +13,16 @@ at each release; older distribution approaches may now be superseded.
 
 ## [Unreleased]
 
+### Added
+
+- **Interactive memory browser (CONV C6, PR #263).** `kindling tui` uses
+  `eddacraft-tui` 0.6, the canonical TUI library for eddacraft products, with
+  shared themed containers, `TextInput`, text-entry key handling, `HelpBar`
+  and the panic-safe `TerminalGuard`. Direct ratatui 0.30/crossterm 0.29
+  dependencies match the library. Filtering and pins-first ordering remain
+  terminal-free; interaction and rendering tests cover query editing, empty
+  results, preview scrolling and multiple terminal sizes.
+
 ### Fixed
 
 - **Release evidence and publish dry-run no longer report success after failed checks (GH-194).**
@@ -31,7 +41,7 @@ at each release; older distribution approaches may now be superseded.
   does not buffer them ahead of later entries.
 - **Installer cargo fallback honours a pinned version and the Cargo install path (GH-193).**
   A failed archive download no longer runs unversioned `cargo install
-  eddacraft-kindling` and then a bare `kindling` from PATH. The fallback
+eddacraft-kindling` and then a bare `kindling` from PATH. The fallback
   passes `--version` when `KINDLING_VERSION` is set, refuses a non-default
   `KINDLING_REPO`, and invokes the binary cargo installed (including a
   nonstandard `CARGO_HOME` or `CARGO_INSTALL_ROOT`).
