@@ -2,3 +2,21 @@ packages:
   - 'packages/*'
   - 'plugins/*'
   - 'examples/*'
+
+allowBuilds:
+  '@vscode/vsce-sign': false
+  esbuild: true
+
+overrides:
+  esbuild: '>=0.27.0 <0.27.3'
+  vite: ^7.3.5
+  rollup: ^4.59.0
+  postcss: ^8.5.23
+  flatted: ^3.4.2
+  js-yaml@4: ^4.3.1
+  minimatch@9: ^9.0.7
+  '@humanfs/node': ^0.16.8
+  picomatch: ^4.0.4
+  yaml: ^2.8.3
+  brace-expansion@1: ^1.1.16
+  brace-expansion@2: ^2.1.2
