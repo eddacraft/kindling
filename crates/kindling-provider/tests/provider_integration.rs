@@ -81,6 +81,13 @@ fn entity_id(result: &ProviderSearchResult) -> &str {
     }
 }
 
+/// The returned entity ids, sorted, for membership assertions (not just counts).
+fn sorted_ids(results: &[ProviderSearchResult]) -> Vec<&str> {
+    let mut ids: Vec<&str> = results.iter().map(entity_id).collect();
+    ids.sort_unstable();
+    ids
+}
+
 // ===== FTS search =====
 
 #[test]
@@ -208,7 +215,8 @@ fn scope_fixture() -> SqliteKindlingStore {
 fn filters_by_session_id() {
     let store = scope_fixture();
     let results = search(&store, &options("authentication", scope(Some("s1"), None)));
-    assert_eq!(results.len(), 2);
+    // s1 matches obs-1 (/repo1) and obs-3 (/repo2), never obs-2 (s2).
+    assert_eq!(sorted_ids(&results), ["obs-1", "obs-3"]);
 }
 
 #[test]
@@ -218,7 +226,8 @@ fn filters_by_repo_id() {
         &store,
         &options("authentication", scope(None, Some("/repo1"))),
     );
-    assert_eq!(results.len(), 2);
+    // /repo1 matches obs-1 (s1) and obs-2 (s2), never obs-3 (/repo2).
+    assert_eq!(sorted_ids(&results), ["obs-1", "obs-2"]);
 }
 
 #[test]
@@ -228,14 +237,15 @@ fn filters_by_multiple_scope_dimensions_with_and_semantics() {
         &store,
         &options("authentication", scope(Some("s1"), Some("/repo1"))),
     );
-    assert_eq!(results.len(), 1);
+    // Only obs-1 carries BOTH s1 and /repo1.
+    assert_eq!(sorted_ids(&results), ["obs-1"]);
 }
 
 #[test]
 fn returns_all_results_when_no_scope_specified() {
     let store = scope_fixture();
     let results = search(&store, &options("authentication", ScopeIds::default()));
-    assert_eq!(results.len(), 3);
+    assert_eq!(sorted_ids(&results), ["obs-1", "obs-2", "obs-3"]);
 }
 
 #[test]

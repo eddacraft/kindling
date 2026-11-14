@@ -7,7 +7,9 @@
 //! with `Date.now()` pinned; this test replays every case through the Rust
 //! implementation with the same pinned clock and compares the JSON output.
 //!
-//! Retired after Phase 4 of the Rust port (PORT-005 validation note).
+//! The TypeScript implementation was retired after Phase 4 of the Rust port
+//! (PORT-005), so these are frozen golden fixtures that still guard ranking
+//! parity (regenerating them would require the retired TS packages).
 
 use std::path::PathBuf;
 
@@ -40,7 +42,12 @@ fn search_results_match_ts_provider() {
     let now = fixture["now"].as_i64().expect("fixture now") as Timestamp;
     let provider = LocalFtsProvider::from_store(&store);
 
-    for case in fixture["searchCases"].as_array().expect("searchCases") {
+    let cases = fixture["searchCases"].as_array().expect("searchCases");
+    assert!(
+        !cases.is_empty(),
+        "searchCases fixture must contain at least one case"
+    );
+    for case in cases {
         let name = case["name"].as_str().unwrap_or("?");
         let options: ProviderSearchOptions =
             serde_json::from_value(case["options"].clone()).expect("case options should parse");
@@ -66,7 +73,12 @@ fn retrieve_results_match_ts_orchestrator() {
     let now = fixture["now"].as_i64().expect("fixture now") as Timestamp;
     let provider = LocalFtsProvider::from_store(&store);
 
-    for case in fixture["retrieveCases"].as_array().expect("retrieveCases") {
+    let cases = fixture["retrieveCases"].as_array().expect("retrieveCases");
+    assert!(
+        !cases.is_empty(),
+        "retrieveCases fixture must contain at least one case"
+    );
+    for case in cases {
         let name = case["name"].as_str().unwrap_or("?");
         let options: RetrieveOptions =
             serde_json::from_value(case["options"].clone()).expect("case options should parse");
