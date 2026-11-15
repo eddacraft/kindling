@@ -1,7 +1,6 @@
 //! Low-overhead process resource sampling for repeatable workload profiles.
 
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::mpsc::{self, Sender};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
@@ -63,7 +62,7 @@ pub struct ResourceSummary {
 /// fields are reported as unavailable without failing the benchmark.
 pub struct ResourceSampler {
     before: Snapshot,
-    stop: Arc<AtomicBool>,
+    stop: Option<Sender<()>>,
     handle: Option<JoinHandle<Snapshot>>,
     measurement_scope: &'static str,
 }
@@ -83,12 +82,10 @@ impl ResourceSampler {
 
     fn start_self(interval: Duration, measurement_scope: &'static str) -> Self {
         let before = snapshot();
-        let stop = Arc::new(AtomicBool::new(false));
-        let thread_stop = Arc::clone(&stop);
+        let (stop, thread_stop) = mpsc::channel();
         let handle = thread::spawn(move || {
             let mut peak = snapshot();
-            while !thread_stop.load(Ordering::Relaxed) {
-                thread::sleep(interval);
+            while let Err(mpsc::RecvTimeoutError::Timeout) = thread_stop.recv_timeout(interval) {
                 let current = snapshot();
                 peak.rss_kib = option_max(peak.rss_kib, current.rss_kib);
                 peak.threads = option_max(peak.threads, current.threads);
@@ -98,7 +95,7 @@ impl ResourceSampler {
         });
         Self {
             before,
-            stop,
+            stop: Some(stop),
             handle: Some(handle),
             measurement_scope,
         }
@@ -106,12 +103,7 @@ impl ResourceSampler {
 
     #[must_use]
     pub fn finish(mut self) -> ResourceSummary {
-        self.stop.store(true, Ordering::Relaxed);
-        let peak = self
-            .handle
-            .take()
-            .and_then(|handle| handle.join().ok())
-            .unwrap_or_default();
+        let peak = self.stop_and_join().unwrap_or_default();
         let after = snapshot();
         let ncpus = thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get);
         let cpu_cores = match (
@@ -166,6 +158,11 @@ impl ResourceSampler {
             logical_write_bytes: delta(self.before.wchar, after.wchar),
         }
     }
+
+    fn stop_and_join(&mut self) -> Option<Snapshot> {
+        self.stop.take();
+        self.handle.take().and_then(|handle| handle.join().ok())
+    }
 }
 
 impl Drop for ResourceSampler {
@@ -174,10 +171,7 @@ impl Drop for ResourceSampler {
         // sampler without calling `finish`. Signal the polling thread to exit
         // and join it so it does not keep running detached past the sampler's
         // lifetime.
-        self.stop.store(true, Ordering::Relaxed);
-        if let Some(handle) = self.handle.take() {
-            let _ = handle.join();
-        }
+        self.stop_and_join();
     }
 }
 

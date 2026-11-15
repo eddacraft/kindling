@@ -6,47 +6,35 @@
 //! binary so the process-wide thread count read from `/proc/self/status` stays
 //! deterministic: there are no sibling tests running in parallel threads.
 
-#[cfg(target_os = "linux")]
+#![cfg(target_os = "linux")]
+
 use kindling_bench::resources::{parse_proc_status, ResourceSampler};
-#[cfg(target_os = "linux")]
 use std::time::Duration;
 
-#[cfg(target_os = "linux")]
-fn live_thread_count() -> u64 {
-    std::fs::read_to_string("/proc/self/status")
-        .ok()
-        .and_then(|status| parse_proc_status(&status))
-        .map_or(0, |(_, threads)| threads)
+fn live_thread_count() -> Option<u64> {
+    let status = std::fs::read_to_string("/proc/self/status").ok()?;
+    let (_, threads) = parse_proc_status(&status)?;
+    Some(threads)
 }
 
-#[cfg(target_os = "linux")]
 #[test]
 fn dropping_without_finish_stops_the_sampler_thread() {
-    let baseline = live_thread_count();
+    let baseline = live_thread_count().expect("read baseline thread count");
     let sampler = ResourceSampler::start(Duration::from_millis(1));
 
     // Confirm the sampler thread is actually running before we drop it.
     let deadline = std::time::Instant::now() + Duration::from_secs(5);
-    while live_thread_count() <= baseline && std::time::Instant::now() < deadline {
+    while live_thread_count().is_some_and(|count| count <= baseline)
+        && std::time::Instant::now() < deadline
+    {
         std::thread::sleep(Duration::from_millis(1));
     }
-    assert!(
-        live_thread_count() > baseline,
-        "sampler thread did not spawn"
-    );
+    let during = live_thread_count().expect("read thread count after sampler start");
+    assert!(during > baseline, "sampler thread did not spawn");
 
     drop(sampler);
 
-    // Dropping joins the sampler thread. Poll (bounded) for the thread count to
-    // return to baseline: a joined thread's `/proc` entry can linger briefly
-    // during teardown, but a genuinely leaked thread never disappears.
-    let deadline = std::time::Instant::now() + Duration::from_secs(5);
-    while live_thread_count() > baseline && std::time::Instant::now() < deadline {
-        std::thread::sleep(Duration::from_millis(1));
-    }
-    assert_eq!(
-        live_thread_count(),
-        baseline,
-        "sampler thread was not joined on drop"
-    );
+    // A successful drop returns only after the sampler thread has been joined.
+    let after = live_thread_count().expect("read thread count after sampler drop");
+    assert_eq!(after, baseline, "sampler thread was not joined on drop");
 }
