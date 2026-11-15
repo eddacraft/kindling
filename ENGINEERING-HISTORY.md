@@ -15,6 +15,10 @@ at each release; older distribution approaches may now be superseded.
 
 ### Fixed
 
+- **Contributor package-manager tooling now requires pnpm 12.** The exact
+  package-manager pin is recorded in `package.json`; dependency overrides and
+  build permissions live in `pnpm-workspace.yaml`.
+
 - **Release evidence and publish dry-run no longer report success after failed checks (GH-194).**
   `capture-release-evidence.sh` records each fmt, clippy, test, and pnpm
   command's status so a later success cannot mask an earlier failure, and
