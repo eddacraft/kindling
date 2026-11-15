@@ -50,25 +50,18 @@ pub fn run(args: DemoArgs) -> CliResult {
         std::fs::remove_file(&db_path)?;
     }
 
-    let (service, _) = open_service(Some(db_path.to_string_lossy().as_ref()))?;
+    let database = database_string(&db_path)?;
+    let (service, _) = open_service(Some(database))?;
 
     let bundle = ExportBundle::from_json(DEMO_FIXTURE)?;
     let result = service.import(&bundle, ImportOptions { dry_run: false })?;
 
-    let try_next = vec![
-        format!(
-            "kindling search \"JWT\" --all-repos --db {}",
-            shell_quote(&db_path)
-        ),
-        format!("kindling browse --db {}", shell_quote(&db_path)),
-        format!("kindling list observations --db {}", shell_quote(&db_path)),
-        format!("kindling status --db {}", shell_quote(&db_path)),
-    ];
+    let try_next = try_next_commands(database);
 
     if args.common.json {
         let out = DemoOutput {
             success: result.errors.is_empty(),
-            database: db_path.to_string_lossy().into_owned(),
+            database: database.to_owned(),
             imported: ImportCounts {
                 observations: result.observations,
                 capsules: result.capsules,
@@ -111,22 +104,78 @@ pub fn run(args: DemoArgs) -> CliResult {
 /// keeps paths with spaces, apostrophes or metacharacters (`$`, `;`, `` ` ``,
 /// `*`, …) literal without having to enumerate them.
 ///
-/// This targets POSIX shells. On Windows the recipes are not quoted for
-/// `cmd.exe`/PowerShell, which treat `'` as an ordinary character rather than a
-/// grouping delimiter; run them through a POSIX shell (Git Bash, WSL) there.
-fn shell_quote(path: &Path) -> String {
-    format!("'{}'", path.to_string_lossy().replace('\'', "'\\''"))
+/// Unix emits POSIX recipes. Windows emits labelled `cmd.exe` and PowerShell
+/// recipes because those shells use different quoting rules.
+fn try_next_commands(database: &str) -> Vec<String> {
+    let prefixes = [
+        "kindling search \"JWT\" --all-repos --db=",
+        "kindling browse --db=",
+        "kindling list observations --db=",
+        "kindling status --db=",
+    ];
+    #[cfg(windows)]
+    {
+        prefixes
+            .into_iter()
+            .flat_map(|prefix| {
+                [
+                    format!("cmd.exe: {prefix}{}", cmd_quote(database)),
+                    format!("PowerShell: {prefix}{}", powershell_quote(database)),
+                ]
+            })
+            .collect()
+    }
+    #[cfg(not(windows))]
+    {
+        prefixes
+            .into_iter()
+            .map(|prefix| format!("POSIX: {prefix}{}", posix_quote(database)))
+            .collect()
+    }
+}
+
+fn database_string(path: &Path) -> Result<&str, CliError> {
+    path.to_str()
+        .ok_or_else(|| CliError::Invalid("demo database path is not valid UTF-8".to_string()))
+}
+
+#[cfg(not(windows))]
+fn posix_quote(path: &str) -> String {
+    format!("'{}'", path.replace('\'', "'\\''"))
+}
+
+#[cfg(windows)]
+fn cmd_quote(path: &str) -> String {
+    if needs_windows_quote(path) {
+        format!("\"{path}\"")
+    } else {
+        path.to_owned()
+    }
+}
+
+#[cfg(windows)]
+fn powershell_quote(path: &str) -> String {
+    format!("'{}'", path.replace('\'', "''"))
+}
+
+#[cfg(windows)]
+fn needs_windows_quote(path: &str) -> bool {
+    path.chars().any(|character| {
+        character.is_whitespace() || matches!(character, '&' | '(' | ')' | '%' | '!' | '^' | '|')
+    })
 }
 
 #[cfg(test)]
 mod tests {
-    use super::shell_quote;
-    use std::path::Path;
+    #[cfg(not(windows))]
+    use super::posix_quote;
+    use super::{database_string, try_next_commands};
+    use std::path::PathBuf;
 
     #[test]
     fn quotes_a_plain_path() {
         assert_eq!(
-            shell_quote(Path::new("/home/user/kindling.db")),
+            posix_quote("/home/user/kindling.db"),
             "'/home/user/kindling.db'"
         );
     }
@@ -134,7 +183,7 @@ mod tests {
     #[test]
     fn quotes_paths_with_spaces() {
         assert_eq!(
-            shell_quote(Path::new("/tmp/kindling home/demo.db")),
+            posix_quote("/tmp/kindling home/demo.db"),
             "'/tmp/kindling home/demo.db'"
         );
     }
@@ -142,7 +191,7 @@ mod tests {
     #[test]
     fn escapes_embedded_single_quotes() {
         assert_eq!(
-            shell_quote(Path::new("/tmp/o'brien/demo.db")),
+            posix_quote("/tmp/o'brien/demo.db"),
             "'/tmp/o'\\''brien/demo.db'"
         );
     }
@@ -150,8 +199,53 @@ mod tests {
     #[test]
     fn quotes_shell_metacharacters_literally() {
         assert_eq!(
-            shell_quote(Path::new("/tmp/db $HOME;$(id)/demo.db")),
+            posix_quote("/tmp/db $HOME;$(id)/demo.db"),
             "'/tmp/db $HOME;$(id)/demo.db'"
+        );
+    }
+
+    #[test]
+    fn posix_recipe_round_trips_through_shell() {
+        let path = "/tmp/db $HOME;$(id)/demo.db";
+        let recipe = try_next_commands(path).remove(0);
+        let command = recipe.strip_prefix("POSIX: ").unwrap();
+        let quoted = command.split_once("--db=").unwrap().1;
+        let script = format!("printf '%s' {quoted}");
+        let output = std::process::Command::new("sh")
+            .args(["-c", &script])
+            .output()
+            .expect("POSIX shell should run");
+        assert_eq!(String::from_utf8(output.stdout).unwrap(), path);
+    }
+
+    #[test]
+    fn recipes_bind_leading_dash_paths_to_db_option() {
+        let recipes = try_next_commands("-scratch.db");
+        assert!(recipes
+            .iter()
+            .all(|recipe| recipe.contains("--db='-scratch.db'")));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rejects_non_utf8_database_paths() {
+        use std::ffi::OsString;
+        use std::os::unix::ffi::OsStringExt;
+
+        let path = PathBuf::from(OsString::from_vec(vec![b'd', b'b', 0xff]));
+        assert!(database_string(&path).is_err());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_recipes_quote_cmd_and_powershell_paths() {
+        assert_eq!(
+            cmd_quote(r"C:\Users\alice\.kindling\demo.db"),
+            r#"C:\Users\alice\.kindling\demo.db"#
+        );
+        assert_eq!(
+            powershell_quote(r"C:\tmp\o'brien\demo.db"),
+            r#"'C:\tmp\o''brien\demo.db'"#
         );
     }
 }
