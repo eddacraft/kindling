@@ -1015,3 +1015,55 @@ fn search_kind_filter_applies_before_max_limit() {
     // Provenance reflects the filtered, re-limited result.
     assert_eq!(v["provenance"]["returnedCandidates"], json!(3));
 }
+
+// --- C6: kindling tui -------------------------------------------------------
+
+#[test]
+fn tui_with_empty_db_prints_hint() {
+    let env = CliEnv::new();
+    let out = env.run_db(&["tui"]);
+    assert_success(&out);
+    assert!(stdout(&out).contains("No memory to browse"));
+}
+
+#[test]
+fn tui_without_terminal_errors_cleanly() {
+    let env = CliEnv::new();
+    assert_success(&env.run_db(&["log", "hello", "--kind", "message"]));
+
+    // Captured (non-TTY) stdout makes the TUI refuse, with a clean error
+    // rather than a panic.
+    let out = env.run_db(&["tui"]);
+    assert!(!out.status.success());
+    assert!(
+        support::stderr(&out).contains("interactive terminal"),
+        "stderr: {}",
+        support::stderr(&out)
+    );
+}
+
+#[test]
+fn tui_rejects_json_before_opening_database() {
+    let env = CliEnv::new();
+    let db = env.db();
+    assert!(!std::path::Path::new(&db).exists());
+    let out = env.run_db(&["tui", "--json"]);
+    assert!(!out.status.success(), "JSON mode must be rejected");
+    assert!(stdout(&out).is_empty());
+    let err: serde_json::Value = serde_json::from_slice(&out.stderr).unwrap();
+    assert!(err["error"]
+        .as_str()
+        .unwrap()
+        .contains("does not support --json"));
+    assert!(
+        !std::path::Path::new(&db).exists(),
+        "rejection must not create a database"
+    );
+    assert_success(&env.run_db(&["log", "hello", "--kind", "message"]));
+    let out = env.run_db(&["tui", "--json"]);
+    let err: serde_json::Value = serde_json::from_slice(&out.stderr).unwrap();
+    assert!(err["error"]
+        .as_str()
+        .unwrap()
+        .contains("does not support --json"));
+}
