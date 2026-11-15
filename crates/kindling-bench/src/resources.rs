@@ -1,5 +1,7 @@
 //! Low-overhead process resource sampling for repeatable workload profiles.
 
+use std::any::Any;
+use std::fmt;
 use std::sync::mpsc::{self, Sender};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
@@ -58,6 +60,23 @@ pub struct ResourceSummary {
     pub logical_write_bytes: Option<u64>,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum SamplerError {
+    WorkerPanicked(String),
+}
+
+impl fmt::Display for SamplerError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::WorkerPanicked(message) => {
+                write!(formatter, "resource sampler worker panicked: {message}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for SamplerError {}
+
 /// Background sampler. On Linux it samples `/proc/self`; elsewhere resource
 /// fields are reported as unavailable without failing the benchmark.
 pub struct ResourceSampler {
@@ -101,9 +120,9 @@ impl ResourceSampler {
         }
     }
 
-    #[must_use]
-    pub fn finish(mut self) -> ResourceSummary {
-        let peak = self.stop_and_join().unwrap_or_default();
+    #[must_use = "finish the sampler and handle measurement failure"]
+    pub fn finish(mut self) -> Result<ResourceSummary, SamplerError> {
+        let peak = self.stop_and_join()?;
         let after = snapshot();
         let ncpus = thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get);
         let cpu_cores = match (
@@ -128,7 +147,7 @@ impl ResourceSampler {
         let rss_end_mib = after.rss_kib.map(kib_to_mib);
         let peak_rss_mib = peak_rss_kib.map(kib_to_mib);
 
-        ResourceSummary {
+        Ok(ResourceSummary {
             platform: std::env::consts::OS.to_string(),
             available: self.before.rss_kib.is_some(),
             measurement_scope: self.measurement_scope.to_string(),
@@ -156,12 +175,19 @@ impl ResourceSampler {
             write_bytes: delta(self.before.write_bytes, after.write_bytes),
             logical_read_bytes: delta(self.before.rchar, after.rchar),
             logical_write_bytes: delta(self.before.wchar, after.wchar),
-        }
+        })
     }
 
-    fn stop_and_join(&mut self) -> Option<Snapshot> {
+    fn stop_and_join(&mut self) -> Result<Snapshot, SamplerError> {
         self.stop.take();
-        self.handle.take().and_then(|handle| handle.join().ok())
+        self.handle
+            .take()
+            .map(|handle| {
+                handle
+                    .join()
+                    .map_err(|payload| SamplerError::WorkerPanicked(panic_message(payload)))
+            })
+            .unwrap_or_else(|| Ok(Snapshot::default()))
     }
 }
 
@@ -171,7 +197,41 @@ impl Drop for ResourceSampler {
         // sampler without calling `finish`. Signal the polling thread to exit
         // and join it so it does not keep running detached past the sampler's
         // lifetime.
-        self.stop_and_join();
+        let _ = self.stop_and_join();
+    }
+}
+
+fn panic_message(payload: Box<dyn Any + Send>) -> String {
+    if let Some(message) = payload.downcast_ref::<&str>() {
+        (*message).to_owned()
+    } else if let Some(message) = payload.downcast_ref::<String>() {
+        message.clone()
+    } else {
+        "non-string panic payload".to_owned()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn worker_panic_is_reported_instead_of_defaulting_snapshot() {
+        let handle = thread::spawn(|| -> Snapshot { panic!("sampler exploded") });
+        let mut sampler = ResourceSampler {
+            before: Snapshot::default(),
+            stop: None,
+            handle: Some(handle),
+            measurement_scope: "in-process",
+        };
+
+        let error = sampler
+            .stop_and_join()
+            .expect_err("panic should be reported");
+        assert_eq!(
+            error,
+            SamplerError::WorkerPanicked("sampler exploded".to_owned())
+        );
     }
 }
 

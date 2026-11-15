@@ -195,7 +195,7 @@ async fn cold_start_group(
         name: "cold-start".into(),
         description: "Fresh bundled daemon startup through a health-ready runtime".into(),
         metrics: vec![metric("runtime-start", samples, elapsed, None)],
-        resources: sampler.finish(),
+        resources: sampler.finish()?,
         storage_bytes,
         spool_bytes: 0,
     })
@@ -257,7 +257,7 @@ fn direct_service_group(
                 Some(retrieve_rows),
             ),
         ],
-        resources: sampler.finish(),
+        resources: sampler.finish()?,
         storage_bytes: directory_size(temp.path())?,
         spool_bytes: 0,
     })
@@ -326,7 +326,7 @@ async fn daemon_group(profile: &Profile, mode: MeasurementMode) -> Result<Worklo
         })
         .await?;
 
-    let resources = sampler.finish();
+    let resources = sampler.finish()?;
     let storage_bytes = directory_size(temp.path())?;
     runtime.shutdown().await?;
     Ok(WorkloadGroup {
@@ -405,7 +405,7 @@ async fn spool_group(profile: &Profile, mode: MeasurementMode) -> Result<Workloa
     let flush_report = runtime.spooled_client().flush().await?;
     let flush_elapsed = flush_start.elapsed();
     let flush_samples = [flush_elapsed];
-    let resources = sampler.finish();
+    let resources = sampler.finish()?;
     let storage_bytes = directory_size(temp.path())?;
     runtime.shutdown().await?;
 
