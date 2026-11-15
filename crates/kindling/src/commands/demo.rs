@@ -188,11 +188,16 @@ fn needs_windows_quote(path: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(unix)]
+    use super::database_string;
+    #[cfg(windows)]
+    use super::{cmd_quote, powershell_quote};
     #[cfg(not(windows))]
-    use super::posix_quote;
-    use super::{database_string, try_next_commands};
+    use super::{posix_quote, try_next_commands};
+    #[cfg(unix)]
     use std::path::PathBuf;
 
+    #[cfg(not(windows))]
     #[test]
     fn quotes_a_plain_path() {
         assert_eq!(
@@ -201,6 +206,7 @@ mod tests {
         );
     }
 
+    #[cfg(not(windows))]
     #[test]
     fn quotes_paths_with_spaces() {
         assert_eq!(
@@ -209,6 +215,7 @@ mod tests {
         );
     }
 
+    #[cfg(not(windows))]
     #[test]
     fn escapes_embedded_single_quotes() {
         assert_eq!(
@@ -217,6 +224,7 @@ mod tests {
         );
     }
 
+    #[cfg(not(windows))]
     #[test]
     fn quotes_shell_metacharacters_literally() {
         assert_eq!(
@@ -225,6 +233,7 @@ mod tests {
         );
     }
 
+    #[cfg(not(windows))]
     #[test]
     fn posix_recipe_round_trips_through_shell() {
         let path = "/tmp/db $HOME;$(id)/demo.db";
@@ -239,6 +248,7 @@ mod tests {
         assert_eq!(String::from_utf8(output.stdout).unwrap(), path);
     }
 
+    #[cfg(not(windows))]
     #[test]
     fn recipes_bind_leading_dash_paths_to_db_option() {
         let recipes = try_next_commands("-scratch.db");
