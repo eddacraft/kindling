@@ -22,6 +22,11 @@ struct DemoOutput {
     try_next: Vec<String>,
 }
 
+struct DemoRecipe {
+    label: &'static str,
+    command: String,
+}
+
 #[derive(Serialize)]
 struct ImportCounts {
     observations: usize,
@@ -68,7 +73,10 @@ pub fn run(args: DemoArgs) -> CliResult {
                 summaries: result.summaries,
                 pins: result.pins,
             },
-            try_next,
+            try_next: try_next
+                .iter()
+                .map(|recipe| recipe.command.clone())
+                .collect(),
         };
         println!("{}", format_json(&out, true)?);
     } else {
@@ -86,8 +94,13 @@ pub fn run(args: DemoArgs) -> CliResult {
             }
         }
         println!("\nTry next:");
-        for line in &try_next {
-            println!("  {line}");
+        let mut label = None;
+        for recipe in &try_next {
+            if label != Some(recipe.label) {
+                println!("\n{}:", recipe.label);
+                label = Some(recipe.label);
+            }
+            println!("  {}", recipe.command);
         }
         println!();
     }
@@ -106,7 +119,7 @@ pub fn run(args: DemoArgs) -> CliResult {
 ///
 /// Unix emits POSIX recipes. Windows emits labelled `cmd.exe` and PowerShell
 /// recipes because those shells use different quoting rules.
-fn try_next_commands(database: &str) -> Vec<String> {
+fn try_next_commands(database: &str) -> Vec<DemoRecipe> {
     let prefixes = [
         "kindling search \"JWT\" --all-repos --db=",
         "kindling browse --db=",
@@ -115,21 +128,29 @@ fn try_next_commands(database: &str) -> Vec<String> {
     ];
     #[cfg(windows)]
     {
-        prefixes
-            .into_iter()
-            .flat_map(|prefix| {
-                [
-                    format!("cmd.exe: {prefix}{}", cmd_quote(database)),
-                    format!("PowerShell: {prefix}{}", powershell_quote(database)),
-                ]
-            })
-            .collect()
+        let mut recipes = Vec::with_capacity(prefixes.len() * 2);
+        for prefix in prefixes {
+            recipes.push(DemoRecipe {
+                label: "cmd.exe",
+                command: format!("{prefix}{}", cmd_quote(database)),
+            });
+        }
+        for prefix in prefixes {
+            recipes.push(DemoRecipe {
+                label: "PowerShell",
+                command: format!("{prefix}{}", powershell_quote(database)),
+            });
+        }
+        recipes
     }
     #[cfg(not(windows))]
     {
         prefixes
             .into_iter()
-            .map(|prefix| format!("POSIX: {prefix}{}", posix_quote(database)))
+            .map(|prefix| DemoRecipe {
+                label: "POSIX",
+                command: format!("{prefix}{}", posix_quote(database)),
+            })
             .collect()
     }
 }
@@ -208,8 +229,8 @@ mod tests {
     fn posix_recipe_round_trips_through_shell() {
         let path = "/tmp/db $HOME;$(id)/demo.db";
         let recipe = try_next_commands(path).remove(0);
-        let command = recipe.strip_prefix("POSIX: ").unwrap();
-        let quoted = command.split_once("--db=").unwrap().1;
+        assert_eq!(recipe.label, "POSIX");
+        let quoted = recipe.command.split_once("--db=").unwrap().1;
         let script = format!("printf '%s' {quoted}");
         let output = std::process::Command::new("sh")
             .args(["-c", &script])
@@ -223,7 +244,10 @@ mod tests {
         let recipes = try_next_commands("-scratch.db");
         assert!(recipes
             .iter()
-            .all(|recipe| recipe.contains("--db='-scratch.db'")));
+            .all(|recipe| recipe.command.contains("--db='-scratch.db'")));
+        assert!(recipes
+            .iter()
+            .all(|recipe| !recipe.command.contains("POSIX:")));
     }
 
     #[cfg(unix)]
@@ -241,7 +265,7 @@ mod tests {
     fn windows_recipes_quote_cmd_and_powershell_paths() {
         assert_eq!(
             cmd_quote(r"C:\Users\alice\.kindling\demo.db"),
-            r#"C:\Users\alice\.kindling\demo.db"#
+            r"C:\Users\alice\.kindling\demo.db"
         );
         assert_eq!(
             powershell_quote(r"C:\tmp\o'brien\demo.db"),
