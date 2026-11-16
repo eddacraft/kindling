@@ -51,11 +51,13 @@ pub fn run(args: DemoArgs) -> CliResult {
         None => demo_db_path()?,
     };
 
+    // Validate before `--reset` so an unusable path never deletes the file.
+    let database = database_string(&db_path)?;
+
     if args.reset && db_path.exists() {
         std::fs::remove_file(&db_path)?;
     }
 
-    let database = database_string(&db_path)?;
     let (service, _) = open_service(Some(database))?;
 
     let bundle = ExportBundle::from_json(DEMO_FIXTURE)?;
@@ -73,10 +75,7 @@ pub fn run(args: DemoArgs) -> CliResult {
                 summaries: result.summaries,
                 pins: result.pins,
             },
-            try_next: try_next
-                .iter()
-                .map(|recipe| recipe.command.clone())
-                .collect(),
+            try_next: json_try_next(&try_next),
         };
         println!("{}", format_json(&out, true)?);
     } else {
@@ -108,17 +107,19 @@ pub fn run(args: DemoArgs) -> CliResult {
     Ok(())
 }
 
-/// Quote a database path for a POSIX shell (`sh`/`bash`/`zsh`).
-///
-/// The demo recipes are copied by hand, so the path must survive a shell
-/// word-splitting pass verbatim. Single quotes make every character literal
-/// except `'` itself, so embedded single quotes are rewritten as the shell
-/// sequence `'\''` (close quote, escaped quote, reopen quote). Always quoting
-/// keeps paths with spaces, apostrophes or metacharacters (`$`, `;`, `` ` ``,
-/// `*`, …) literal without having to enumerate them.
+/// Shell whose recipes populate `--json` `tryNext`, so the array holds exactly
+/// one command per action on every platform. PowerShell is the default shell
+/// in Windows Terminal.
+#[cfg(windows)]
+const JSON_RECIPE_SHELL: &str = "PowerShell";
+#[cfg(not(windows))]
+const JSON_RECIPE_SHELL: &str = "POSIX";
+
+/// Build the labelled "try next" recipes for `database`.
 ///
 /// Unix emits POSIX recipes. Windows emits labelled `cmd.exe` and PowerShell
-/// recipes because those shells use different quoting rules.
+/// recipes because those shells use different quoting rules. The label is for
+/// human-readable output only and never appears in the command text.
 fn try_next_commands(database: &str) -> Vec<DemoRecipe> {
     let prefixes = [
         "kindling search \"JWT\" --all-repos --db=",
@@ -155,16 +156,39 @@ fn try_next_commands(database: &str) -> Vec<DemoRecipe> {
     }
 }
 
+/// The `--json` `tryNext` commands: one shell's recipes, without labels.
+fn json_try_next(recipes: &[DemoRecipe]) -> Vec<String> {
+    recipes
+        .iter()
+        .filter(|recipe| recipe.label == JSON_RECIPE_SHELL)
+        .map(|recipe| recipe.command.clone())
+        .collect()
+}
+
 fn database_string(path: &Path) -> Result<&str, CliError> {
     path.to_str()
         .ok_or_else(|| CliError::Invalid("demo database path is not valid UTF-8".to_string()))
 }
 
+/// Quote a database path for a POSIX shell (`sh`/`bash`/`zsh`).
+///
+/// The demo recipes are copied by hand, so the path must survive a shell
+/// word-splitting pass verbatim. Single quotes make every character literal
+/// except `'` itself, so embedded single quotes are rewritten as the shell
+/// sequence `'\''` (close quote, escaped quote, reopen quote). Always quoting
+/// keeps paths with spaces, apostrophes or metacharacters (`$`, `;`, `` ` ``,
+/// `*`, …) literal without having to enumerate them.
 #[cfg(not(windows))]
 fn posix_quote(path: &str) -> String {
     format!("'{}'", path.replace('\'', "'\\''"))
 }
 
+/// Quote a database path for `cmd.exe`, only when it needs quoting.
+///
+/// Double quotes stop `cmd.exe` treating spaces and `& ( ) ^ |` as syntax.
+/// They do not stop `%VAR%` expansion, which `cmd.exe` cannot suppress inside
+/// quotes, so a path containing `%name%` may still be rewritten. Such paths
+/// are rare enough that we accept the limitation rather than escape for it.
 #[cfg(windows)]
 fn cmd_quote(path: &str) -> String {
     if needs_windows_quote(path) {
@@ -174,6 +198,8 @@ fn cmd_quote(path: &str) -> String {
     }
 }
 
+/// Quote a database path as a PowerShell literal string: single quotes, with
+/// embedded single quotes doubled (`''`).
 #[cfg(windows)]
 fn powershell_quote(path: &str) -> String {
     format!("'{}'", path.replace('\'', "''"))
@@ -190,12 +216,22 @@ fn needs_windows_quote(path: &str) -> bool {
 mod tests {
     #[cfg(unix)]
     use super::database_string;
+    #[cfg(not(windows))]
+    use super::posix_quote;
     #[cfg(windows)]
     use super::{cmd_quote, powershell_quote};
-    #[cfg(not(windows))]
-    use super::{posix_quote, try_next_commands};
+    use super::{json_try_next, try_next_commands};
     #[cfg(unix)]
     use std::path::PathBuf;
+
+    #[test]
+    fn json_try_next_has_one_unlabelled_command_per_action() {
+        let json = json_try_next(&try_next_commands("demo.db"));
+        assert_eq!(json.len(), 4);
+        assert!(json
+            .iter()
+            .all(|command| command.starts_with("kindling ") && !command.contains(':')));
+    }
 
     #[cfg(not(windows))]
     #[test]
@@ -281,5 +317,28 @@ mod tests {
             powershell_quote(r"C:\tmp\o'brien\demo.db"),
             r#"'C:\tmp\o''brien\demo.db'"#
         );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn cmd_quote_wraps_paths_that_need_it() {
+        assert_eq!(
+            cmd_quote(r"C:\Program Files\kindling\demo.db"),
+            r#""C:\Program Files\kindling\demo.db""#
+        );
+        assert_eq!(
+            cmd_quote(r"C:\R&D\kindling\demo.db"),
+            r#""C:\R&D\kindling\demo.db""#
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_json_try_next_uses_powershell_recipes() {
+        let json = json_try_next(&try_next_commands(r"C:\Program Files\demo.db"));
+        assert_eq!(json.len(), 4);
+        assert!(json
+            .iter()
+            .all(|command| command.ends_with(r"--db='C:\Program Files\demo.db'")));
     }
 }

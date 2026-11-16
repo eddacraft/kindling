@@ -19,7 +19,7 @@ ended with v0.4.0.
 - Project-root overrides now reject sibling directories with similar path prefixes, preventing incorrect repository selection.
 - Invalid project-root requests are rejected rather than queued for retry.
 - Installer fallback respects a pinned Kindling version and non-default Cargo installation locations.
-- Demo command recipes now use labelled, shell-appropriate quoting across POSIX shells, Windows cmd.exe and PowerShell, including paths with spaces, shell metacharacters and leading dashes.
+- Demo command recipes now use labelled, shell-appropriate quoting across POSIX shells, Windows cmd.exe and PowerShell, including paths with spaces, shell metacharacters and leading dashes. `kindling demo --json` lists one command per action in `tryNext` (PowerShell syntax on Windows).
 
 ## [0.4.1] - 2026-11-10
 
