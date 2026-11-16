@@ -19,7 +19,7 @@ client wiring; it does not encode downstream governance.
 
 ```toml
 [dependencies]
-kindling-runtime = "0.4"   # default features: client + spool + embedded-daemon
+kindling-runtime = "0.4" # default features: client + spool + embedded-daemon
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 ```
 
@@ -70,7 +70,7 @@ daemon (`true`) or attached to an existing one (`false`).
 | Strategy             | Behaviour                                          | Feature           |
 | -------------------- | -------------------------------------------------- | ----------------- |
 | `Embedded` (default) | start `kindling-server` in-process on a tokio task | `embedded-daemon` |
-| `External`           | exec `$KINDLING_BIN`, else `kindling` on `PATH`     | `external-spawn`  |
+| `External`           | exec `$KINDLING_BIN`, else `kindling` on `PATH`    | `external-spawn`  |
 | `AttachOnly`         | never spawn — attach to a running daemon or error  | (always)          |
 
 ## Feature flags
@@ -86,7 +86,11 @@ To trim binary size (drop the embedded server + store), disable default features
 and opt back into only what you need:
 
 ```toml
-kindling-runtime = { version = "0.4", default-features = false, features = ["client", "spool", "external-spawn"] }
+kindling-runtime = { version = "0.4", default-features = false, features = [
+  "client",
+  "spool",
+  "external-spawn",
+] }
 ```
 
 ## License

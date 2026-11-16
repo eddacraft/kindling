@@ -88,6 +88,9 @@ pub enum Command {
     /// Open a local HTML viewer for memory in the database.
     Browse(BrowseArgs),
 
+    /// Open an interactive terminal browser for memory.
+    Tui(TuiArgs),
+
     /// Run a command and capture it as a command observation.
     Wrap(WrapArgs),
 
@@ -417,6 +420,12 @@ pub struct BrowseArgs {
 
 #[derive(Debug, Args)]
 pub struct StatsArgs {
+    #[command(flatten)]
+    pub common: CommonOpts,
+}
+
+#[derive(Debug, Args)]
+pub struct TuiArgs {
     #[command(flatten)]
     pub common: CommonOpts,
 }

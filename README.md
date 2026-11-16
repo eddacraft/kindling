@@ -93,7 +93,7 @@ kindling is not published to npm. The `@eddacraft/kindling` packages on npm are 
 
 ```toml
 [dependencies]
-kindling-client = "0.4"     # daemon-backed; default for integrations
+kindling-client = "0.4" # daemon-backed; default for integrations
 # kindling-runtime = "0.4"  # bundles the daemon in your binary; no `kindling` on PATH needed
 # kindling-service = "0.4"  # embedded, in-process, zero IPC
 ```
@@ -112,6 +112,7 @@ Search returns three tiers: **pins** (always first), **current summary**, then *
 kindling init                              # create the database (--claude-code to check hooks)
 kindling demo                              # load sample memory (own DB; pass --db to search it)
 kindling browse                            # open HTML viewer
+kindling tui                               # browse memory in the terminal
 kindling log "root cause: cache eviction"
 kindling search "authentication error"     # scoped to the current git repo
 kindling search "authentication error" --all-repos
@@ -124,6 +125,13 @@ kindling capsule open --intent "debug leak"
 kindling export ./backup.json              # and: kindling import ./backup.json
 kindling serve                             # daemon (clients auto-spawn it)
 ```
+
+`kindling tui` opens the terminal browser; `kindling browse` opens the HTML viewer.
+In the terminal, type to filter, use Up/Down to select observations, Left/Right
+and Home/End to edit the query, and Page Up/Page Down to scroll the preview.
+Press Esc or Ctrl-C to quit. The interactive browser rejects `--json`; use
+`kindling list observations --json` for machine-readable output. To browse the sample memory, run
+`kindling tui --db ~/.kindling/demo/kindling.db` after `kindling demo`.
 
 Full CLI reference: [docs.eddacraft.ai/kindling/reference/cli](https://docs.eddacraft.ai/kindling/reference/cli)
 
