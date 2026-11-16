@@ -11,7 +11,7 @@
 devLoop:
   integrationBranch: main
   isolation:
-    provider: worktrunk
+    provider: git-worktree
     requireFor: [module, autonomous, parallel]
   pullRequests:
     autonomousMerge: true

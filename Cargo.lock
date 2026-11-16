@@ -799,6 +799,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tower",
+ "windows-sys",
 ]
 
 [[package]]

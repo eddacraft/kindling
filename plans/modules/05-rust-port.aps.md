@@ -79,3 +79,19 @@ they do not authorise parallel implementations.
 - **Reconciliation (2026-11-13):** Source removal is in the published releases and current npm notices were read back on 2026-11-13. The seven earlier notices still recommend the now-retired thin client; repointing them remains optional maintenance. No 1.0.0 tag exists. Preserve the maintainer's deferred 1.0.0 decision and separate anvil TS-bridge follow-up.
 - **Historical status:** In Progress — in-repo source removal done (`feat/next-release-prep`): the seven retired TS implementation package directories (`-core`, `-store-sqlite`, `-store-sqljs`, `-provider-local`, `-server`, `-cli`, `-adapter-claude-code`) and stale `tsconfig.base.json` path entries are gone; `pnpm install --frozen-lockfile` succeeds. Prior deprecation slice (warn-at-entry + `scripts/deprecate.sh`) landed earlier. `npm deprecate` VERIFIED on the registry 2026-10-19: all seven retired packages (`-core`, `-store-sqlite`, `-store-sqljs`, `-provider-local`, `-server`, `-cli`, `-adapter-claude-code`) show a deprecation notice at 0.1.2. D-010 npm-channel deprecation VERIFIED on the registry 2026-10-22: `@eddacraft/kindling`, `@eddacraft/kindling-adapter-opencode` and `@eddacraft/kindling-adapter-pocketflow` (0.1.2 is the only version of each ever published) carry the notice pointing at the binary install. REMAINING: (1) optionally `scripts/deprecate.sh retired-ts` to re-point the seven earlier notices away from the now-deprecated thin client; (2) the formal `1.0.0` tag cut naming the removal complete — DEFERRED by maintainer decision (2026-10-20); the 0.4.0 release does not make that call. Anvil `command.invoked` daemon path landed (PORT-011); full TS-bridge removal in anvil repo is separate follow-up.
 - **Delivered dependencies:** PORT-019 and PORT-011 (Complete; [archive](../archive/modules/05-rust-port.aps.md)).
+
+### PORT-022: Exclusive cross-platform daemon ownership
+
+- **Intent:** Ensure concurrent daemon starts cannot both acquire the same PID-file lock.
+- **Expected Outcome:** `kindling serve` acquires ownership through atomic lock-file creation; concurrent starters produce `AlreadyRunning` without clobbering the owner; stale PID files, including those left by clean shutdown, are safely reclaimed; shutdown never removes or clobbers a successor's lock; Windows live-owner detection prevents takeover of an active daemon.
+- **Validation:**
+  - `cargo test -p kindling-server pid`
+  - `cargo test -p kindling-server --test socket_cleanup`
+  - `cargo clippy -p kindling-server --all-targets --all-features -- -D warnings`
+  - `cargo fmt --all -- --check`
+  - Platform-specific CI/tests cover concurrent acquisition, stale takeover, clean drop, and Windows live-owner behavior.
+- **Status:** Ready
+- **Files:** `crates/kindling-server/src/pid.rs`, `crates/kindling-server/tests/`, `.github/workflows/`
+- **Dependencies:** None
+- **Constraints / non-goals:** Preserve the existing PID-file path and `AlreadyRunning` error surface. Do not introduce advisory-lock semantics or daemon protocol changes.
+- **Issue:** [GH-171](https://github.com/eddacraft/kindling/issues/171)

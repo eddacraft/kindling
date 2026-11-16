@@ -2,21 +2,22 @@
 //!
 //! On startup the daemon writes its PID to [`ServerConfig::pid_path`]. Before
 //! binding, if a PID file already exists it is checked for liveness:
-//!   - **dead PID → stale**: the file is removed and acquisition proceeds,
-//!     rewriting the file with the current PID.
+//!   - **dead or malformed PID → stale**: the entry is quarantined and
+//!     acquisition proceeds, writing a fresh ownership record.
 //!   - **live PID → another daemon is running**: acquisition fails with
 //!     [`ServerError::AlreadyRunning`] (the file is never clobbered).
 //!
-//! [`PidGuard`] removes the PID file on drop, so a clean shutdown leaves no
-//! stale file behind.
+//! [`PidGuard`] leaves the PID file on drop; the next starter safely reclaims
+//! the stale entry. This avoids a pathname-removal race with a successor.
 
-use std::fs;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::error::ServerError;
 
-/// Holds the PID-file lock for the lifetime of the daemon. Removes the file on
-/// drop (best-effort).
+/// Holds the PID-file lock for the lifetime of the daemon.
 #[derive(Debug)]
 pub struct PidGuard {
     path: PathBuf,
@@ -31,29 +32,17 @@ impl PidGuard {
 
 impl Drop for PidGuard {
     fn drop(&mut self) {
-        // Best-effort: only remove the file if it still holds *our* pid, so we
-        // never delete a file a successor process has rewritten.
-        if let Ok(contents) = fs::read_to_string(&self.path) {
-            if contents.trim().parse::<i32>().ok() == Some(std::process::id() as i32) {
-                let _ = fs::remove_file(&self.path);
-            }
-        }
+        // Deliberately leave the file in place. Removing by pathname would
+        // race a successor that acquired the path after this guard was made;
+        // the next starter safely reclaims our stale PID atomically.
     }
 }
 
 /// Acquire the PID-file lock at `path`, cleaning up a stale file if present.
 ///
-/// Returns a [`PidGuard`] that releases the lock on drop. Errors with
+/// Returns a [`PidGuard`] that holds ownership for its lifetime. Errors with
 /// [`ServerError::AlreadyRunning`] if a live daemon already holds the file.
 pub fn acquire_pid_lock(path: &Path) -> Result<PidGuard, ServerError> {
-    if let Some(existing) = read_pid(path)? {
-        if process_is_alive(existing) {
-            return Err(ServerError::AlreadyRunning(existing));
-        }
-        // Stale: the owning process is gone. Remove and take over.
-        fs::remove_file(path).map_err(|e| ServerError::Pid(format!("removing stale pid: {e}")))?;
-    }
-
     if let Some(parent) = path.parent() {
         if !parent.as_os_str().is_empty() {
             fs::create_dir_all(parent)
@@ -62,24 +51,69 @@ pub fn acquire_pid_lock(path: &Path) -> Result<PidGuard, ServerError> {
     }
 
     let pid = std::process::id();
-    fs::write(path, pid.to_string())
-        .map_err(|e| ServerError::Pid(format!("writing pid file: {e}")))?;
-
-    Ok(PidGuard {
-        path: path.to_path_buf(),
-    })
-}
-
-/// Read and parse the PID from `path`, if the file exists. A malformed file is
-/// treated as stale (`Ok(None)` would leave it in place, so we surface a parse
-/// failure as "no live owner" by returning `Ok(None)` — the caller then treats
-/// a present-but-unparseable file as removable). We return the parsed PID when
-/// readable, and `Ok(None)` when the file is absent or unparseable.
-fn read_pid(path: &Path) -> Result<Option<i32>, ServerError> {
-    match fs::read_to_string(path) {
-        Ok(contents) => Ok(contents.trim().parse::<i32>().ok()),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(e) => Err(ServerError::Pid(format!("reading pid file: {e}"))),
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|e| ServerError::Pid(format!("clock before epoch: {e}")))?
+        .as_nanos();
+    let ownership = format!("{pid}\n{nonce}");
+    loop {
+        match OpenOptions::new().write(true).create_new(true).open(path) {
+            Ok(mut file) => {
+                file.write_all(ownership.as_bytes())
+                    .map_err(|e| ServerError::Pid(format!("writing pid file: {e}")))?;
+                return Ok(PidGuard {
+                    path: path.to_path_buf(),
+                });
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                let contents = fs::read_to_string(path)
+                    .map_err(|e| ServerError::Pid(format!("reading pid file: {e}")))?;
+                let existing = contents
+                    .lines()
+                    .next()
+                    .and_then(|line| line.trim().parse::<i32>().ok());
+                if let Some(existing) = existing {
+                    if process_is_alive(existing) {
+                        return Err(ServerError::AlreadyRunning(existing));
+                    }
+                }
+                // Move the stale entry out of the lock path atomically. A
+                // concurrent starter can then either create the original path
+                // or fail its own atomic create, but can never be removed by
+                // this cleanup.
+                let nonce = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .map_err(|e| ServerError::Pid(format!("clock before epoch: {e}")))?
+                    .as_nanos();
+                let quarantine = path.with_extension(format!("stale.{pid}.{nonce}"));
+                match fs::rename(path, &quarantine) {
+                    Ok(()) => {
+                        if fs::read_to_string(&quarantine).ok().as_deref()
+                            == Some(contents.as_str())
+                        {
+                            let _ = fs::remove_file(quarantine);
+                        } else {
+                            // Restore only when the lock path is still free;
+                            // never replace a successor that won the race.
+                            if let Ok(replacement) = fs::read(&quarantine) {
+                                if let Ok(mut file) =
+                                    OpenOptions::new().write(true).create_new(true).open(path)
+                                {
+                                    let _ = file.write_all(&replacement);
+                                    let _ = fs::remove_file(&quarantine);
+                                }
+                            }
+                            continue;
+                        }
+                    }
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+                    Err(error) => {
+                        return Err(ServerError::Pid(format!("quarantining stale pid: {error}")));
+                    }
+                }
+            }
+            Err(error) => return Err(ServerError::Pid(format!("creating pid file: {error}"))),
+        }
     }
 }
 
@@ -99,10 +133,22 @@ fn process_is_alive(pid: i32) -> bool {
 }
 
 #[cfg(windows)]
-fn process_is_alive(_pid: i32) -> bool {
-    // Minimal Windows fallback: assume not alive so a stale file never blocks
-    // startup. PORT-013 can harden this with OpenProcess if needed.
-    false
+fn process_is_alive(pid: i32) -> bool {
+    use windows_sys::Win32::Foundation::{CloseHandle, STILL_ACTIVE};
+    use windows_sys::Win32::System::Threading::{
+        GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
+    };
+
+    // A successful query means the process exists; STILL_ACTIVE distinguishes
+    // a running process from one that has already exited.
+    let handle = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid as u32) };
+    if handle.is_null() {
+        return false;
+    }
+    let mut status = 0;
+    let result = unsafe { GetExitCodeProcess(handle, &mut status) };
+    unsafe { CloseHandle(handle) };
+    result != 0 && status == STILL_ACTIVE
 }
 
 #[cfg(test)]
@@ -116,9 +162,12 @@ mod tests {
         let path = dir.path().join("kindling.pid");
         let guard = acquire_pid_lock(&path).expect("should acquire");
         let written = fs::read_to_string(&path).unwrap();
-        assert_eq!(written.trim(), std::process::id().to_string());
+        assert_eq!(
+            written.lines().next().unwrap(),
+            std::process::id().to_string()
+        );
         drop(guard);
-        assert!(!path.exists(), "guard should remove pid file on drop");
+        assert!(path.exists(), "drop must not race a successor lock");
     }
 
     #[test]
@@ -138,7 +187,7 @@ mod tests {
         let guard = acquire_pid_lock(&path).expect("stale pid must not block acquisition");
         let written = fs::read_to_string(&path).unwrap();
         assert_eq!(
-            written.trim(),
+            written.lines().next().unwrap(),
             std::process::id().to_string(),
             "pid file should be rewritten with the new (live) pid"
         );
@@ -161,5 +210,32 @@ mod tests {
         );
         // The live file must be left untouched.
         assert_eq!(fs::read_to_string(&path).unwrap().trim(), me.to_string());
+    }
+
+    #[test]
+    fn concurrent_acquisition_has_one_owner() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("kindling.pid");
+        let barrier = std::sync::Arc::new(std::sync::Barrier::new(2));
+        let first = {
+            let barrier = barrier.clone();
+            let path = path.clone();
+            std::thread::spawn(move || {
+                barrier.wait();
+                acquire_pid_lock(&path)
+            })
+        };
+        let second = {
+            let barrier = barrier.clone();
+            let path = path.clone();
+            std::thread::spawn(move || {
+                barrier.wait();
+                acquire_pid_lock(&path)
+            })
+        };
+        let results = [first.join().unwrap(), second.join().unwrap()];
+        assert_eq!(results.iter().filter(|result| result.is_ok()).count(), 1);
+        assert_eq!(results.iter().filter(|result| result.is_err()).count(), 1);
+        drop(results);
     }
 }
