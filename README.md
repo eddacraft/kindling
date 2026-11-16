@@ -93,7 +93,7 @@ kindling is not published to npm. The `@eddacraft/kindling` packages on npm are 
 
 ```toml
 [dependencies]
-kindling-client = "0.4"     # daemon-backed; default for integrations
+kindling-client = "0.4" # daemon-backed; default for integrations
 # kindling-runtime = "0.4"  # bundles the daemon in your binary; no `kindling` on PATH needed
 # kindling-service = "0.4"  # embedded, in-process, zero IPC
 ```

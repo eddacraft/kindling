@@ -449,7 +449,7 @@ Stability guarantee:
   fields. The version is bumped only for a breaking change.
 - **Forward-compatibility policy.** Importers validate `bundleVersion` /
   `dataset.version` and reject versions they do not recognise (`Unsupported
-bundle version`) rather than silently mis-parsing. Pin on `bundleVersion` to
+  bundle version`) rather than silently mis-parsing. Pin on `bundleVersion` to
   detect format changes deterministically.
 - Within a bundle, all entity lists use deterministic ordering (`ts`/`*_at` then
   `id`), so re-exporting unchanged data is byte-stable.
