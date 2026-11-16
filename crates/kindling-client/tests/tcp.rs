@@ -44,7 +44,14 @@ fn raw_status(
     req.push_str(&format!("content-length: {}\r\n\r\n{}", body.len(), body));
     stream.write_all(req.as_bytes()).expect("write request");
     let mut resp = Vec::new();
-    stream.read_to_end(&mut resp).expect("read response");
+    if let Err(err) = stream.read_to_end(&mut resp) {
+        // Keep whatever arrived before the error (e.g. the 5s read timeout) so
+        // a slow server can be told apart from one that never responded.
+        panic!(
+            "read response: {err}; partial response: {:?}",
+            String::from_utf8_lossy(&resp)
+        );
+    }
     let text = String::from_utf8_lossy(&resp);
     let status_line = text.lines().next().unwrap_or("");
     status_line

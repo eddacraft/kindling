@@ -1,5 +1,6 @@
 //! Client configuration and the daemon-spawn abstraction.
 
+use std::ffi::OsString;
 use std::io;
 use std::path::PathBuf;
 use std::process::{Child, Command, ExitStatus, Stdio};
@@ -106,12 +107,14 @@ pub enum Transport {
 
 /// How the client starts the daemon when it is not already running.
 ///
-/// The default execs the real `kindling` binary; tests inject a closure that
+/// The default execs the real `kindling` binary (`$KINDLING_BIN`, else
+/// `kindling` on `PATH`); tests inject a closure that
 /// starts an in-process daemon so cold-spawn can be exercised without the
 /// (not-yet-built) binary on `PATH`.
 #[derive(Clone, Default)]
 pub enum Spawner {
-    /// Production path: `kindling serve --daemonize`. The launcher is reaped
+    /// Production path: `kindling serve --daemonize`, using `$KINDLING_BIN`
+    /// when set and non-empty, else `kindling` on `PATH`. The launcher is reaped
     /// in the background so an immediate exit cannot linger as a zombie in a
     /// long-lived Unix host; the daemon itself is not awaited on the connect
     /// path. A missing binary surfaces as a spawn error, which the connect
@@ -140,15 +143,28 @@ impl Spawner {
     }
 }
 
+/// The daemon binary [`Spawner::Command`] execs: `$KINDLING_BIN` when set and
+/// non-empty, otherwise `kindling` resolved on `PATH`. Same rule as the
+/// TypeScript client's `resolveBinaryPath`. Read with `var_os` so a non-UTF-8
+/// path is honoured rather than silently ignored.
+fn kindling_binary() -> OsString {
+    binary_from_override(std::env::var_os("KINDLING_BIN"))
+}
+
+/// Pure half of [`kindling_binary`], split out so the rule is unit-testable
+/// without mutating the process environment.
+fn binary_from_override(value: Option<OsString>) -> OsString {
+    match value {
+        Some(bin) if !bin.is_empty() => bin,
+        _ => OsString::from("kindling"),
+    }
+}
+
 /// `kindling serve --daemonize` with stdio detached and, on Unix, its own
 /// process group. The returned child is adopted so a failed launcher is
 /// reaped instead of being dropped.
 fn spawn_kindling_command() -> io::Result<()> {
-    // `KINDLING_BIN` overrides the daemon binary name so tests can point the
-    // default spawner at a name that is guaranteed absent and exercise the
-    // missing-binary path deterministically, regardless of the ambient PATH.
-    let bin = std::env::var("KINDLING_BIN").unwrap_or_else(|_| "kindling".to_string());
-    let mut cmd = Command::new(bin);
+    let mut cmd = Command::new(kindling_binary());
     cmd.args(["serve", "--daemonize"])
         // Detach the daemon's stdio from ours. Without this the
         // long-lived daemon inherits the spawner's stdout — fatal
@@ -343,6 +359,19 @@ fn spawn_log_timestamp_ms() -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn kindling_bin_override_falls_back_to_path_when_unset_or_empty() {
+        assert_eq!(binary_from_override(None), OsString::from("kindling"));
+        assert_eq!(
+            binary_from_override(Some(OsString::new())),
+            OsString::from("kindling")
+        );
+        assert_eq!(
+            binary_from_override(Some(OsString::from("/opt/kindling/bin/kindling"))),
+            OsString::from("/opt/kindling/bin/kindling")
+        );
+    }
 
     #[test]
     fn expected_schema_version_parses_to_six() {

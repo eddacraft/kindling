@@ -70,7 +70,7 @@ daemon (`true`) or attached to an existing one (`false`).
 | Strategy             | Behaviour                                          | Feature           |
 | -------------------- | -------------------------------------------------- | ----------------- |
 | `Embedded` (default) | start `kindling-server` in-process on a tokio task | `embedded-daemon` |
-| `External`           | exec the real `kindling` binary on `PATH`          | `external-spawn`  |
+| `External`           | exec `$KINDLING_BIN`, else `kindling` on `PATH`     | `external-spawn`  |
 | `AttachOnly`         | never spawn — attach to a running daemon or error  | (always)          |
 
 ## Feature flags

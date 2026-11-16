@@ -14,6 +14,10 @@ ended with v0.4.0.
 
 ## [Unreleased]
 
+### Changed
+
+- The Rust client (`kindling-client`, the Claude Code hooks, and `kindling-runtime` with `external-spawn`) now honours `KINDLING_BIN` when it auto-spawns the daemon, matching the TypeScript client. An empty value is treated as unset; otherwise `kindling` on `PATH` is used as before.
+
 ### Fixed
 
 - Project-root overrides now reject sibling directories with similar path prefixes, preventing incorrect repository selection.

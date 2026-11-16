@@ -105,6 +105,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --workspace
+      # Guards #184: the runtime crate and its tests must build with only the
+      # minimal feature set, not just the defaults.
+      - name: kindling-runtime builds without default features
+        run: cargo check -p kindling-runtime --no-default-features --tests
 
   ts-bindings:
     name: ts-rs bindings up to date
