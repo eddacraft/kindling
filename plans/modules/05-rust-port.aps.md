@@ -83,7 +83,7 @@ they do not authorise parallel implementations.
 ### PORT-022: Exclusive cross-platform daemon ownership
 
 - **Intent:** Ensure concurrent daemon starts cannot both acquire the same PID-file lock.
-- **Expected Outcome:** `kindling serve` acquires ownership through atomic lock-file creation; concurrent starters produce `AlreadyRunning` without clobbering the owner; stale PID files, including those left by clean shutdown, are safely reclaimed; shutdown never removes or clobbers a successor's lock; Windows live-owner detection prevents takeover of an active daemon.
+- **Expected Outcome:** `kindling serve` acquires ownership through atomic lock-file creation; concurrent starters produce `AlreadyRunning` without clobbering the owner; stale PID files are safely reclaimed; clean shutdown removes only the exact ownership record held by the current guard; Windows live-owner detection prevents takeover of an active daemon.
 - **Validation:**
   - `cargo test -p kindling-server pid`
   - `cargo test -p kindling-server --test socket_cleanup`

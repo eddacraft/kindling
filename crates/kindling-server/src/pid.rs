@@ -7,8 +7,8 @@
 //!   - **live PID → another daemon is running**: acquisition fails with
 //!     [`ServerError::AlreadyRunning`] (the file is never clobbered).
 //!
-//! [`PidGuard`] leaves the PID file on drop; the next starter safely reclaims
-//! the stale entry. This avoids a pathname-removal race with a successor.
+//! [`PidGuard`] removes its exact ownership record on drop; a successor's
+//! different ownership record is left untouched.
 
 use std::fs::{self, OpenOptions};
 use std::io::Write;
@@ -21,6 +21,7 @@ use crate::error::ServerError;
 #[derive(Debug)]
 pub struct PidGuard {
     path: PathBuf,
+    ownership: String,
 }
 
 impl PidGuard {
@@ -32,15 +33,17 @@ impl PidGuard {
 
 impl Drop for PidGuard {
     fn drop(&mut self) {
-        // Deliberately leave the file in place. Removing by pathname would
-        // race a successor that acquired the path after this guard was made;
-        // the next starter safely reclaims our stale PID atomically.
+        if let Ok(contents) = fs::read_to_string(&self.path) {
+            if contents == self.ownership {
+                let _ = fs::remove_file(&self.path);
+            }
+        }
     }
 }
 
 /// Acquire the PID-file lock at `path`, cleaning up a stale file if present.
 ///
-/// Returns a [`PidGuard`] that holds ownership for its lifetime. Errors with
+/// Returns a [`PidGuard`] that releases ownership on drop. Errors with
 /// [`ServerError::AlreadyRunning`] if a live daemon already holds the file.
 pub fn acquire_pid_lock(path: &Path) -> Result<PidGuard, ServerError> {
     if let Some(parent) = path.parent() {
@@ -63,6 +66,7 @@ pub fn acquire_pid_lock(path: &Path) -> Result<PidGuard, ServerError> {
                     .map_err(|e| ServerError::Pid(format!("writing pid file: {e}")))?;
                 return Ok(PidGuard {
                     path: path.to_path_buf(),
+                    ownership: ownership.clone(),
                 });
             }
             Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
@@ -134,21 +138,16 @@ fn process_is_alive(pid: i32) -> bool {
 
 #[cfg(windows)]
 fn process_is_alive(pid: i32) -> bool {
-    use windows_sys::Win32::Foundation::{CloseHandle, STILL_ACTIVE};
-    use windows_sys::Win32::System::Threading::{
-        GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
-    };
-
-    // A successful query means the process exists; STILL_ACTIVE distinguishes
-    // a running process from one that has already exited.
-    let handle = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid as u32) };
-    if handle.is_null() {
+    // `tasklist` is available on supported Windows installations and avoids
+    // introducing unsafe Win32 FFI into a crate that forbids unsafe code.
+    let Ok(output) = std::process::Command::new("tasklist")
+        .args(["/FI", &format!("PID eq {pid}"), "/FO", "CSV", "/NH"])
+        .output()
+    else {
         return false;
-    }
-    let mut status = 0;
-    let result = unsafe { GetExitCodeProcess(handle, &mut status) };
-    unsafe { CloseHandle(handle) };
-    result != 0 && status == STILL_ACTIVE
+    };
+    output.status.success()
+        && String::from_utf8_lossy(&output.stdout).contains(&format!("\"{pid}\""))
 }
 
 #[cfg(test)]
@@ -167,7 +166,7 @@ mod tests {
             std::process::id().to_string()
         );
         drop(guard);
-        assert!(path.exists(), "drop must not race a successor lock");
+        assert!(!path.exists(), "guard should remove its ownership record");
     }
 
     #[test]
