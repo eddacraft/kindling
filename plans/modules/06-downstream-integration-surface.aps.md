@@ -10,9 +10,10 @@
 
 Maintain the mechanism contract consumed by anvil and other integrations.
 Thirteen delivered items are in the [archive](../archive/modules/06-downstream-integration-surface.aps.md)
-and [completed index](../completed.aps.md). Two items remain active: the full
-adapter-fixture scope and the proposed next-minor event contract (KINTEG-015,
-[design](../specs/2026-11-18-generic-event-keyed-append-design.md)).
+and [completed index](../completed.aps.md). Active work: the full
+adapter-fixture scope (KINTEG-007) and the next-minor generic-event contract
+(KINTEG-015), delivered in sequence through KINTEG-015a to 015e
+([design](../specs/2026-11-18-generic-event-keyed-append-design.md)).
 
 ## Current contract
 
@@ -65,246 +66,262 @@ adapter-fixture scope and the proposed next-minor event contract (KINTEG-015,
 ### KINTEG-015: Publish `generic-event@1` and a keyed direct-retained append in the next minor
 
 - **Intent:** Downstream Rust consumers can store an opaque, versioned event
-  under a key and get a receipt proving it is durably retained, without kindling
+  under a key and hold a receipt proving it is durably retained, without kindling
   learning their policy.
 - **Design:** [Generic events and keyed durable append](../specs/2026-11-18-generic-event-keyed-append-design.md)
-  (planning council plan-9ad9b830). The spec is authoritative for the wire
-  contract, schema, durability and security behaviour. It amends this item's
-  original wording in five places: uniqueness is per project store, not per
-  profile; the failure set gains `Indeterminate`; `StoreBusy` folds into
-  `FailedCommit{Busy}`; a forget endpoint is added; and the release is a final
-  0.5.0 with no release candidate.
-- **Expected Outcome:** Final 0.5.0 ships the following through
-  `kindling-runtime`, `kindling-client` and new v1 endpoints, behind one
-  capability feature, `generic-event@1`:
-  - **Envelope:** an opaque payload of at most 256 KiB, sent as base64, with a
-    consumer-declared schema name and version. kindling validates only the
-    envelope. Events live in a separate `generic_events` table that FTS,
-    retrieve, inject and list never see, but that export and import carry. The
-    closed `ObservationKind` set and its behaviour are unchanged.
-  - **Keyed durable append:** the key is unique per (schema name, key) within a
-    project store. Append atomically reserves the key, the canonical scope
-    (including the project id) and a SHA-256 digest. It returns a receipt only
-    after a `synchronous=FULL` commit. A same-key retry of identical content
-    returns the byte-identical original receipt without a second row. A
-    different scope or payload is a conflict, and so is any append to a
-    forgotten key.
-  - **Lookup and forget:** exact lookup by key after a restart returns `found`,
-    `redacted` or `notFound`, with the same event id, scope and digest as the
-    receipt. Forget tombstones the payload and keeps the key reserved.
-  - **Closed failure set:** `Unsupported`, `Unavailable`, `RejectedPayload`
-    (invalid envelope, too large, secret detected), `Conflict` (mismatch,
-    redacted), `Quota`, `LowDisk`, `FailedCommit` (busy, storage) and
-    `Indeterminate` (safe to retry after the single same-key recovery
-    re-append). No failure returns a receipt, and none falls back to the spool.
-  - **Capability negotiation:** a `features` entry with limits on
-    `/v1/health`. Releases through 0.4.x answer "unsupported" and are
-    documented as incompatible with this contract.
-  - **Compatibility:** schema revision 7 is additive (`user_version` stays 6),
-    so 0.4.x binaries keep opening 0.5 databases. Ordinary spooled append,
-    replay, observation masking and redaction are unchanged.
-- **Delivery:** four sequential PRs, KINTEG-015a to 015d. All four ship
-  together in one 0.5.0 release behind the single `generic-event@1` capability.
-  The feature entry is not advertised until 015d merges, so the earlier merges
-  stay dark.
-- **Validation:** Every sub-item's validation passes. Then, at release:
-  `cargo test --workspace`,
-  `cargo clippy --all-targets --all-features -- -D warnings`,
-  `cargo test -p kindling-runtime --all-features`, the failpoint crash suite,
-  the `keyed-durable` release-prep bench gate, a package-content check and a
-  clean scratch-crate install of the published 0.5.0. That install commits one
-  keyed event, restarts the runtime and looks up the exact row, matching anvil's
-  cross-repository fixture. Runtime tests cover a crash after commit but before
-  the receipt, a same-key retry leaving exactly one row, and both conflict
-  kinds. Negative tests prove that quota, low disk, outage, busy, failed commit,
-  indeterminate, rejected and conflict outcomes never return a receipt and never
-  touch the spool.
-- **Performance contract:** Inherits the KINTEG-013/014 budgets: warm ordinary
-  append p95 < 1 ms and outage append p95 < 5 ms. The release-prep gate runs on
-  a real ext4 or APFS disk and takes the median of 5 runs. It requires ordinary
-  append p95 < 1 ms in a closed loop with keyed appends at 5/s on the same
-  project, and keyed same-key replay p95 < 1 ms. A rate sweep (1, 5, 20 and
-  50/s, plus saturated) is reported but not gated. CI runs smoke only.
-- **Out of scope:** anvil-specific schemas, kinds or policy (anvil owns its
-  `anvil.governance.v1` payload); unkeyed generic events, listing, pagination
-  and batch (a later `generic-event-list@1`); a TypeScript client method, a CLI
-  verb or an embedded-service-only API; a consumer allow-list for the detector;
-  physical erasure on forget; retention or prune semantics beyond today's;
-  cloud or sync.
+  (council plan-9ad9b830, revised after the Phase 4 review). The spec is
+  authoritative for numbers, codes and mechanisms. Its
+  [Amendments](../specs/2026-11-18-generic-event-keyed-append-design.md#amendments-to-the-original-kinteg-015-wording)
+  section changes this item's original wording.
+- **Expected Outcome:** Final 0.5.0 ships through `kindling-runtime`,
+  `kindling-client` and v1 endpoints, behind one capability feature:
+  - A consumer can append an opaque, versioned event under a key. It gets a
+    receipt only once the row is durable. An identical retry returns the same
+    receipt and never creates a second row. Different content under the key, or
+    any append to a forgotten key, is a conflict
+    ([Wire contract](../specs/2026-11-18-generic-event-keyed-append-design.md#wire-contract-t2),
+    [Durability](../specs/2026-11-18-generic-event-keyed-append-design.md#durability-concurrency-and-failure-handling-t3)).
+  - After a restart, the consumer can look up the exact row and its receipt. It
+    can also forget the row while the key stays reserved
+    ([Forget](../specs/2026-11-18-generic-event-keyed-append-design.md#forget)).
+  - Every failure is one of the spec's closed outcomes. A failure never returns
+    a receipt and never writes to the spool
+    ([Error codes](../specs/2026-11-18-generic-event-keyed-append-design.md#error-codes-and-invariants),
+    [Recovery](../specs/2026-11-18-generic-event-keyed-append-design.md#recovery-flow)).
+  - A consumer can tell before writing whether the attached daemon supports the
+    contract, and 0.4.x answers "unsupported"
+    ([Capability](../specs/2026-11-18-generic-event-keyed-append-design.md#capability-and-versioning)).
+  - 0.4.x binaries keep working against 0.5 databases and daemons. Ordinary
+    append, replay, masking and redaction are unchanged
+    ([Mixed-version matrix](../specs/2026-11-18-generic-event-keyed-append-design.md#mixed-version-matrix-t1)).
+- **Delivery:** Five sequential PRs (015a to 015e) ship together as one 0.5.0
+  release behind one capability. Nothing is advertised until 015d merges.
+  - No release is cut from `main` between the 015a and 015d merges. Any 0.4.x
+    patch comes from `release/0.4`.
+  - Each sub-item adds its own `Unreleased` CHANGELOG and ENGINEERING-HISTORY
+    entries.
+  - See [Delivery and release](../specs/2026-11-18-generic-event-keyed-append-design.md#delivery-and-release).
+- **Validation:** Every sub-item's validation passes. The last check is 015e's
+  packaged check and post-publish install, which reproduce anvil's fixture:
+  commit one keyed event, restart, and look up the exact row with the project id
+  asserted
+  ([Test plan](../specs/2026-11-18-generic-event-keyed-append-design.md#test-and-validation-plan)).
+- **Performance contract:** Inherits the KINTEG-013/014 budgets unchanged. The
+  keyed-durable gate, the gating platform, the action if the gate fails and the
+  APFS reporting are defined in
+  [Performance](../specs/2026-11-18-generic-event-keyed-append-design.md#performance-contract-and-bench-t3-g-2).
+- **Out of scope:** The spec's
+  [non-goals](../specs/2026-11-18-generic-event-keyed-append-design.md#goals-and-non-goals):
+  anvil schemas, kinds or policy; unkeyed events, listing, pagination and batch;
+  a TypeScript client method, a CLI verb or an embedded-service API; a detector
+  allow-list; physical erasure; retention or prune changes; cloud or sync.
 - **Requested by:** anvil KFIT-005 (`eddacraft/anvil-001`,
   `plans/modules/kindling-product-fit.aps.md`). Its Track B (KFIT-007, -009,
-  -010, -011, -013) waits on this release. anvil validates it with a
+  -010, -011, -013) waits on this release. anvil validates the release with a
   cross-repository fixture that commits one keyed opaque event, restarts the
-  runtime and retrieves the exact row. Before 015a starts, anvil should confirm
-  that per-project key uniqueness meets KFIT-005, and confirm the key grammar
-  and field naming against the detector fixtures (spec open questions 1–2).
+  runtime and retrieves the exact row. anvil should answer the spec's open
+  questions 1–2 before 015a starts.
 - **Dependencies:** None upstream. Design approval is the open Ready Checklist
-  item. The release is not coupled to C14: it is published manually through
-  `scripts/publish.sh`.
+  item. This item is not coupled to C14.
 - **Repositories:** `eddacraft/kindling`
-- **Confidence:** medium. The design is settled. The remaining risks are
-  macOS `F_FULLFSYNC` latency against the bench gate, and anvil's confirmation
-  of the amended key domain.
+- **Confidence:** medium. The main risks are macOS full-fsync cost, anvil's
+  confirmation of the per-project key domain, and the settings surface (open
+  question 4).
 - **Status:** Draft
 
 ### KINTEG-015a: Generic-event types, detector profile and schema revision 7
 
-- **Intent:** The `generic-event@1` contract exists as shared types, fixtures
-  and an additive schema revision, with no new reachable behaviour yet.
+- **Intent:** The `generic-event@1` contract exists as shared types, published
+  fixtures and an additive schema revision. There is no new reachable behaviour
+  yet.
 - **Expected Outcome:**
-  - `kindling-types` defines the envelope, receipt, scope, lookup and forget
-    states, `GenericEventLimits`, the capability feature entry and the detail
-    enums (`RejectReason`, `ConflictKind`, `CommitFailure`), with the base64
-    payload encoding. The ts-rs bindings are regenerated. Capability gains
-    `schemaRevision` and `features` (both `serde(default)`), and `features` is
-    empty for now.
-  - One shared secret-rule table backs both profiles. Observation masking is
-    unchanged. `GenericEventDetector` v1 matches the spec, and its vectors ship
-    in `schema/fixtures/generic-event-detector-v1.json`.
-  - Migration 007 and `schema.sql` add `generic_events`, the
-    `generic_event_usage` counter and its triggers, and `schema_migrations` row
-    7, without writing `user_version`. `version.json` carries
-    `{version: 7, minReader: 6, wireVersion: 6, minCompatible: 1}`, and the
-    vendored copies are synced. A single wire-version helper feeds `/v1/health`
-    and `kindling status`.
-  - The Rust and TS clients accept `6 <= schemaVersion <= MAX_WIRE_VERSION` and
-    read `wireVersion` explicitly, which fixes both parse traps.
-    `EXPECTED_SCHEMA_VERSION` keeps its name as the lower bound.
-  - The server-side digest reproduces the spec's golden vectors in
-    `schema/fixtures/generic-event-digest-v1.json`.
-  - `schema/README.md`, `schema/schema.sql`, `CONTEXT.md`,
-    `docs/architecture.md` and `docs/data-model.md` describe the revision,
-    minReader and wire-version split.
-- **Validation:** `cargo test -p kindling-types --features ts-rs` passes, with
-  no bindings drift. `cargo test -p kindling-store` covers migration
-  idempotence, the rewritten `user_version` pin tests, the golden
-  no-coupling test, the frozen 0.4.1 open-check test and read-only `notFound`.
-  `cargo test -p kindling-service` covers the detector fixture vectors, the
-  masking parity test and the digest golden vectors. `cargo test -p kindling-client`
-  covers the wire range and parse trap. Also run
-  `pnpm --filter @eddacraft/kindling test`,
-  `scripts/sync-vendored-schema.sh && git diff --exit-code` and
-  `cargo clippy --all-targets --all-features -- -D warnings`.
-- **Dependencies:** KINTEG-015 design approval (Ready Checklist).
+  - The wire shapes and detail enums in
+    [Rust API](../specs/2026-11-18-generic-event-keyed-append-design.md#rust-api)
+    exist in `kindling-types`. Their TypeScript bindings follow the spec's type
+    mapping.
+  - The rules in
+    [GenericEventDetector v1](../specs/2026-11-18-generic-event-keyed-append-design.md#genericeventdetector-v1-rules)
+    and their fixture file are published. Observation masking output is
+    unchanged.
+  - Fresh and migrated stores carry the revision described in
+    [Storage](../specs/2026-11-18-generic-event-keyed-append-design.md#storage-and-schema-compatibility-t1),
+    and a 0.4.1 binary still opens them.
+  - The Rust and TS clients accept any daemon within the spec's wire range.
+    `/v1/health` and `kindling status` report the wire and revision stamps.
+  - The server digest reproduces the golden vectors in
+    [Digest framing](../specs/2026-11-18-generic-event-keyed-append-design.md#digest-framing).
+  - `Unreleased` records describe the schema-contract change.
+- **Validation:** All of the following pass:
+  - `cargo test -p kindling-types --features ts-rs`, with no bindings drift.
+  - `cargo test -p kindling-store`: migration idempotence, the rewritten pin
+    tests, the no-coupling golden test, the frozen 0.4.1 open check, and each
+    open-rule row.
+  - `cargo test -p kindling-service`: the detector fixtures, the equality check
+    between the fixture and the spec block, masking parity, and the digest
+    vectors.
+  - `cargo test -p kindling-client`: the wire range and the parse trap.
+  - `pnpm --filter @eddacraft/kindling test`
+  - `scripts/sync-vendored-schema.sh && git diff --exit-code`
+  - `cargo clippy --all-targets --all-features -- -D warnings`
+  - `python3 scripts/check-release-docs.py`
+- **Dependencies:** KINTEG-015 design approval (Ready Checklist)
 - **Repositories:** `eddacraft/kindling`
 - **Confidence:** high
 - **Status:** Draft
 
-### KINTEG-015b: Keyed durable write path, forget tombstone and export/import
+### KINTEG-015b: Keyed durable write path, durability barrier, forget tombstone and export/import
 
-- **Intent:** The service can durably reserve, replay, reject and tombstone
-  keyed generic events, and can export and import them, with exact, closed
-  outcomes.
+- **Intent:** The service durably reserves, replays, rejects and tombstones
+  keyed generic events. It never vouches for a row whose durability it has not
+  confirmed, and it exports and imports these events losslessly.
 - **Expected Outcome:**
-  - A store-level durable write (FULL sync, plus fullfsync on macOS, verified
-    before begin, an immediate transaction with a 1 s busy wait, and settings
-    restored on every path) wraps every write to `generic_events`.
-    `checkpoint_fullfsync` is on for every writable connection.
-  - Keyed append follows the spec sequence. An existing key wins (receipt,
-    mismatch or redacted conflict) before the detector, quota and free-space
-    floor apply. Outcomes are typed so the daemon can map them to codes.
-    `SQLITE_FULL`/`ENOSPC` map to low disk. A COMMIT-step I/O error reopens the
-    service and re-checks the key.
-  - The usage counter enforces an optional per-project quota, which is off by
-    default. A cached free-space probe enforces a configurable floor.
-  - Tombstone forget clears the payload and keeps the key, scope, digest and
-    event id. It is idempotent and returns the original `redactedAt`.
-  - Export writes `"1.0"`, byte-identical to 0.4, when there are no generic
-    events, and `"2.0"` when there are any, tombstones included. Import of
-    generic events is all-or-nothing, recomputes digests, does not re-scan,
-    follows the spec's precedence table and reports stale detector versions
-    and `dry_run` redacted counts.
-  - Ordinary observation append, masking, forget and existing export and import
-    behave as before.
+  - Every generic-event write is fully synced. Ordinary connection settings are
+    left as they were, as described in
+    [Durable write](../specs/2026-11-18-generic-event-keyed-append-design.md#durable-write).
+  - After any open, reopen, commit-step error or panic, no existing row is
+    receipted, found or forgotten until its durability is confirmed, as
+    described in
+    [Durability barrier and keyed-suspect state](../specs/2026-11-18-generic-event-keyed-append-design.md#durability-barrier-and-keyed-suspect-state).
+  - Keyed append, forget and their failures follow
+    [Sequences and server errors](../specs/2026-11-18-generic-event-keyed-append-design.md#sequences-and-server-errors).
+    An existing key always wins. Only the failures the spec marks as definite
+    report "not committed".
+  - Lookup returns a row only when its recomputed digest matches.
+  - The optional quota and the low-disk floor reject new rows but never a
+    replay. The floor's default value and its configuration are pending open
+    questions 3–5.
+  - Bundles and imports follow
+    [Export bundles](../specs/2026-11-18-generic-event-keyed-append-design.md#export-bundles)
+    and [Import](../specs/2026-11-18-generic-event-keyed-append-design.md#import).
+    Bundles without generic events, and their import, behave exactly as in 0.4.
+  - Ordinary observation behaviour is unchanged.
+  - `Unreleased` records are updated.
 - **Validation:** `cargo test -p kindling-store` and
-  `cargo test -p kindling-service` pass. They cover the pragma-state test
-  (success, error and panic), the keyed outcome matrix (insert, replay, both
-  conflicts, a detector hit only on key miss, quota, an injected low-disk
-  probe and `SQLITE_FULL`), the generic path never calling the hook-filter
-  heuristic, `"1.0"` byte-identity, the `"2.0"` round-trip, import
-  all-or-nothing (a mismatch on the last generic row leaves no entity writes)
-  and import precedence. `cargo clippy --all-targets --all-features -- -D warnings`
-  also passes.
+  `cargo test -p kindling-service` pass, covering:
+  - the pragma-state test (success, error and panic);
+  - the barrier test: reopen a DB whose WAL holds an unsynced commit frame and
+    assert the barrier runs before any replay;
+  - commit-error and panic tests: never a receipt, the project becomes suspect,
+    and the mutex is not poisoned;
+  - the keyed outcome matrix;
+  - a tampered row returning `digest_mismatch`;
+  - a read-only open returning `notFound`;
+  - the generic path never calling the hook-filter heuristic;
+  - export byte-identity, and import all-or-nothing behaviour and precedence.
+
+  `cargo clippy --all-targets --all-features -- -D warnings` and
+  `python3 scripts/check-release-docs.py` also pass.
+
 - **Dependencies:** KINTEG-015a
 - **Repositories:** `eddacraft/kindling`
 - **Confidence:** medium
 - **Status:** Draft
 
-### KINTEG-015c: Daemon endpoints, capability wiring and client methods
+### KINTEG-015c: Daemon append and lookup routes, concurrency and client recovery
 
-- **Intent:** A daemon-backed client can append and look up keyed generic
-  events, with typed errors, bounded deadlines and one safe recovery attempt.
+- **Intent:** A daemon-backed client can append and look up keyed generic events
+  with typed outcomes, bounded waits and one safe recovery attempt. The keyed
+  path does not stall the daemon beyond the stated bound.
 - **Expected Outcome:**
-  - `POST /v1/generic-events` (201 new, 200 replay) and
-    `POST /v1/generic-events/lookup` run with per-project routing and a sized
-    body limit. They return `{error, code, details}` bodies and the spec's
-    status and code mapping. Existing endpoints are unchanged.
-  - `kindling serve` runs on its own multi-thread runtime. Keyed work runs off
-    the async workers behind a per-project single-permit gate, so ordinary
-    handlers wait for at most one fsync and `/v1/health` stays responsive.
-    Panics and poisoned locks recover.
-  - The `generic-event` capability entry and its limits, including the
-    configured quota and floor, are built, but not advertised by default until
-    015d. Tests exercise them explicitly.
-  - `kindling-client` gains append and lookup methods that return
-    `AppendEventError` and `LookupEventError`. Each attempt has a 3 s deadline
-    set in `ClientConfig`. An ambiguous outcome triggers exactly one same-key
-    re-append, and anything other than a receipt, a conflict or a deterministic
-    rejection then becomes `Indeterminate`. A missing feature or a bare 404/405
-    gives `Unsupported`, and unknown feature entries are tolerated.
-  - The daemon keeps keyed counters and logs errors and slow commits to stderr,
-    never payload bytes.
-- **Validation:** `cargo test -p kindling-server` covers every code, status and
-  `details` shape, a 413 with and without a body, the capability golden shape
-  and unknown-feature tolerance, and health responsiveness during a keyed
-  commit. `cargo test -p kindling-client` covers the recovery matrix
-  (deadline, a transport drop after send, `commit_indeterminate`, and a
-  503/507/500 on recovery giving `Indeterminate`) and the negative tests (no
-  receipt, spool file untouched). `cargo test -p eddacraft-kindling` and
-  `cargo clippy --all-targets --all-features -- -D warnings` also pass.
+  - The append and lookup routes answer with the codes, statuses and details in
+    [Error codes and invariants](../specs/2026-11-18-generic-event-keyed-append-design.md#error-codes-and-invariants).
+    Existing endpoints are unchanged.
+  - Keyed work never runs on the async workers. An ordinary request waits no
+    longer than the bound in
+    [Concurrency and shutdown](../specs/2026-11-18-generic-event-keyed-append-design.md#concurrency-and-shutdown),
+    and a poisoned lock never takes the daemon down.
+  - The capability entry is built, but advertised only under the test-only
+    feature named in
+    [Capability](../specs/2026-11-18-generic-event-keyed-append-design.md#capability-and-versioning).
+  - `kindling-client` exposes the append and lookup methods and the per-call
+    options in
+    [Rust API](../specs/2026-11-18-generic-event-keyed-append-design.md#rust-api).
+    It resolves ambiguous outcomes exactly as in
+    [Recovery flow](../specs/2026-11-18-generic-event-keyed-append-design.md#recovery-flow).
+  - Keyed counters and logs exist, and they never contain payload bytes.
+  - `Unreleased` records are updated.
+- **Validation:**
+  - `cargo test -p kindling-server`: every code, status and `details` shape; a
+    413 with and without a body; the capability golden shape; tolerance of
+    unknown features. With more concurrent ordinary appends than workers during
+    an injected slow keyed commit, `/v1/health` still responds. When a client
+    deadline fires mid-fsync, the ordinary wait stays within one keyed
+    transaction.
+  - `cargo test -p kindling-client`: the recovery matrix (404, 413, 401, 503,
+    507 or 500 on the recovery attempt returns `Indeterminate`); the send
+    boundary; the negative tests (no receipt, spool untouched).
+  - `cargo test -p eddacraft-kindling`
+  - `cargo clippy --all-targets --all-features -- -D warnings`
+  - `python3 scripts/check-release-docs.py`
 - **Dependencies:** KINTEG-015b
 - **Repositories:** `eddacraft/kindling`
 - **Confidence:** medium
 - **Status:** Draft
 
-### KINTEG-015d: Runtime facade, forget endpoint, crash tests, bench gate, docs and 0.5.0
+### KINTEG-015d: Forget route, runtime facade, advertising and crash tests
 
-- **Intent:** anvil can depend on the published 0.5.0 `kindling-runtime` for
-  keyed generic events, with crash behaviour proven, the performance gate met
-  and the contract documented.
+- **Intent:** A `kindling-runtime` consumer can append, look up and forget keyed
+  generic events against an advertised capability, with crash behaviour proven
+  in CI.
 - **Expected Outcome:**
-  - `POST /v1/generic-events/forget` and a client forget method returning
-    `ForgetEventError` (gate G-3).
-  - `kindling-runtime` exposes append, lookup and forget, re-exporting the
-    closed enums. It checks the feature before the first write and after any
-    reconnect, and pre-validates limits locally. Attaching to a 0.4.x daemon
-    yields `Unsupported`, and there is never a spool fallback.
+  - Forget is reachable through the daemon, the client and the runtime, with the
+    spec's closed outcomes (gate G-3).
+  - The runtime exposes the methods, the feature check and the project id listed
+    in
+    [Rust API](../specs/2026-11-18-generic-event-keyed-append-design.md#rust-api).
+    It reports when its settings were not applied to an attached daemon. It
+    never falls back to the spool, and its shutdown waits for in-flight keyed
+    work.
   - The daemon advertises `generic-event@1`.
-  - A `test-failpoints` cargo feature drives `keyed_before_commit` and
-    `keyed_after_commit` crash tests in CI on Linux, macOS and Windows. A
-    nightly random-SIGKILL job checks that receipts are a subset of the rows on
-    disk.
-  - A `keyed-durable` kindling-bench group exists. The release-prep gate
-    passes, and its results are recorded in ENGINEERING-HISTORY.
-  - These docs are updated per the spec: SECURITY.md (a "Generic events"
-    section), `schema/README.md`, `docs/data-model.md`, `docs/architecture.md`,
-    `docs/development.md`, `docs/integrations.md`, `CONTEXT.md`, the client,
-    runtime and bench READMEs, and `AGENTS.md`. CHANGELOG and
-    ENGINEERING-HISTORY entries include the macOS durability caveat and the
-    upgrade note.
-  - The workspace is released as final 0.5.0 via `scripts/publish.sh`, with no
-    release candidate, and tagged `v0.5.0` with GitHub Release assets.
-- **Validation:** All of these pass:
-  - `cargo test -p kindling-runtime --all-features`
+  - Failpoint crash tests run in CI, including on a new macOS job, and a new
+    nightly crash workflow exists. Both are new CI, pending open question 6.
+  - `Unreleased` records are updated.
+- **Validation:**
+  - `cargo test -p kindling-runtime --all-features`: feature checks;
+    `Unsupported` against a 0.4-like daemon; `settings_applied`; `project_id()`
+    matching the receipt; a lookup under a different root returning `notFound`;
+    shutdown waiting for in-flight work; the negative tests.
   - `cargo clippy -p kindling-runtime --all-features -- -D warnings`
-  - `cargo test -p eddacraft-kindling --features test-failpoints` (crash suite)
-  - `cargo run -p kindling-bench --release -- --profile standard --only-group keyed-durable`,
-    meeting the gate on ext4 or APFS
+  - `cargo test -p eddacraft-kindling --features test-failpoints` (the crash
+    suite) on Linux, macOS and Windows.
+  - The forget tests in `cargo test -p kindling-server` and
+    `cargo test -p kindling-client`.
   - `python3 scripts/check-release-docs.py`
-  - a package-content check
-  - a clean scratch-crate install of the published 0.5.0 running the keyed
-    round-trip across a runtime restart
 - **Dependencies:** KINTEG-015c
+- **Repositories:** `eddacraft/kindling`
+- **Confidence:** medium
+- **Status:** Draft
+
+### KINTEG-015e: Release prep and 0.5.0 publication
+
+- **Intent:** The published 0.5.0 crates deliver the contract as specified, and
+  this is proven both before and after publishing.
+- **Expected Outcome:**
+  - The ext4 bench gate in
+    [Performance](../specs/2026-11-18-generic-event-keyed-append-design.md#performance-contract-and-bench-t3-g-2)
+    passes on the release commit. Its results, with the APFS report, are
+    recorded in ENGINEERING-HISTORY. A gate failure blocks the release and
+    returns the decision to the maintainer.
+  - Every document listed in
+    [Documentation and release notes](../specs/2026-11-18-generic-event-keyed-append-design.md#documentation-and-release-notes)
+    is current, including the macOS caveat and the upgrade note.
+  - The pre-publish packaged check in
+    [Delivery and release](../specs/2026-11-18-generic-event-keyed-append-design.md#delivery-and-release)
+    passes before anything is published.
+  - Final 0.5.0 is published, with no release candidate, and tagged. A clean
+    install from crates.io repeats the anvil round-trip.
+- **Validation:**
+  - `cargo run -p kindling-bench --release -- --profile standard --only-group keyed-durable`
+    meets the gate on ext4.
+  - `cargo package --workspace`
+  - The scratch crate runs commit, restart and lookup against the packaged
+    crates.
+  - `cargo test -p eddacraft-kindling --features test-failpoints` passes on the
+    release commit.
+  - `DRY_RUN=1 scripts/publish.sh`
+  - `python3 scripts/check-release-docs.py`
+  - Then `scripts/publish.sh`, followed by the post-publish scratch install.
+- **Dependencies:** KINTEG-015d
 - **Repositories:** `eddacraft/kindling`
 - **Confidence:** medium
 - **Status:** Draft
