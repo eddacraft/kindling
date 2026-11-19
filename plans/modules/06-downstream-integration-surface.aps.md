@@ -4,7 +4,7 @@
 | ------ | ------ | ----------- |
 | KINTEG | @aneki | In Progress |
 
-**Last reviewed:** 2026-11-13.
+**Last reviewed:** 2026-11-19.
 
 ## Purpose
 
@@ -35,7 +35,8 @@ adapter-fixture scope (KINTEG-007) and the next-minor generic-event contract
 
 - [x] Delivered dependencies reconciled against publication
 - [x] Open fixture acceptance and next-minor scope distinguished
-- [ ] KINTEG-015 design and release scope approved before implementation
+- [x] KINTEG-015 design and release scope approved before implementation
+      ([#282](https://github.com/eddacraft/kindling/pull/282), merged 2026-11-19)
 
 ## Work Items
 
@@ -119,14 +120,14 @@ adapter-fixture scope (KINTEG-007) and the next-minor generic-event contract
   `plans/modules/kindling-product-fit.aps.md`). Its Track B (KFIT-007, -009,
   -010, -011, -013) waits on this release. anvil validates the release with a
   cross-repository fixture that commits one keyed opaque event, restarts the
-  runtime and retrieves the exact row. anvil should answer the spec's open
-  questions 1–2 before 015a starts.
-- **Dependencies:** None upstream. Design approval is the open Ready Checklist
-  item. This item is not coupled to C14.
+  runtime and retrieves the exact row. anvil answered the spec's open
+  questions 1–2 on 2026-11-19 (both resolved).
+- **Dependencies:** None upstream. Design approval is recorded in the Ready
+  Checklist (#282). This item is not coupled to C14.
 - **Repositories:** `eddacraft/kindling`
-- **Confidence:** medium. The main risks are macOS full-fsync cost, anvil's
-  confirmation of the per-project key domain, and the settings surface (open
-  question 4).
+- **Confidence:** medium. The main risk is macOS full-fsync cost; anvil has
+  confirmed the per-project key domain and the settings surface is resolved
+  (open questions 1 and 4).
 - **Status:** Draft
 
 ### KINTEG-015a: Generic-event types, detector profile and schema revision 7
@@ -164,10 +165,11 @@ adapter-fixture scope (KINTEG-007) and the next-minor generic-event contract
   - `scripts/sync-vendored-schema.sh && git diff --exit-code`
   - `cargo clippy --all-targets --all-features -- -D warnings`
   - `python3 scripts/check-release-docs.py`
-- **Dependencies:** KINTEG-015 design approval (Ready Checklist)
+- **Dependencies:** KINTEG-015 design approval (Ready Checklist, #282); the
+  spec's open questions 1–2, resolved by anvil on 2026-11-19
 - **Repositories:** `eddacraft/kindling`
 - **Confidence:** high
-- **Status:** Draft
+- **Status:** Ready
 
 ### KINTEG-015b: Keyed durable write path, durability barrier, forget tombstone and export/import
 
@@ -188,8 +190,8 @@ adapter-fixture scope (KINTEG-007) and the next-minor generic-event contract
     report "not committed".
   - Lookup returns a row only when its recomputed digest matches.
   - The optional quota and the low-disk floor reject new rows but never a
-    replay. The floor's default value and its configuration are pending open
-    questions 3–5.
+    replay. The quota and floor are set through `RuntimeConfig` only, and the
+    floor's default and probe follow the spec (open questions 3–5, resolved).
   - Bundles and imports follow
     [Export bundles](../specs/2026-11-18-generic-event-keyed-append-design.md#export-bundles)
     and [Import](../specs/2026-11-18-generic-event-keyed-append-design.md#import).
@@ -275,7 +277,8 @@ adapter-fixture scope (KINTEG-007) and the next-minor generic-event contract
     work.
   - The daemon advertises `generic-event@1`.
   - Failpoint crash tests run in CI, including on a new macOS job, and a new
-    nightly crash workflow exists. Both are new CI, pending open question 6.
+    nightly crash workflow exists, scoped as in the spec (open question 6,
+    resolved).
   - `Unreleased` records are updated.
 - **Validation:**
   - `cargo test -p kindling-runtime --all-features`: feature checks;
