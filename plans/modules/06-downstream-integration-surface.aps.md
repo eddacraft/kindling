@@ -190,9 +190,8 @@ adapter-fixture scope (KINTEG-007) and the next-minor generic-event contract
     report "not committed".
   - Lookup returns a row only when its recomputed digest matches.
   - The optional quota and the low-disk floor reject new rows but never a
-    replay. The quota is set through `RuntimeConfig` only (open question 4,
-    resolved); the floor's default value and probe are pending open questions 3
-    and 5.
+    replay. The quota and floor are set through `RuntimeConfig` only, and the
+    floor's default and probe follow the spec (open questions 3–5, resolved).
   - Bundles and imports follow
     [Export bundles](../specs/2026-11-18-generic-event-keyed-append-design.md#export-bundles)
     and [Import](../specs/2026-11-18-generic-event-keyed-append-design.md#import).
@@ -278,7 +277,8 @@ adapter-fixture scope (KINTEG-007) and the next-minor generic-event contract
     work.
   - The daemon advertises `generic-event@1`.
   - Failpoint crash tests run in CI, including on a new macOS job, and a new
-    nightly crash workflow exists. Both are new CI, pending open question 6.
+    nightly crash workflow exists, scoped as in the spec (open question 6,
+    resolved).
   - `Unreleased` records are updated.
 - **Validation:**
   - `cargo test -p kindling-runtime --all-features`: feature checks;

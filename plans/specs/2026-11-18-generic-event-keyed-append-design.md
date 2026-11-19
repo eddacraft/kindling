@@ -124,7 +124,7 @@ breaking wire change.
 | `user_version` 6 (or 7), row 7 missing | Runs 007 (present: opens)                                         | Opens without migrating. Generic reads return `notFound`. |
 | `user_version` above 7                 | Refused (`SchemaTooNew`)                                          | Refused                                                   |
 
-Every writable open then runs the [durability barrier](#durability-barrier-and-keyed-suspect-state).
+Every writable open then marks the project keyed-suspect; the [durability barrier](#durability-barrier-and-keyed-suspect-state) runs lazily, on the first request that needs it.
 
 Migration 007 runs inside `BEGIN IMMEDIATE`. It uses `CREATE … IF NOT EXISTS`
 for the tables, index and triggers, seeds the usage row, and
@@ -379,7 +379,11 @@ and 5 s busy timeout, without `durable_write`.
 After a process crash, the next opener recovers WAL frames that were never
 fsynced and could replay a receipt for a row a power loss would still erase. So
 every writable open and in-place reopen (daemon, in-process CLI, embedded daemon)
-runs a **barrier** before answering any keyed or forget request from existing rows.
+marks the project keyed-suspect, and a **barrier** must succeed before any keyed
+or forget request is answered from existing rows. The barrier is **lazy** (open
+question 8): it never runs at open, only on the first keyed append, forget or
+lookup hit that needs it, so CLI commands that never touch generic events
+(`search`, `list`, `stats`, `status`, `browse`, `tui` and the rest) pay nothing.
 
 - **Barrier:** under `synchronous=FULL` with `checkpoint_fullfsync=ON`, run
   `PRAGMA wal_checkpoint(FULL)`; it succeeds only when the result shows
@@ -394,7 +398,7 @@ runs a **barrier** before answering any keyed or forget request from existing ro
   `generic_events` is empty after WAL recovery.
 - **Keyed-suspect:** from open until the barrier succeeds, and again after any
   COMMIT-step error or panic. While suspect, each keyed append, forget, or lookup
-  that hits an existing row retries the barrier once inside the project permit,
+  that hits an existing row runs (or retries) the barrier once inside the project permit,
   so a lookup-only consumer cannot stay stuck; a lookup that misses never runs it.
 
 | Request while keyed-suspect                | Answer                                                                                       |
@@ -473,10 +477,18 @@ retry. `Indeterminate` is always retry-safe with the same key; nothing is spoole
 
 `maxPayloadBytes` is fixed. `projectQuotaBytes` (optional, off by default) caps
 live payload bytes in `generic_event_usage`; tombstones free theirs. The low-disk
-floor is a cached, unadvertised free-space probe refreshed outside the lock. Its
-64 MiB default and the probe dependency are **proposals** pending
-[open questions](#open-questions) 3 and 5. The quota and floor are configured
-through `RuntimeConfig` only (open question 4, resolved).
+floor is a cached, unadvertised free-space probe refreshed outside the lock.
+Both are configured through `RuntimeConfig` only (open question 4).
+
+- **Floor default (open question 3):** 64 MiB, fixed, overridable; `0` disables
+  it. One keyed commit needs at most a 256 KiB row plus WAL growth to the default
+  auto-checkpoint (about 4 MiB) plus the barrier checkpoint, so 64 MiB is roughly
+  10× headroom. It applies to keyed writes only.
+- **Probe (open question 5):** `rustix` safe `statvfs` on Unix, made a direct
+  dependency with its `fs` feature (1.1.4 is already in `Cargo.lock` through
+  `tempfile` and `crossterm`, so no new crate). On Windows there is no proactive
+  check in 0.5.0: `LowDisk` comes only from `SQLITE_FULL` at commit. The floor is
+  not advertised, so the difference is documented but invisible on the wire.
 
 ### Concurrency and shutdown
 
@@ -494,7 +506,7 @@ through `RuntimeConfig` only (open question 4, resolved).
   it has no poisoning, which also removes the poison path for ordinary handlers.
 - **True bound:** with the fair lock and the keyed permit, an ordinary append on
   the same project waits for at most one keyed transaction or barrier attempt
-  (≤ 1 s busy plus its fsyncs), plus one barrier per open. Ordinary handlers still lock inline, so with concurrent
+  (≤ 1 s busy plus its fsyncs), which includes the one lazy barrier after an open. Ordinary handlers still lock inline, so with concurrent
   same-project requests ≥ `serve` workers, other projects, `/v1/health` and a
   `current_thread` embedding host can stall up to that bound.
 - **Shutdown:** `serve` shutdown and `Runtime::shutdown` wait for in-flight keyed
@@ -603,16 +615,16 @@ forget is logical; for CodeQL the detector is not a sanitiser.
 
 ## Mixed-version matrix (T1)
 
-| Combination                                                           | Ordinary operations                              | Generic events                                                                         |
-| --------------------------------------------------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------- |
-| 0.5 client or runtime → 0.4 daemon already on the socket              | Work (wire version 6)                            | `Unsupported` until the daemon restarts on 0.5                                         |
-| 0.4 client, hooks, VSIX or TS client → 0.5 daemon                     | Work                                             | Not visible                                                                            |
-| 0.4 in-process binary on a revision-7 DB                              | Work (`user_version` is still 6)                 | Invisible but preserved. A 0.4 export omits them                                       |
-| 0.5 on a 0.4 DB                                                       | Work                                             | A writable open migrates 007 and runs the barrier. A read-only open returns `notFound` |
-| 0.4 importing a `"2.0"` bundle, or 0.4/0.5 importing a `"1.0"` bundle | Fails loudly for `"2.0"`; `"1.0"` works as today | —                                                                                      |
-| 0.5 client → a daemon with `wireVersion` above 6                      | `SchemaMismatch` (upper bound)                   | —                                                                                      |
-| macOS, with a 0.4 process writing the same DB                         | Work                                             | Durable against process crash. Power-loss guarantee void until every writer is 0.5     |
-| Tools that read `user_version` as the revision                        | —                                                | Must read `MAX(schema_migrations.version)`                                             |
+| Combination                                                           | Ordinary operations                              | Generic events                                                                                                 |
+| --------------------------------------------------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| 0.5 client or runtime → 0.4 daemon already on the socket              | Work (wire version 6)                            | `Unsupported` until the daemon restarts on 0.5                                                                 |
+| 0.4 client, hooks, VSIX or TS client → 0.5 daemon                     | Work                                             | Not visible                                                                                                    |
+| 0.4 in-process binary on a revision-7 DB                              | Work (`user_version` is still 6)                 | Invisible but preserved. A 0.4 export omits them                                                               |
+| 0.5 on a 0.4 DB                                                       | Work                                             | A writable open migrates 007; the barrier runs on the first keyed request. A read-only open returns `notFound` |
+| 0.4 importing a `"2.0"` bundle, or 0.4/0.5 importing a `"1.0"` bundle | Fails loudly for `"2.0"`; `"1.0"` works as today | —                                                                                                              |
+| 0.5 client → a daemon with `wireVersion` above 6                      | `SchemaMismatch` (upper bound)                   | —                                                                                                              |
+| macOS, with a 0.4 process writing the same DB                         | Work                                             | Durable against process crash. Power-loss guarantee void until every writer is 0.5                             |
+| Tools that read `user_version` as the revision                        | —                                                | Must read `MAX(schema_migrations.version)`                                                                     |
 
 ## Consumer guidance (Rust integrations)
 
@@ -655,24 +667,24 @@ smoke only, no threshold. Results go in ENGINEERING-HISTORY.
 
 ## Test and validation plan
 
-| Area                        | Test                                                                                                                                                                                                                                                                                                                                                                     | Item       |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------- |
-| Digest                      | The three golden vectors from `schema/fixtures/generic-event-digest-v1.json`                                                                                                                                                                                                                                                                                             | 015a       |
-| Detector                    | Fixture vectors, including the key cases. The fixture's rule bodies equal the spec block, and the compiled table equals the fixture. The masking parity test passes                                                                                                                                                                                                      | 015a       |
-| Envelope, types, wire range | Grammar boundaries (0, 1, max, max+1). Strict base64 (rejects unpadded input, the URL alphabet and whitespace). `""` scope is rejected. ts-rs types `payload` as string and timestamps as number. Rust and TS accept 6 and reject 5 and 7. The parse trap is covered by a `version.json` whose first `"version"` is 7                                                    | 015a       |
-| Schema                      | Migration 007 is idempotent when opens race. `schema_sql_pins_user_version` (`kindling-store/src/schema.rs:59`) and `kindling-store/tests/store_integration.rs:64` are rewritten. No-coupling golden test. Open rules for each `user_version` row. The 0.4.1 gate accepts a revision-7 DB and can still INSERT, UPDATE and DELETE observations                           | 015a       |
-| **Barrier**                 | Reopen a DB whose WAL holds an unsynced commit frame. The barrier must complete before any replay or `found`. While suspect, a hit returns `commit_indeterminate` or `durability_unconfirmed`, ordinary routes are unaffected, and health still advertises                                                                                                               | 015b       |
-| COMMIT errors, pragma state | An injected COMMIT error or panic returns `commit_indeterminate`, never a receipt. The project becomes suspect and the mutex is not poisoned. `SQLITE_FULL` before COMMIT returns `low_disk`. FULL inside the closure. NORMAL and a 5 s busy timeout restored after success, error and panic. `checkpoint_fullfsync=ON` on writable connections                          | 015b       |
-| Keyed path and lookup       | Insert, byte-identical replay, both conflicts, detector hit only on a miss, quota, injected low-disk probe. A tampered row returns `digest_mismatch`. Read-only open returns `notFound`. The generic path never calls `hook/filter.rs`                                                                                                                                   | 015b       |
-| Export and import           | `"1.0"` is byte-identical; `"2.0"` includes tombstones (with `envelopeVersion`); a `"1.0"` bundle carrying `genericEvents` is rejected. A mismatch on the last row writes nothing. The precedence table holds. `"1.0"` import behaves as today                                                                                                                           | 015b       |
-| Daemon                      | Every code, status and `details` shape. A 413 with and without a body. Capability golden shape and tolerance of unknown features                                                                                                                                                                                                                                         | 015c       |
-| Concurrency                 | More concurrent ordinary appends than workers during an injected slow keyed commit, and `/v1/health` still responds. A client deadline that fires mid-fsync leaves the ordinary wait within one keyed transaction, and the permit is held until the blocking task ends                                                                                                   | 015c       |
-| Recovery                    | Deadline, transport drop after send, and `commit_indeterminate` each cause exactly one re-append. Every non-receipt, non-409 recovery result (404, 413, 401, 503, 507, 500) returns `Indeterminate`. The send boundary returns `Unavailable` only before the first byte                                                                                                  | 015c       |
-| **Negative**                | For quota, low disk, outage, busy, failed commit, indeterminate, rejected and conflict, through both the client and the runtime: no receipt, the spool file is untouched, and no `Spooled` outcome                                                                                                                                                                       | 015c, 015d |
-| Forget                      | Forget is idempotent with its original `redactedAt`. A later append returns `key_redacted`. A re-send returns `redacted` or `notFound` as terminal, and anything else returns `Indeterminate`                                                                                                                                                                            | 015d       |
-| Failpoint crash, nightly    | `--features test-failpoints`. `KINDLING_FAILPOINT=keyed_before_commit` gives `notFound` then a fresh insert. `keyed_after_commit` gives the same id and digest with one row. Runs on ubuntu, macos (**new job**) and windows (over TCP). A **new workflow** runs a random-SIGKILL loop and checks that every receipt matches a row. An optional LazyFS job runs on Linux | 015d       |
-| Runtime                     | Feature check before the first write and after a reconnect. Attaching to a 0.4-like daemon returns `Unsupported`. `settings_applied` is reported. `project_id()` matches the receipt. A lookup under a different root returns `notFound`. Shutdown waits for blocking tasks                                                                                              | 015d       |
-| Release                     | The pre-publish packaged check and the post-publish install (see [Delivery](#delivery-and-release))                                                                                                                                                                                                                                                                      | 015e       |
+| Area                        | Test                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Item       |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------- |
+| Digest                      | The three golden vectors from `schema/fixtures/generic-event-digest-v1.json`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | 015a       |
+| Detector                    | Fixture vectors, including the key cases. The fixture's rule bodies equal the spec block, and the compiled table equals the fixture. The masking parity test passes                                                                                                                                                                                                                                                                                                                                                                                          | 015a       |
+| Envelope, types, wire range | Grammar boundaries (0, 1, max, max+1). Strict base64 (rejects unpadded input, the URL alphabet and whitespace). `""` scope is rejected. ts-rs types `payload` as string and timestamps as number. Rust and TS accept 6 and reject 5 and 7. The parse trap is covered by a `version.json` whose first `"version"` is 7                                                                                                                                                                                                                                        | 015a       |
+| Schema                      | Migration 007 is idempotent when opens race. `schema_sql_pins_user_version` (`kindling-store/src/schema.rs:59`) and `kindling-store/tests/store_integration.rs:64` are rewritten. No-coupling golden test. Open rules for each `user_version` row. The 0.4.1 gate accepts a revision-7 DB and can still INSERT, UPDATE and DELETE observations                                                                                                                                                                                                               | 015a       |
+| **Barrier**                 | Reopen a DB whose WAL holds an unsynced commit frame. The barrier must complete before any replay or `found`. While suspect, a hit returns `commit_indeterminate` or `durability_unconfirmed`, ordinary routes are unaffected, and health still advertises                                                                                                                                                                                                                                                                                                   | 015b       |
+| COMMIT errors, pragma state | An injected COMMIT error or panic returns `commit_indeterminate`, never a receipt. The project becomes suspect and the mutex is not poisoned. `SQLITE_FULL` before COMMIT returns `low_disk`. FULL inside the closure. NORMAL and a 5 s busy timeout restored after success, error and panic. `checkpoint_fullfsync=ON` on writable connections                                                                                                                                                                                                              | 015b       |
+| Keyed path and lookup       | Insert, byte-identical replay, both conflicts, detector hit only on a miss, quota, injected low-disk probe. A tampered row returns `digest_mismatch`. Read-only open returns `notFound`. The generic path never calls `hook/filter.rs`                                                                                                                                                                                                                                                                                                                       | 015b       |
+| Export and import           | `"1.0"` is byte-identical; `"2.0"` includes tombstones (with `envelopeVersion`); a `"1.0"` bundle carrying `genericEvents` is rejected. A mismatch on the last row writes nothing. The precedence table holds. `"1.0"` import behaves as today                                                                                                                                                                                                                                                                                                               | 015b       |
+| Daemon                      | Every code, status and `details` shape. A 413 with and without a body. Capability golden shape and tolerance of unknown features                                                                                                                                                                                                                                                                                                                                                                                                                             | 015c       |
+| Concurrency                 | More concurrent ordinary appends than workers during an injected slow keyed commit, and `/v1/health` still responds. A client deadline that fires mid-fsync leaves the ordinary wait within one keyed transaction, and the permit is held until the blocking task ends                                                                                                                                                                                                                                                                                       | 015c       |
+| Recovery                    | Deadline, transport drop after send, and `commit_indeterminate` each cause exactly one re-append. Every non-receipt, non-409 recovery result (404, 413, 401, 503, 507, 500) returns `Indeterminate`. The send boundary returns `Unavailable` only before the first byte                                                                                                                                                                                                                                                                                      | 015c       |
+| **Negative**                | For quota, low disk, outage, busy, failed commit, indeterminate, rejected and conflict, through both the client and the runtime: no receipt, the spool file is untouched, and no `Spooled` outcome                                                                                                                                                                                                                                                                                                                                                           | 015c, 015d |
+| Forget                      | Forget is idempotent with its original `redactedAt`. A later append returns `key_redacted`. A re-send returns `redacted` or `notFound` as terminal, and anything else returns `Indeterminate`                                                                                                                                                                                                                                                                                                                                                                | 015d       |
+| Failpoint crash, nightly    | `--features test-failpoints`. `KINDLING_FAILPOINT=keyed_before_commit` gives `notFound` then a fresh insert. `keyed_after_commit` gives the same id and digest with one row. Runs on ubuntu and windows (over TCP), and on a **new macOS job** (`cargo test -p kindling-store -p kindling-server --features test-failpoints`, on PRs touching those crates and on `main`). A **new nightly workflow** (Linux only, scheduled, non-blocking) runs a random-SIGKILL loop and checks that every receipt matches a row. LazyFS is out of 0.5.0 (open question 6) | 015d       |
+| Runtime                     | Feature check before the first write and after a reconnect. Attaching to a 0.4-like daemon returns `Unsupported`. `settings_applied` is reported. `project_id()` matches the receipt. A lookup under a different root returns `notFound`. Shutdown waits for blocking tasks                                                                                                                                                                                                                                                                                  | 015d       |
+| Release                     | The pre-publish packaged check and the post-publish install (see [Delivery](#delivery-and-release))                                                                                                                                                                                                                                                                                                                                                                                                                                                          | 015e       |
 
 ## Delivery and release
 
@@ -713,7 +725,7 @@ smoke only, no threshold. Results go in ENGINEERING-HISTORY.
 **CHANGELOG:** _Added_ `generic-event@1` (append, lookup, forget) and Capability
 `features`. _Changed_ schema revision 7 (`user_version` still 6), the client
 range check, bundle `"2.0"`, the multi-thread `serve` runtime, the barrier
-checkpoint on writable open, and macOS `checkpoint_fullfsync`. _Security_ the
+checkpoint before the first keyed request after an open, and macOS `checkpoint_fullfsync`. _Security_ the
 detector, the trust boundary and logical forget. _Upgrade_ restart the daemon
 after upgrading; 0.4 cannot see or export generic events or import `"2.0"`
 bundles; on macOS stop 0.4 hooks and daemons; tools must read
@@ -754,7 +766,7 @@ anvil with the existing contract.
    asserted), and a tampered row returns `lookup_failed`/`digest_mismatch`.
 7. **Change to Q-07:** ordinary append still commits NORMAL, but on macOS
    `checkpoint_fullfsync` adds `F_FULLFSYNC` to auto-checkpoints ordinary commits
-   trigger (~1 in 150–250), plus one barrier checkpoint per writable open (APFS p99 benched).
+   trigger (~1 in 150–250), plus one lazy barrier checkpoint on the first keyed request after an open (APFS p99 benched).
 
 ## Open questions
 
@@ -765,7 +777,7 @@ anvil with the existing contract.
    **Resolved 2026-11-19: passes.** Keys are a fixed lowercase prefix plus UUID or
    hex segments; anvil bans `credentialField` names as JSON keys and runs the
    detector fixture in its CI.
-3. **Low-disk floor default:** 64 MiB is proposed.
+3. ~~**Low-disk floor default.**~~ **Resolved 2026-11-19 (owner):** 64 MiB, overridable through `RuntimeConfig`, `0` disables; keyed writes only (see [Quota and low disk](#quota-and-low-disk)).
 4. **Settings surface and the Q-09 tension.** Embedded daemons get
    `GenericEventSettings` through `RuntimeConfig`; `ServerConfig` has pub fields
    and is not `#[non_exhaustive]`, so it needs a separate entry point. The shared
@@ -774,11 +786,12 @@ anvil with the existing contract.
    **Resolved 2026-11-19 (owner):** `RuntimeConfig`-only, off by default, no
    `serve` flag in 0.5.0. A consumer sharing `kindling serve` has no kindling
    cap; anvil accounts its own budgets.
-5. **Free-space probe:** which crate, under `unsafe_code = "forbid"`? (`rustix` is
-   locked for Unix; a Windows dependency may be Discuss-first.)
-6. **New CI:** approve a macOS test job and a nightly crash workflow (neither exists).
+5. ~~**Free-space probe.**~~ **Resolved 2026-11-19 (owner):** `rustix` `statvfs` on Unix (already in the lock file); Windows relies on `SQLITE_FULL` only in 0.5.0, documented.
+6. ~~**New CI.**~~ **Resolved 2026-11-19 (owner):** approved, kept narrow: a macOS job for the store and server failpoint suites on PRs touching those crates and on `main`, and a Linux-only nightly crash workflow that does not block PRs. No LazyFS job in 0.5.0.
 7. ~~**`project_root` canonicalisation.**~~ **Resolved 2026-11-19:** the routing
    string stays opaque and is never canonicalised by kindling (see
    [Consumer guidance](#consumer-guidance-rust-integrations)); path
    canonicalisation, if added, is caller-side only.
-8. **Barrier cost on CLI writable opens:** one checkpoint per open (skipped with no generic events)?
+8. ~~**Barrier cost on CLI writable opens.**~~ **Resolved 2026-11-19 (owner):** the barrier is lazy, run on the first keyed append, forget or lookup hit after an open, never at open; safety is unchanged because the project stays keyed-suspect until it succeeds.
+
+All open questions are resolved.
