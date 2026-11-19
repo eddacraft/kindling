@@ -31,6 +31,74 @@ PRAGMA user_version = 6;
 COMMIT;
 "#;
 
+/// Additive revision 7: `generic_events`, `generic_event_usage`, and usage triggers.
+///
+/// Runs inside `BEGIN IMMEDIATE`, uses `IF NOT EXISTS` and `INSERT OR IGNORE`,
+/// and deliberately never writes `PRAGMA user_version` so racing 0.5 opens are
+/// idempotent and 0.4.x binaries can still open the database.
+const MIGRATION_007_GENERIC_EVENTS: &str = r#"
+BEGIN IMMEDIATE;
+CREATE TABLE IF NOT EXISTS schema_migrations (
+  version     INTEGER PRIMARY KEY,
+  name        TEXT    NOT NULL,
+  applied_at  INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS generic_events (
+  event_id          TEXT    PRIMARY KEY,
+  envelope_version  INTEGER NOT NULL,
+  schema_name       TEXT    NOT NULL,
+  event_key         TEXT    NOT NULL,
+  schema_version    INTEGER NOT NULL,
+  project_id        TEXT    NOT NULL,
+  session_id        TEXT,
+  repo_id           TEXT,
+  agent_id          TEXT,
+  user_id           TEXT,
+  task_id           TEXT,
+  digest            TEXT    NOT NULL,
+  payload           BLOB,
+  committed_at      INTEGER NOT NULL,
+  redacted_at       INTEGER,
+  detector_version  INTEGER NOT NULL,
+  UNIQUE(schema_name, event_key)
+);
+CREATE TABLE IF NOT EXISTS generic_event_usage (
+  id            INTEGER PRIMARY KEY CHECK(id = 1),
+  payload_bytes INTEGER NOT NULL DEFAULT 0,
+  event_count   INTEGER NOT NULL DEFAULT 0
+);
+INSERT OR IGNORE INTO generic_event_usage (id, payload_bytes, event_count)
+  VALUES (1, 0, 0);
+CREATE TRIGGER IF NOT EXISTS generic_events_usage_insert
+AFTER INSERT ON generic_events
+BEGIN
+  UPDATE generic_event_usage
+     SET payload_bytes = payload_bytes + COALESCE(length(CAST(NEW.payload AS BLOB)), 0),
+         event_count   = event_count + 1
+   WHERE id = 1;
+END;
+CREATE TRIGGER IF NOT EXISTS generic_events_usage_update
+AFTER UPDATE ON generic_events
+BEGIN
+  UPDATE generic_event_usage
+     SET payload_bytes = payload_bytes
+                       - COALESCE(length(CAST(OLD.payload AS BLOB)), 0)
+                       + COALESCE(length(CAST(NEW.payload AS BLOB)), 0)
+   WHERE id = 1;
+END;
+CREATE TRIGGER IF NOT EXISTS generic_events_usage_delete
+AFTER DELETE ON generic_events
+BEGIN
+  UPDATE generic_event_usage
+     SET payload_bytes = payload_bytes - COALESCE(length(CAST(OLD.payload AS BLOB)), 0),
+         event_count   = event_count - 1
+   WHERE id = 1;
+END;
+INSERT OR IGNORE INTO schema_migrations (version, name, applied_at)
+  VALUES (7, '007_generic_events', unixepoch('subsec') * 1000);
+COMMIT;
+"#;
+
 /// Database open options.
 #[derive(Debug, Clone, Default)]
 pub struct StoreOptions {
@@ -201,8 +269,27 @@ fn ensure_schema(conn: &Connection, readonly: bool) -> StoreResult<()> {
             supported: contract.version,
         });
     }
-    if user_version == 5 && contract.version == 6 && !readonly {
-        conn.execute_batch(MIGRATION_006_SCOPED_KEYSET_INDEXES)?;
+    if !readonly {
+        if user_version == 5 {
+            conn.execute_batch(MIGRATION_006_SCOPED_KEYSET_INDEXES)?;
+        }
+        let has_migrations_table: bool = conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations')",
+            [],
+            |row| row.get(0),
+        )?;
+        let has_rev_7: bool = if has_migrations_table {
+            conn.query_row(
+                "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version = 7)",
+                [],
+                |row| row.get(0),
+            )?
+        } else {
+            false
+        };
+        if !has_rev_7 {
+            conn.execute_batch(MIGRATION_007_GENERIC_EVENTS)?;
+        }
     }
     Ok(())
 }

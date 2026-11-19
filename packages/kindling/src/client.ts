@@ -8,11 +8,17 @@
  * daemon is auto-spawned on first use.
  */
 
-import { resolveConfig, type KindlingOptions, type ResolvedConfig } from './config.js';
+import {
+  isSupportedWireVersion,
+  resolveConfig,
+  type KindlingOptions,
+  type ResolvedConfig,
+} from './config.js';
 import { ApiError, SchemaMismatchError } from './errors.js';
 import { request, type OutgoingRequest } from './transport.js';
 
 import type { Capability } from './generated/Capability.js';
+import type { CapabilityFeature } from './generated/CapabilityFeature.js';
 import type { Capsule } from './generated/Capsule.js';
 import type { CapsuleType } from './generated/CapsuleType.js';
 import type { KindRegistryEntry } from './generated/KindRegistryEntry.js';
@@ -64,9 +70,11 @@ export interface PinArgs {
 interface HealthBody {
   version: string;
   schemaVersion: number;
+  schemaRevision?: number;
   supportedKinds: string[];
   storagePath: string;
   kindRegistry: KindRegistryEntry[];
+  features?: CapabilityFeature[];
   projects?: string[];
 }
 
@@ -102,15 +110,17 @@ export class Kindling {
   async health(): Promise<Health> {
     const body = await this.#call<HealthBody>('GET', '/v1/health', false, undefined, [200]);
     const expected = this.#config.expectedSchemaVersion;
-    if (body.schemaVersion !== expected) {
+    if (!isSupportedWireVersion(body.schemaVersion, expected)) {
       throw new SchemaMismatchError(expected, body.schemaVersion);
     }
     return {
       version: body.version,
       schemaVersion: body.schemaVersion,
+      ...(body.schemaRevision !== undefined ? { schemaRevision: body.schemaRevision } : {}),
       supportedKinds: body.supportedKinds,
       storagePath: body.storagePath,
       kindRegistry: body.kindRegistry,
+      features: body.features ?? [],
       projects: body.projects ?? [],
     };
   }
