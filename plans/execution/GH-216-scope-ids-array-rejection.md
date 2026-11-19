@@ -1,25 +1,28 @@
-# GH-216: pin the keyed-object shape of `scopeIds` at the API boundary
+# GH-216: reject array-shaped `scopeIds` at the type and API boundary
 
-**Authority:** GitHub issue #216 (no APS work item; regression test and doc
-clarification, not a Discuss-first lane)
+**Authority:** GitHub issue #216 (no APS work item). The issue asks to "reject
+non-object forms if they are not supported"; the documented contract is a keyed
+object, so this is a bug fix, not a Discuss-first API change.
 **Date:** 2026-11-19
-**Risk:** standard (tests and docs only; no production code change)
+**Risk:** standard (narrows accepted input to the documented contract)
 
 ## Context
 
-The retired TypeScript validator accepted arrays as `scopeIds`. Triage on #216
-found the Rust boundary already rejects them: `ScopeIds`
-(`crates/kindling-types/src/common.rs`) is a plain derived struct with no
-`flatten` or `untagged`, so serde's visitor accepts only a JSON map, and the
-server's `axum::Json<T>` extractor turns the type error into a 4xx. Nothing pins
-that behaviour, so a future change (for example `#[serde(untagged)]` or a custom
-`Deserialize`) could silently reopen it.
+The retired TypeScript validator accepted arrays as `scopeIds`. The triage
+comment on #216 concluded the Rust boundary already rejected them. That was
+wrong: serde's derived `Deserialize` for a named struct implements `visit_seq`
+as well as `visit_map`, binding sequence elements to fields by position. The
+first regression test failed, and against the daemon `POST /v1/capsules` with
+`"scopeIds": []` returned 201; `["x"]` would be read as `{ "sessionId": "x" }`.
 
 ## Work item
 
 - **Intent:** a JSON array in `scopeIds` is rejected at both the type layer and
   every v1 endpoint that accepts `scopeIds`, and the contract says so.
 - **Expected Outcome:**
+  - `ScopeIds` has a hand-written `Deserialize` that accepts only a map
+    (delegating to a private derived field struct), so a sequence fails with
+    `invalid type: sequence`.
   - `kindling-types` test: `ScopeIds` rejects `[]` and `["x"]`, and so do the
     wire types that embed it (`ObservationInput`, `RetrieveOptions`,
     `ListObservationsRequest`).
@@ -31,20 +34,25 @@ that behaviour, so a future change (for example `#[serde(untagged)]` or a custom
     proves the rejection is caused by the array, not by another invalid field.
   - `docs/retrieval-contract.md` Scoping states that `scopeIds` is a keyed JSON
     object and that arrays are rejected.
-- **Non-scope:** changing `ScopeIds`, the DTOs, or the status code axum returns
-  for a JSON data error; the TS thin client.
+  - CHANGELOG `### Fixed` and ENGINEERING-HISTORY entries.
+- **Non-scope:** the field set or serialization of `ScopeIds`; the DTOs; the
+  status code axum returns for a JSON data error; the TS thin client; the same
+  positional-sequence acceptance in other derived request structs (whole
+  bodies), which is noted in the PR as separate follow-up work.
 - **Validation:**
   - `cargo test -p kindling-types`
+  - `cargo test -p kindling-types --features ts-rs` (bindings drift)
   - `cargo test -p kindling-server --test api`
   - `cargo clippy --all-targets --all-features -- -D warnings`
   - `cargo fmt --all -- --check`
+  - `python3 scripts/check-release-docs.py`
 
 ## Actions
 
-### 1. Type-level regression
+### 1. Type-level regression and fix
 
 - **Checkpoint:** array forms fail to deserialize for `ScopeIds` and its
-  embedding wire types.
+  embedding wire types; the test fails before the fix and passes after.
 - **Validate:** `cargo test -p kindling-types`
 
 ### 2. API-level regression
@@ -52,9 +60,11 @@ that behaviour, so a future change (for example `#[serde(untagged)]` or a custom
 - **Checkpoint:** every `scopeIds`-carrying route: object → 2xx, array → 4xx.
 - **Validate:** `cargo test -p kindling-server --test api`
 
-### 3. Contract doc
+### 3. Contract doc and release records
 
-- **Checkpoint:** Scoping section names the keyed-object shape.
+- **Checkpoint:** Scoping section names the keyed-object shape; CHANGELOG and
+  ENGINEERING-HISTORY entries added.
+- **Validate:** `python3 scripts/check-release-docs.py`
 
 ### 4. Verify and publish
 

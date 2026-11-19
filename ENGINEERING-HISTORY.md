@@ -39,6 +39,18 @@ at each release; older distribution approaches may now be superseded.
   install stderr is kept in the transcript. `publish.sh` dry-run still treats
   a missing crates.io dependency as expected, and fails on any other cargo
   error.
+- **`scopeIds` deserializes only from a JSON object (GH-216).**
+  serde's derived `Deserialize` for a named struct also accepts a sequence and
+  binds elements to fields by position, so every v1 route bound `["x"]` to
+  `sessionId` and accepted `[]` as an empty scope. `ScopeIds` now has a
+  hand-written `Deserialize` that calls `deserialize_map` and delegates the
+  map to a private derived `ScopeIdsFields`, so a sequence fails with
+  `invalid type: sequence`. Flattened bodies (`AppendObservationRequest`) keep
+  working because the nested value is still a map. Type-level tests cover
+  `ScopeIds` and the wire types that embed it; an API test checks each of the
+  seven `scopeIds` routes accepts an object and returns a 4xx for `[]` and
+  `["s1"]`. Other derived request structs still accept the positional sequence
+  form for the whole body; that is left for a separate issue.
 - **Hook and client project-root override rejects sibling directory prefixes (GH-173).**
   `KINDLING_REPO_ROOT` is normalised and compared as path components, so a cwd
   such as `/work/repo-copy` is no longer treated as inside `/work/repo`.

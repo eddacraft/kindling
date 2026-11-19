@@ -25,6 +25,7 @@ ended with v0.4.0.
 - Project-root overrides now reject sibling directories with similar path prefixes, preventing incorrect repository selection.
 - Invalid project-root requests are rejected rather than queued for retry.
 - Installer fallback respects a pinned Kindling version and non-default Cargo installation locations.
+- API requests that send `scopeIds` as a JSON array are now rejected with a 4xx. Previously `[]` was treated as an empty scope and `["x"]` was silently read as `{ "sessionId": "x" }`. Send `scopeIds` as an object.
 
 ## [0.4.1] - 2026-11-10
 
