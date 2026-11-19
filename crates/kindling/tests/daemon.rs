@@ -88,8 +88,8 @@ async fn via_daemon_log_roundtrip() {
     assert!(socket.exists(), "daemon socket never appeared");
 
     // Run the CLI with HOME pointed at the temp home so the client's default
-    // socket path resolves to our daemon. The project root is the CLI process's
-    // cwd; the daemon hashes it to a per-project DB under <home>/projects/.
+    // socket path resolves to our daemon. The daemon hashes the CLI's project
+    // root to a per-project DB under <home>/projects/.
     let bin = env!("CARGO_BIN_EXE_kindling");
     let project_root = std::env::current_dir().unwrap();
     let cli_home = home.path().to_path_buf();
@@ -115,7 +115,19 @@ async fn via_daemon_log_roundtrip() {
 
     // The row landed in the daemon's per-project DB: verify via a `status`
     // against that DB file (in-process, no daemon).
-    let project_id = kindling_store::project_id(project_root.to_string_lossy().as_ref());
+    // The CLI routes by the hooks' project root: the Git toplevel of its cwd
+    // (this crate lives inside the kindling repository), else the cwd itself.
+    let routed_root = Command::new("git")
+        .args(["rev-parse", "--show-toplevel"])
+        .current_dir(&project_root)
+        .env_remove("GIT_DIR")
+        .env_remove("GIT_WORK_TREE")
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim_end().to_string())
+        .unwrap_or_else(|| project_root.to_string_lossy().into_owned());
+    let project_id = kindling_store::project_id(&routed_root);
     let db_path = home_path
         .join("projects")
         .join(&project_id)

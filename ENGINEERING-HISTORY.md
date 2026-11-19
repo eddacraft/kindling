@@ -47,6 +47,18 @@ at each release; older distribution approaches may now be superseded.
   valid HTTP header field, now surface as `ClientError::InvalidRequest` instead
   of `ClientError::Http`. The spool treats these as permanent local errors and
   does not buffer them ahead of later entries.
+- **CLI project routing matches the hooks (GH-205, PORT-023).** The embedded
+  `resolve_db_path` and the daemon `build_client` hashed
+  `std::env::current_dir()`, while hooks hash `hook::project::project_root`
+  (`KINDLING_REPO_ROOT` when cwd is inside it, else the Git toplevel, else
+  cwd). Both CLI paths now resolve the root through one
+  `current_project_root()` helper backed by that resolver; the daemon path sets
+  `ClientConfig.project_root` explicitly. `kindling-client`'s
+  `ClientConfig::defaults()` keeps its cwd fallback as the SDK default. No
+  migration: the hooks already wrote the Git-root hash, so the CLI is
+  re-pointed at the existing hook database. End-to-end tests in
+  `crates/kindling/tests/project_routing.rs` cover root and nested
+  invocations, embedded and over the daemon, and the override precedence.
 - **Installer cargo fallback honours a pinned version and the Cargo install path (GH-193).**
   A failed archive download no longer runs unversioned `cargo install
   eddacraft-kindling` and then a bare `kindling` from PATH. The fallback
