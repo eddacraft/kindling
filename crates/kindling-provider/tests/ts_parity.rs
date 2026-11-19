@@ -10,6 +10,11 @@
 //! The TypeScript implementation was retired after Phase 4 of the Rust port
 //! (PORT-005), so these are frozen golden fixtures that still guard ranking
 //! parity (regenerating them would require the retired TS packages).
+//!
+//! If ranking changes on purpose, hand-edit the affected expected entries in
+//! `ts-parity.json` in the same PR, explain the diff in the PR description, and
+//! record it in ENGINEERING-HISTORY. Ranking changes are discuss-first (see
+//! CONTRIBUTING).
 
 use std::path::PathBuf;
 

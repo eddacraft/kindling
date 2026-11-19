@@ -253,7 +253,7 @@ fn handles_adversarial_sql_metacharacters_in_scope_values() {
     let store = scope_fixture();
 
     let legit = search(&store, &options("authentication", scope(Some("s1"), None)));
-    assert!(!legit.is_empty());
+    assert_eq!(sorted_ids(&legit), ["obs-1", "obs-3"]);
 
     let adversarial = search(
         &store,
