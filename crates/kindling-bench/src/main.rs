@@ -6,7 +6,7 @@ use kindling_bench::workloads::{self, MeasurementMode};
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let mut args = std::env::args().skip(1);
-    let mut profile_name = "smoke".to_string();
+    let mut profile_name: Option<String> = None;
     let mut profile_json: Option<String> = None;
     let mut pretty = false;
     let mut only_group: Option<String> = None;
@@ -14,7 +14,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--profile" => {
-                profile_name = args.next().ok_or("--profile requires a value")?;
+                profile_name = Some(args.next().ok_or("--profile requires a value")?);
             }
             "--profile-json" => {
                 profile_json = Some(args.next().ok_or("--profile-json requires a value")?);
@@ -45,6 +45,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
                        (default)              in-process sampling (groups share one process)\n\
                        --isolated-process     each group runs in a fresh child process\n\
                        --only-group NAME      run one group and emit its JSON (child entry)\n\
+                       --profile-json JSON    full Profile as JSON for isolated children (not with --profile)\n\
                        --measurement-scope S  in-process|isolated-child (label + mode)"
                 );
                 return Ok(());
@@ -52,10 +53,15 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
             unknown => return Err(format!("unknown argument: {unknown}").into()),
         }
     }
-    let profile = match profile_json {
-        Some(json) => serde_json::from_str(&json)?,
-        None => Profile::from_name(&profile_name)
-            .ok_or_else(|| format!("unknown profile: {profile_name}"))?,
+    let profile = match (profile_json, profile_name) {
+        (Some(_), Some(_)) => {
+            return Err("--profile and --profile-json cannot be used together".into());
+        }
+        (Some(json), None) => serde_json::from_str(&json)?,
+        (None, name) => {
+            let name = name.unwrap_or_else(|| "smoke".to_string());
+            Profile::from_name(&name).ok_or_else(|| format!("unknown profile: {name}"))?
+        }
     };
 
     if let Some(group) = only_group {

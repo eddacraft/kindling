@@ -57,3 +57,32 @@ fn isolated_run_honours_a_customized_profile() {
         .expect("append metric");
     assert_eq!(append["operationCount"].as_u64(), Some(7));
 }
+
+#[test]
+fn profile_and_profile_json_together_are_rejected() {
+    // `--profile-json` replaces the whole profile, so combining it with
+    // `--profile` would silently drop the named preset. Refuse instead.
+    let json = serde_json::to_string(&Profile::from_name("smoke").expect("smoke preset"))
+        .expect("serialize profile");
+    let output = Command::new(env!("CARGO_BIN_EXE_kindling-bench"))
+        .args(["--profile", "stress", "--profile-json", &json])
+        .output()
+        .expect("run benchmark");
+
+    assert!(!output.status.success(), "combination must be rejected");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("--profile and --profile-json cannot be used together"),
+        "unexpected stderr: {stderr}"
+    );
+}
+
+#[test]
+fn help_lists_profile_json() {
+    let output = Command::new(env!("CARGO_BIN_EXE_kindling-bench"))
+        .arg("--help")
+        .output()
+        .expect("run --help");
+    let help = String::from_utf8_lossy(&output.stderr);
+    assert!(help.contains("--profile-json JSON"), "help: {help}");
+}
