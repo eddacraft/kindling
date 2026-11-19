@@ -248,8 +248,9 @@ pub struct ClientConfig {
     /// Interval between socket-connect attempts while polling for the daemon.
     /// Defaults to 10ms.
     pub poll_interval: Duration,
-    /// How to start the daemon when it is not running. Defaults to the real
-    /// `kindling serve --daemonize` binary.
+    /// How to start the daemon when it is not running. Defaults to
+    /// [`Spawner::Command`]: `kindling serve --daemonize`, using `$KINDLING_BIN`
+    /// when set and non-empty.
     pub spawn: Spawner,
     /// Transport to reach the daemon. Defaults to [`Transport::default`] (UDS
     /// on Unix, TCP on Windows).
