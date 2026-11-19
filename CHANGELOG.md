@@ -18,6 +18,10 @@ ended with v0.4.0.
 
 - `kindling tui` browses local memory with editable search, pins first, and a wrapped, scrollable preview. Panels adapt to terminal width; press Esc or Ctrl-C to quit. Preview scrolling stops at the final page, and unsupported `--json` mode is rejected.
 
+### Security
+
+- Resolved Dependabot alerts in development tooling (`minimatch`, `tinypool`, `@vitest/mocker`, `@azure/msal-node`). None of these ship in kindling, its crates or the VSIX.
+
 ### Fixed
 
 - **Contributor package-manager tooling now requires pnpm 12.** Enable Corepack
