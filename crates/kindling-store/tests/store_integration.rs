@@ -1122,3 +1122,68 @@ fn memory_stats_counts_by_kind_capsules_and_pins() {
     assert_eq!(later.pins.active, 1);
     assert_eq!(later.pins.expired, 2);
 }
+
+/// GH-216: the retired TS store wrote `JSON.stringify(scopeIds)` and its
+/// validator allowed an array, so a TS-era row can hold `scope_ids = '[]'` or
+/// `'["x"]'`. TS read `.sessionId` from such an array as `undefined` and wrote
+/// NULL denormalized columns, so the row means "no scope". It must stay
+/// readable now that `ScopeIds` rejects arrays on the wire.
+#[test]
+fn ts_era_array_scope_ids_rows_read_as_unscoped() {
+    for legacy in ["[]", r#"["x"]"#] {
+        let store = SqliteKindlingStore::open_in_memory().unwrap();
+        store
+            .insert_observation(&observation("obs-1", "legacy row", 1000, "sess-1"))
+            .unwrap();
+        store
+            .create_capsule(&capsule("cap-1", "sess-1", 1000))
+            .unwrap();
+        store
+            .insert_pin(&Pin {
+                id: "pin-1".to_string(),
+                target_type: PinTargetType::Observation,
+                target_id: "obs-1".to_string(),
+                reason: None,
+                created_at: 1000,
+                expires_at: None,
+                scope_ids: scope("sess-1"),
+            })
+            .unwrap();
+        for table in ["observations", "capsules", "pins"] {
+            store
+                .connection()
+                .execute(
+                    &format!(
+                        "UPDATE {table} SET scope_ids = ?1, session_id = NULL, repo_id = NULL"
+                    ),
+                    [legacy],
+                )
+                .unwrap();
+        }
+
+        let obs = store.get_observation_by_id("obs-1").unwrap().unwrap();
+        assert_eq!(obs.scope_ids, ScopeIds::default(), "observation {legacy}");
+        let cap = store.get_capsule("cap-1").unwrap().unwrap();
+        assert_eq!(cap.scope_ids, ScopeIds::default(), "capsule {legacy}");
+        let pins = store.list_active_pins(None, None).unwrap();
+        assert_eq!(pins.len(), 1);
+        assert_eq!(pins[0].scope_ids, ScopeIds::default(), "pin {legacy}");
+    }
+}
+
+/// Only the array form is tolerated; other malformed `scope_ids` still fail.
+#[test]
+fn non_object_non_array_scope_ids_row_is_an_error() {
+    let store = SqliteKindlingStore::open_in_memory().unwrap();
+    store
+        .insert_observation(&observation("obs-1", "bad row", 1000, "sess-1"))
+        .unwrap();
+    store
+        .connection()
+        .execute("UPDATE observations SET scope_ids = '42'", [])
+        .unwrap();
+    assert!(matches!(
+        store.get_observation_by_id("obs-1"),
+        Err(StoreError::Json(_))
+    ));
+}

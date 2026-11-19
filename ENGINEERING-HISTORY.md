@@ -51,10 +51,13 @@ at each release; older distribution approaches may now be superseded.
   seven `scopeIds` routes accepts an object and returns a 4xx for `[]` and
   `["s1"]`. Other derived request structs still accept the positional sequence
   form for the whole body; that is left for a separate issue.
-  Store and provider rows decode `scope_ids` through the same impl. The Rust
-  writer always stores an object, but a database written by the retired TS
-  engine, whose validator allowed arrays, could hold an array-shaped
-  `scope_ids`; reading such a row now fails instead of binding positionally.
+  Stored rows are decoded leniently. The retired TS store wrote
+  `JSON.stringify(scopeIds)` and its validator allowed arrays, so a TS-era row
+  can hold `scope_ids = '["x"]'` with NULL denormalized columns (TS read
+  `.sessionId` from the array as `undefined`). `decode_stored_scope_ids` in
+  `kindling-store` and `kindling-provider` reads an array-shaped blob as an
+  empty scope, matching those columns, instead of failing the query; any
+  other malformed blob is still an error.
 - **Hook and client project-root override rejects sibling directory prefixes (GH-173).**
   `KINDLING_REPO_ROOT` is normalised and compared as path components, so a cwd
   such as `/work/repo-copy` is no longer treated as inside `/work/repo`.

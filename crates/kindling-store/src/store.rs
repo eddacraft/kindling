@@ -1233,7 +1233,7 @@ impl RawObservation {
             content: self.content,
             provenance: serde_json::from_str(&self.provenance)?,
             ts: self.ts,
-            scope_ids: serde_json::from_str(&self.scope_ids)?,
+            scope_ids: decode_stored_scope_ids(&self.scope_ids)?,
             redacted: self.redacted == 1,
         })
     }
@@ -1270,7 +1270,7 @@ impl RawCapsule {
             status: capsule_status_from_str(&self.status)?,
             opened_at: self.opened_at,
             closed_at: self.closed_at,
-            scope_ids: serde_json::from_str(&self.scope_ids)?,
+            scope_ids: decode_stored_scope_ids(&self.scope_ids)?,
             observation_ids,
             // The capsules table has no summary_id column; the relationship
             // lives in summaries.capsule_id (matches the TS store).
@@ -1331,7 +1331,25 @@ impl RawPin {
             reason: self.reason,
             created_at: self.created_at,
             expires_at: self.expires_at,
-            scope_ids: serde_json::from_str(&self.scope_ids)?,
+            scope_ids: decode_stored_scope_ids(&self.scope_ids)?,
         })
     }
+}
+
+/// Decode a row's stored `scope_ids` JSON blob.
+///
+/// The retired TS store wrote `JSON.stringify(scopeIds)` and its validator
+/// allowed an array, so a TS-era row can hold `'[]'` or `'["x"]'`. TS read
+/// `.sessionId` from that array as `undefined` and wrote NULL denormalized
+/// columns, so such a row means "no scope". `ScopeIds` rejects arrays on the
+/// wire (GH-216); reading one from disk yields an empty scope instead of an
+/// error. Any other malformed value is still an error. Kept in step with the
+/// copy in `kindling-provider`.
+fn decode_stored_scope_ids(raw: &str) -> serde_json::Result<ScopeIds> {
+    serde_json::from_str(raw).or_else(|err| {
+        match serde_json::from_str::<Vec<serde_json::Value>>(raw) {
+            Ok(_) => Ok(ScopeIds::default()),
+            Err(_) => Err(err),
+        }
+    })
 }

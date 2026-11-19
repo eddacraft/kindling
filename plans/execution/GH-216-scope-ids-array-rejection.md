@@ -34,6 +34,10 @@ first regression test failed, and against the daemon `POST /v1/capsules` with
     proves the rejection is caused by the array, not by another invalid field.
   - `docs/retrieval-contract.md` Scoping states that `scopeIds` is a keyed JSON
     object and that arrays are rejected.
+  - TS-era rows stay readable: the store and provider decode an array-shaped
+    stored `scope_ids` blob as an empty scope (TS wrote NULL denormalized
+    columns for such rows), while other malformed blobs still error. Covered
+    by store and provider tests that write a raw legacy row.
   - CHANGELOG `### Fixed` and ENGINEERING-HISTORY entries.
 - **Non-scope:** the field set or serialization of `ScopeIds`; the DTOs; the
   status code axum returns for a JSON data error; the TS thin client; the same
@@ -45,6 +49,7 @@ first regression test failed, and against the daemon `POST /v1/capsules` with
   - `node packages/kindling/scripts/sync-types.mjs` then no diff in
     `packages/kindling/src/generated/` (thin-client copy)
   - `cargo test -p kindling-server --test api`
+  - `cargo test -p kindling-store -p kindling-provider`
   - `cargo clippy --all-targets --all-features -- -D warnings`
   - `cargo fmt --all -- --check`
   - `python3 scripts/check-release-docs.py`
