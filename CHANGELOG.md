@@ -18,8 +18,17 @@ ended with v0.4.0.
 
 - `kindling tui` browses local memory with editable search, pins first, and a wrapped, scrollable preview. Panels adapt to terminal width; press Esc or Ctrl-C to quit. Preview scrolling stops at the final page, and unsupported `--json` mode is rejected.
 
+### Deprecated
+
+- `kindling_server::inject::format_session_start` is deprecated in favour of
+  `format_session_start_with`, which takes a per-timestamp offset resolver.
+  The old function still compiles and behaves as before.
+
 ### Fixed
 
+- SessionStart context renders each observation's timestamp in the
+  daylight-saving offset that applied at that time, rather than an hour off
+  for observations from the other side of a DST change.
 - **Contributor package-manager tooling now requires pnpm 12.** Enable Corepack
   with `corepack enable` so the repository's pinned pnpm version is used.
 - Project-root overrides now reject sibling directories with similar path prefixes, preventing incorrect repository selection.

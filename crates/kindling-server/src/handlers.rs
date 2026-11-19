@@ -27,7 +27,7 @@ use crate::dto::{
     DEFAULT_MAX_RESULTS,
 };
 use crate::error::ApiError;
-use crate::inject::{format_pre_compact, format_session_start, local_offset_seconds};
+use crate::inject::{format_pre_compact, format_session_start_with, local_offset_seconds};
 use crate::state::AppState;
 
 /// Header carrying the project root string for per-project DB routing.
@@ -281,7 +281,7 @@ pub async fn session_start_context(
     };
     // Resolve the local offset at each observation's instant so every timestamp
     // renders in the DST offset that was in effect then, not at request time.
-    let additional = format_session_start(&ctx, local_offset_seconds);
+    let additional = format_session_start_with(&ctx, local_offset_seconds);
     Ok(Json(json!({ "additionalContext": additional })))
 }
 

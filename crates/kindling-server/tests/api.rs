@@ -639,7 +639,9 @@ async fn session_start_context_exact_markdown() {
     // hook), resolving the offset at each observation's instant. Rather than
     // mutate the process `TZ` (forbidden: unsafe + races), we compute the
     // expected dates with the same public formatter + per-instant offset, so the
-    // assertion is host-independent and DST-correct.
+    // assertion is host-independent and DST-correct. These timestamps all fall
+    // in mid-November, so this test can't catch a single-offset regression; the
+    // DST-transition coverage lives in the `inject.rs` unit tests.
     // Distinct timestamps so `ORDER BY ts DESC` is unambiguous: c < a < b.
     let ts_c = 1_700_000_000_000_i64; // pinned message
     let ts_a = 1_700_000_001_000_i64; // git status

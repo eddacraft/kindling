@@ -3,7 +3,7 @@
 //! The daemon (not the hook) owns the markdown so the date logic lives in
 //! exactly one place. Two formatters reproduce the Node plugin hooks:
 //!
-//! - [`format_session_start`] ⇄ `plugins/kindling-claude-code/hooks/session-start.js`
+//! - [`format_session_start_with`] ⇄ `plugins/kindling-claude-code/hooks/session-start.js`
 //! - [`format_pre_compact`] ⇄ `plugins/kindling-claude-code/hooks/pre-compact.js`
 //!
 //! # `toLocaleString` parity
@@ -57,6 +57,21 @@ const PRECOMPACT_SUMMARY_PREVIEW: usize = 500;
 const SESSION_HEADER: &str =
     "# Prior Context (from Kindling)\n\nThe following is prior session context for this project:\n";
 
+/// Format the SessionStart `additionalContext` with every observation
+/// timestamp rendered at one fixed UTC offset.
+///
+/// A batch that spans a daylight-saving transition renders the observations
+/// on the other side of it an hour off. Use [`format_session_start_with`],
+/// which resolves the offset per observation.
+#[deprecated(
+    note = "renders every observation at one offset, so timestamps across a DST \
+            transition are an hour off; use `format_session_start_with` with \
+            `local_offset_seconds`"
+)]
+pub fn format_session_start(ctx: &SessionStartContext, offset_seconds: i32) -> Option<String> {
+    format_session_start_with(ctx, |_| offset_seconds)
+}
+
 /// Format the SessionStart `additionalContext`, or `None` when there is nothing
 /// to inject (matching the Node hook's "only if ≥1 item" gate).
 ///
@@ -64,7 +79,7 @@ const SESSION_HEADER: &str =
 /// and is called once per observation so a batch spanning a DST transition
 /// renders each instant in the offset that was in effect then (use
 /// [`local_offset_seconds`] for the live daemon; a fixed closure in tests).
-pub fn format_session_start(
+pub fn format_session_start_with(
     ctx: &SessionStartContext,
     offset_of: impl Fn(i64) -> i32,
 ) -> Option<String> {
@@ -248,6 +263,19 @@ mod tests {
     const NY_EST: i32 = -5 * 3600; // America/New_York, standard time (Nov).
     const NY_EDT: i32 = -4 * 3600; // America/New_York, daylight time (Jul).
     const UTC: i32 = 0;
+
+    /// America/New_York's offset during 2023, keyed on the exact transition
+    /// instants: EDT from 2023-03-12 07:00 UTC (spring forward) until
+    /// 2023-11-05 06:00 UTC (fall back), EST otherwise.
+    fn ny_offset_2023(ts: i64) -> i32 {
+        let spring_forward = epoch_ms_utc(2023, 3, 12, 7, 0, 0);
+        let fall_back = epoch_ms_utc(2023, 11, 5, 6, 0, 0);
+        if (spring_forward..fall_back).contains(&ts) {
+            NY_EDT
+        } else {
+            NY_EST
+        }
+    }
     const IST: i32 = 5 * 3600 + 30 * 60; // Asia/Kolkata, +05:30.
 
     #[test]
@@ -376,7 +404,7 @@ mod tests {
                 ),
             ],
         };
-        let out = format_session_start(&ctx, |_| NY_EST).expect("non-empty");
+        let out = format_session_start_with(&ctx, |_| NY_EST).expect("non-empty");
         let expected = "# Prior Context (from Kindling)\n\n\
 The following is prior session context for this project:\n\
 ## Pinned Items\n\
@@ -394,7 +422,7 @@ The following is prior session context for this project:\n\
             pins: vec![],
             recent: vec![obs(ObservationKind::Error, "boom", 1_700_049_600_000)],
         };
-        let out = format_session_start(&ctx, |_| UTC).expect("non-empty");
+        let out = format_session_start_with(&ctx, |_| UTC).expect("non-empty");
         let expected = "# Prior Context (from Kindling)\n\n\
 The following is prior session context for this project:\n\
 ## Recent Activity\n\
@@ -416,16 +444,7 @@ The following is prior session context for this project:\n\
                 obs(ObservationKind::Message, "winter", winter_ms),
             ],
         };
-
-        // EDT roughly March–November; EST otherwise.
-        let offset_of = |ts: i64| {
-            if ts >= epoch_ms_utc(2023, 3, 1, 0, 0, 0) && ts < epoch_ms_utc(2023, 11, 1, 0, 0, 0) {
-                NY_EDT
-            } else {
-                NY_EST
-            }
-        };
-        let out = format_session_start(&ctx, offset_of).expect("non-empty");
+        let out = format_session_start_with(&ctx, ny_offset_2023).expect("non-empty");
 
         let expected = "# Prior Context (from Kindling)\n\n\
 The following is prior session context for this project:\n\
@@ -436,12 +455,68 @@ The following is prior session context for this project:\n\
     }
 
     #[test]
+    fn session_start_renders_both_sides_of_the_fall_back_transition() {
+        // America/New_York fell back at 2023-11-05 06:00:00 UTC: 1:59:59 AM EDT
+        // is followed one second later by 1:00:00 AM EST. A single offset for
+        // the batch renders one side wrong (2:00:00 AM under EDT, or
+        // 12:59:59 AM under EST).
+        let before_ms = epoch_ms_utc(2023, 11, 5, 5, 59, 59);
+        let after_ms = epoch_ms_utc(2023, 11, 5, 6, 0, 0);
+        let ctx = SessionStartContext {
+            pins: vec![],
+            recent: vec![
+                obs(ObservationKind::Message, "after", after_ms),
+                obs(ObservationKind::Message, "before", before_ms),
+            ],
+        };
+        let out = format_session_start_with(&ctx, ny_offset_2023).expect("non-empty");
+
+        let expected = "# Prior Context (from Kindling)\n\n\
+The following is prior session context for this project:\n\
+## Recent Activity\n\
+- [11/5/2023, 1:00:00 AM] message: after\n\
+- [11/5/2023, 1:59:59 AM] message: before";
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn deprecated_fixed_offset_entry_point_still_renders() {
+        // `format_session_start(ctx, i32)` is the 0.4.1 public signature and
+        // must keep compiling and rendering every observation at that offset.
+        let ctx = SessionStartContext {
+            pins: vec![],
+            recent: vec![
+                obs(
+                    ObservationKind::Message,
+                    "summer",
+                    epoch_ms_utc(2023, 7, 1, 12, 0, 0),
+                ),
+                obs(
+                    ObservationKind::Message,
+                    "winter",
+                    epoch_ms_utc(2023, 1, 1, 12, 0, 0),
+                ),
+            ],
+        };
+        assert_eq!(
+            format_session_start(&ctx, NY_EST),
+            format_session_start_with(&ctx, |_| NY_EST)
+        );
+        let out = format_session_start(&ctx, NY_EST).expect("non-empty");
+        assert!(
+            out.contains("- [7/1/2023, 7:00:00 AM] message: summer"),
+            "{out}"
+        );
+    }
+
+    #[test]
     fn session_start_zero_ts_renders_empty_bracket() {
         let ctx = SessionStartContext {
             pins: vec![],
             recent: vec![obs(ObservationKind::Message, "hi", 0)],
         };
-        let out = format_session_start(&ctx, |_| UTC).expect("non-empty");
+        let out = format_session_start_with(&ctx, |_| UTC).expect("non-empty");
         assert!(
             out.ends_with("## Recent Activity\n- [] message: hi"),
             "{out}"
@@ -454,7 +529,7 @@ The following is prior session context for this project:\n\
             pins: vec![],
             recent: vec![],
         };
-        assert!(format_session_start(&ctx, |_| UTC).is_none());
+        assert!(format_session_start_with(&ctx, |_| UTC).is_none());
     }
 
     #[test]
