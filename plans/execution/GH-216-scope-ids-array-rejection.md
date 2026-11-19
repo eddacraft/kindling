@@ -42,6 +42,8 @@ first regression test failed, and against the daemon `POST /v1/capsules` with
 - **Validation:**
   - `cargo test -p kindling-types`
   - `cargo test -p kindling-types --features ts-rs` (bindings drift)
+  - `node packages/kindling/scripts/sync-types.mjs` then no diff in
+    `packages/kindling/src/generated/` (thin-client copy)
   - `cargo test -p kindling-server --test api`
   - `cargo clippy --all-targets --all-features -- -D warnings`
   - `cargo fmt --all -- --check`
