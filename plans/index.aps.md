@@ -19,7 +19,7 @@ and the old TypeScript engine are retired by D-010.
 
 [completed.aps.md](./completed.aps.md) indexes 44 completed items and the archived
 task detail. Fourteen superseded items are historical, not completed deliveries.
-Thirty-four items remain active across five modules. See the
+Thirty-five items remain active across five modules. See the
 [full reconciliation](./reconciliation/2026-11-13-aps-cleanup.md) for all 87 dispositions.
 
 ## Success criteria
@@ -39,7 +39,7 @@ Thirty-four items remain active across five modules. See the
 
 | Module                                                                                        | Purpose                                                             | Status      | Active items | Delivered dependencies                                               |
 | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ----------- | ------------ | -------------------------------------------------------------------- |
-| [05-rust-port](./modules/05-rust-port.aps.md)                                                 | Native/plugin acceptance and deferred lifecycle closeout            | In Progress | 4            | Schema, Rust engine/client and PORT-011 delivered                    |
+| [05-rust-port](./modules/05-rust-port.aps.md)                                                 | Native/plugin acceptance and deferred lifecycle closeout            | In Progress | 5            | Schema, Rust engine/client and PORT-011 delivered                    |
 | [06-downstream-integration-surface](./modules/06-downstream-integration-surface.aps.md)       | Complete adapter fixtures; deliver generic-event@1 (KINTEG-015a–e)  | In Progress | 7            | KINTEG-001..006/008..014 delivered                                   |
 | [07-intent-capture-events](./modules/07-intent-capture-events.aps.md)                         | Resolve current ownership/availability after TS retirement (GH-215) | Blocked     | 6            | Historical TS implementation removed; current Rust equivalent absent |
 | [08-conversion-surface](./modules/08-conversion-surface.aps.md)                               | Release acceptance, CLI depth, distribution and docs                | In Progress | 12           | Rust runtime and C1/C3/C4 delivered                                  |
