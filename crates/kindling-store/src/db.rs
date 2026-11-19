@@ -224,15 +224,39 @@ pub fn open_in_memory() -> StoreResult<Connection> {
 }
 
 fn configure(conn: &Connection, readonly: bool) -> StoreResult<()> {
+    // Set busy_timeout before any locking PRAGMA so concurrent openers wait
+    // instead of failing immediately with SQLITE_BUSY.
+    conn.busy_timeout(Duration::from_millis(5000))?;
     if !readonly {
         // journal_mode is persistent in the DB file; read-only connections
-        // inherit it and may not change it.
-        let _mode: String = conn.query_row("PRAGMA journal_mode = WAL", [], |row| row.get(0))?;
+        // inherit it and may not change it. Switching a legacy DELETE-mode DB
+        // to WAL upgrades a shared lock to exclusive, where SQLite returns
+        // SQLITE_BUSY immediately (without invoking busy_timeout) when two
+        // connections race. Retry briefly until the switch succeeds or another
+        // opener finishes switching it to WAL.
+        ensure_wal_mode(conn)?;
     }
     conn.pragma_update(None, "foreign_keys", "ON")?;
-    conn.busy_timeout(Duration::from_millis(5000))?;
     conn.pragma_update(None, "synchronous", "NORMAL")?;
     conn.pragma_update(None, "cache_size", -64000)?;
+    Ok(())
+}
+
+fn ensure_wal_mode(conn: &Connection) -> StoreResult<()> {
+    const MAX_ATTEMPTS: u32 = 50;
+    for attempt in 0..MAX_ATTEMPTS {
+        match conn.query_row("PRAGMA journal_mode = WAL", [], |row| {
+            row.get::<_, String>(0)
+        }) {
+            Ok(_) => return Ok(()),
+            Err(rusqlite::Error::SqliteFailure(err, _))
+                if err.code == rusqlite::ErrorCode::DatabaseBusy && attempt + 1 < MAX_ATTEMPTS =>
+            {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            Err(e) => return Err(e.into()),
+        }
+    }
     Ok(())
 }
 
