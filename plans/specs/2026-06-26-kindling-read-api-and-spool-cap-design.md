@@ -120,9 +120,7 @@ views at quiescent moments and treat counts as "as-of the pinned `until`".
 
 ```jsonc
 {
-  "observations": [
-    /* Observation[] in (ts ASC, id ASC) order */
-  ],
+  "observations": [/* Observation[] in (ts ASC, id ASC) order */],
   "nextCursor": "…", // present iff the +1 sentinel existed; ABSENT = enumeration complete
 }
 ```
@@ -140,8 +138,8 @@ views at quiescent moments and treat counts as "as-of the pinned `until`".
 ### Store / service / wiring
 
 - New store method `list_observations(scope, kinds, since, until, cursor, limit,
-include_redacted)` — **not** an overload of `query_observations` (which is `ts
-DESC`, no cursor, and has live retrieval callers). Mirrors `export_observations`'
+  include_redacted)` — **not** an overload of `query_observations` (which is `ts
+  DESC`, no cursor, and has live retrieval callers). Mirrors `export_observations`'
   ASC ordering and `push_scope_filters`.
 - Service method `list_observations(...)` → store. **No secret masking** (masking
   is a write-path boundary; reads return already-stored content).
@@ -232,7 +230,7 @@ cross-mount rename). (adversarial F18)
 
 1. Read entries in order (append order = drain order).
 2. **Age:** drop a leading prefix whose `spooled_at` is older than `now -
-max_age_ms` (entries lacking `spooled_at` are skipped by the age rule).
+   max_age_ms` (entries lacking `spooled_at` are skipped by the age rule).
 3. **Bytes:** if the serialized remainder still exceeds `max_bytes`, keep dropping
    from the **front** until it fits.
 4. A single entry larger than `max_bytes` is **kept** — the byte cap is a

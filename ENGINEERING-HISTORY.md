@@ -13,7 +13,25 @@ at each release; older distribution approaches may now be superseded.
 
 ## [Unreleased]
 
+### Added
+
+- **Interactive memory browser (CONV C6, PR #263).** `kindling tui` uses
+  `eddacraft-tui` 0.6, the canonical TUI library for eddacraft products, with
+  shared themed containers, `TextInput`, text-entry key handling, `HelpBar`
+  and the panic-safe `TerminalGuard`. Direct ratatui 0.30/crossterm 0.29
+  dependencies match the library. Filtering and pins-first ordering remain
+  terminal-free; interaction and rendering tests cover query editing, empty
+  results, preview scrolling and multiple terminal sizes. The immutable snapshot
+  is sorted and labelled once; query matches and preview layout are cached, and
+  only visible result rows are rendered. Scroll bounds use ratatui's rendered
+  line count (the `unstable-rendered-line-info` feature) and are refreshed on
+  resize. JSON output is rejected before opening the database.
+
 ### Fixed
+
+- **Contributor package-manager tooling now requires pnpm 12.** The exact
+  package-manager pin is recorded in `package.json`; dependency overrides and
+  build permissions live in `pnpm-workspace.yaml`.
 
 - **Release evidence and publish dry-run no longer report success after failed checks (GH-194).**
   `capture-release-evidence.sh` records each fmt, clippy, test, and pnpm
