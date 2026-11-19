@@ -54,9 +54,9 @@ Thirty-four items remain active across five modules. See the
 - KINTEG-007 ships Claude Code fixtures only; its full OpenCode/PocketFlow fixture
   outcome is outstanding. The KINTEG-015 design is accepted (D-011, #282) and
   KINTEG-015a is Ready; 015b–015e stay Draft until their predecessor merges.
-  anvil's answers to the spec's open questions 1–2 (KFIT-005 key domain, detector
-  compatibility) are a precondition for starting 015a; questions 3–8 gate 015b
-  onwards. No release is cut from `main` between the 015a and 015d merges, and
+  anvil resolved the spec's open questions 1–2 (KFIT-005 key domain, detector
+  compatibility) on 2026-11-19, so 015a can start; questions 3–6 and 8 gate 015b
+  onwards (4 has a proposed resolution awaiting the owner). No release is cut from `main` between the 015a and 015d merges, and
   generic-event@1 is not advertised until 015d; 0.4.x never supports it.
 - KINTENT-001..006 are Blocked on [GH-215](https://github.com/eddacraft/kindling/issues/215).
   Historical merges do not establish the feature in the supported Rust release.

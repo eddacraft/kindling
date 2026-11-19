@@ -57,6 +57,11 @@ pagination, batch (later feature entries); a TS method, CLI verb or
 semver-covered embedded API (Q-03); FTS/retrieve/inject/list visibility;
 attestation; physical erasure; a detector allow-list; retention; cloud or sync.
 
+**Principle:** kindling ships only generic mechanism. anvil is the first consumer,
+not the only one. A need that only one consumer has is met in that consumer, or
+in an adapter built on this contract, never by shaping `generic-event@1` around
+it.
+
 ## Decisions
 
 | #   | Source (R = Phase 4 review) | Choice                                                                                                                           | Section                                                                      |
@@ -608,14 +613,18 @@ forget is logical; for CodeQL the detector is not a sanitiser.
 | macOS, with a 0.4 process writing the same DB                         | Work                                             | Durable against process crash. Power-loss guarantee void until every writer is 0.5     |
 | Tools that read `user_version` as the revision                        | —                                                | Must read `MAX(schema_migrations.version)`                                             |
 
-## Consumer guidance for anvil
+## Consumer guidance (Rust integrations)
 
 - **Dedicated `kindling_home`** (`RuntimeConfig::with_home`), so a hook-spawned
   0.4 daemon on the default socket cannot leave generic events `Unsupported`.
-- **One canonical absolute `project_root`.** Routing hashes the raw string, so
-  `/repo` vs `/repo/`, symlinks and macOS temp dirs (`/var/…` vs `/private/var/…`)
-  reach different DBs, where lookup returns `notFound` and looks like data loss.
-  Canonicalisation is follow-up and open question 7.
+- **`project_root` is an opaque routing string.** kindling only hashes it
+  (`paths::project_id`); it is never parsed, canonicalised or used as a path,
+  and that is part of the @1 contract. A consumer may send any stable,
+  non-empty, visible-ASCII identifier (for example a scope string built from
+  UUIDs). One logical project must always send byte-identical bytes:
+  `/repo` vs `/repo/`, symlinks and macOS `/var/…` vs `/private/var/…` reach
+  different DBs, where lookup returns `notFound`. Callers that use filesystem
+  paths canonicalise them before sending.
 - **Fixture assertions:** `receipt.scope.projectId == runtime.project_id()`
   before the lookup, and a lookup under a different root returns `notFound`
   (amendment 6).
@@ -719,11 +728,18 @@ crash-test approach.
 Not added to APS here: reconcile the `hook/filter.rs` detector drift against the
 shared rule table; add `privateKeyBlock` to observation masking; physical erasure
 on forget (`secure_delete` plus a checkpoint, without taxing ordinary appends);
-expose the keyed counters; canonicalise `project_root` (`/repo/`, symlinks,
-`/private/var`); move all project handlers to `spawn_blocking` and re-measure
+expose the keyed counters; caller-side canonicalisation of path-shaped roots in
+the CLI and hooks (never in the routing layer, which stays opaque); move all project handlers to `spawn_blocking` and re-measure
 p95; a runtime attach policy that starts its own embedded daemon when the
 attached one lacks `generic-event@1`; listing and pagination as
 `generic-event-list@1`.
+
+Generic candidates raised by anvil's Track B, each a later feature entry rather
+than a change to @1: an atomic multi-row operation (for example forget-many plus
+an appended receipt in one transaction, which a prune with a receipt needs);
+batch keyed append for bursts above the 5/s gate. anvil's other gaps (rows with
+no repository, mapping its own event id onto key, scope and digest) are met in
+anvil with the existing contract.
 
 ## Amendments to the original KINTEG-015 wording
 
@@ -741,19 +757,27 @@ attached one lacks `generic-event@1`; listing and pagination as
 
 ## Open questions
 
-1. **anvil:** does per-project key uniqueness (amendment 1) meet KFIT-005?
-2. **anvil:** confirm the key grammar and `anvil.governance.v1` field naming
-   against the detector fixtures, including the `"token": "<uuid>"` false positive.
+1. ~~**anvil:** does per-project key uniqueness (amendment 1) meet KFIT-005?~~
+   **Resolved 2026-11-19: yes.** anvil routes one repository/worktree pair per
+   project and rejects cross-root writes; it amends its own "profile-wide" wording.
+2. ~~**anvil:** confirm the key grammar and field naming against the detector.~~
+   **Resolved 2026-11-19: passes.** Keys are a fixed lowercase prefix plus UUID or
+   hex segments; anvil bans `credentialField` names as JSON keys and runs the
+   detector fixture in its CI.
 3. **Low-disk floor default:** 64 MiB is proposed.
 4. **Settings surface and the Q-09 tension.** Embedded daemons get
    `GenericEventSettings` through `RuntimeConfig`; `ServerConfig` has pub fields
    and is not `#[non_exhaustive]`, so it needs a separate entry point. The shared
    `kindling serve` (auto-spawned or started by hooks) cannot receive a cap
-   without a `serve` flag or config file, a Discuss-first CLI change. Does a
-   `RuntimeConfig`-only cap meet Q-09?
+   without a `serve` flag or config file, a Discuss-first CLI change.
+   **Proposed resolution 2026-11-19:** `RuntimeConfig`-only, off by default, no
+   `serve` flag in 0.5.0. anvil does not need a kindling cap (it accounts
+   itself). Pending the owner's confirmation, because it narrows Q-09.
 5. **Free-space probe:** which crate, under `unsafe_code = "forbid"`? (`rustix` is
    locked for Unix; a Windows dependency may be Discuss-first.)
 6. **New CI:** approve a macOS test job and a nightly crash workflow (neither exists).
-7. **`project_root` canonicalisation:** document only in 0.5.0 (proposed), or fix
-   before `@1` is frozen?
+7. ~~**`project_root` canonicalisation.**~~ **Resolved 2026-11-19:** the routing
+   string stays opaque and is never canonicalised by kindling (see
+   [Consumer guidance](#consumer-guidance-rust-integrations)); path
+   canonicalisation, if added, is caller-side only.
 8. **Barrier cost on CLI writable opens:** one checkpoint per open (skipped with no generic events)?

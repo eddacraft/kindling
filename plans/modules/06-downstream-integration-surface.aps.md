@@ -120,8 +120,8 @@ adapter-fixture scope (KINTEG-007) and the next-minor generic-event contract
   `plans/modules/kindling-product-fit.aps.md`). Its Track B (KFIT-007, -009,
   -010, -011, -013) waits on this release. anvil validates the release with a
   cross-repository fixture that commits one keyed opaque event, restarts the
-  runtime and retrieves the exact row. anvil should answer the spec's open
-  questions 1–2 before 015a starts.
+  runtime and retrieves the exact row. anvil answered the spec's open
+  questions 1–2 on 2026-11-19 (both resolved).
 - **Dependencies:** None upstream. Design approval is recorded in the Ready
   Checklist (#282). This item is not coupled to C14.
 - **Repositories:** `eddacraft/kindling`
@@ -165,8 +165,8 @@ adapter-fixture scope (KINTEG-007) and the next-minor generic-event contract
   - `scripts/sync-vendored-schema.sh && git diff --exit-code`
   - `cargo clippy --all-targets --all-features -- -D warnings`
   - `python3 scripts/check-release-docs.py`
-- **Dependencies:** KINTEG-015 design approval (Ready Checklist, #282); anvil's
-  answers to the spec's open questions 1–2 before implementation starts
+- **Dependencies:** KINTEG-015 design approval (Ready Checklist, #282); the
+  spec's open questions 1–2, resolved by anvil on 2026-11-19
 - **Repositories:** `eddacraft/kindling`
 - **Confidence:** high
 - **Status:** Ready
