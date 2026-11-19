@@ -1,4 +1,4 @@
-//! Project routing parity between the CLI and the hooks (GH-205, PORT-023).
+//! Project routing parity between the CLI and the hooks (GH-205).
 //!
 //! The hooks resolve the project root as `KINDLING_REPO_ROOT` (when cwd is
 //! inside it), else the Git toplevel, else cwd, and hash that into

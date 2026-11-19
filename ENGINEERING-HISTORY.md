@@ -47,7 +47,7 @@ at each release; older distribution approaches may now be superseded.
   valid HTTP header field, now surface as `ClientError::InvalidRequest` instead
   of `ClientError::Http`. The spool treats these as permanent local errors and
   does not buffer them ahead of later entries.
-- **CLI project routing matches the hooks (GH-205, PORT-023).** The embedded
+- **CLI project routing matches the hooks (GH-205).** The embedded
   `resolve_db_path` and the daemon `build_client` hashed
   `std::env::current_dir()`, while hooks hash `hook::project::project_root`
   (`KINDLING_REPO_ROOT` when cwd is inside it, else the Git toplevel, else
