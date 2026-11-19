@@ -2,7 +2,7 @@
 
 | Field      | Value                                                    |
 | ---------- | -------------------------------------------------------- |
-| Status     | Proposed                                                 |
+| Status     | Accepted                                                 |
 | Owner      | @aneki                                                   |
 | Created    | 2026-11-18                                               |
 | APS Module | `plans/modules/06-downstream-integration-surface.aps.md` |

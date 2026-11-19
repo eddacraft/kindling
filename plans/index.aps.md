@@ -19,7 +19,7 @@ and the old TypeScript engine are retired by D-010.
 
 [completed.aps.md](./completed.aps.md) indexes 44 completed items and the archived
 task detail. Fourteen superseded items are historical, not completed deliveries.
-Twenty-nine items remain active across five modules. See the
+Thirty-four items remain active across five modules. See the
 [full reconciliation](./reconciliation/2026-11-13-aps-cleanup.md) for all 87 dispositions.
 
 ## Success criteria
@@ -40,7 +40,7 @@ Twenty-nine items remain active across five modules. See the
 | Module                                                                                        | Purpose                                                             | Status      | Active items | Delivered dependencies                                               |
 | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ----------- | ------------ | -------------------------------------------------------------------- |
 | [05-rust-port](./modules/05-rust-port.aps.md)                                                 | Native/plugin acceptance and deferred lifecycle closeout            | In Progress | 4            | Schema, Rust engine/client and PORT-011 delivered                    |
-| [06-downstream-integration-surface](./modules/06-downstream-integration-surface.aps.md)       | Complete adapter fixtures; design the next-minor event contract     | In Progress | 2            | KINTEG-001..006/008..014 delivered                                   |
+| [06-downstream-integration-surface](./modules/06-downstream-integration-surface.aps.md)       | Complete adapter fixtures; deliver generic-event@1 (KINTEG-015a–e)  | In Progress | 7            | KINTEG-001..006/008..014 delivered                                   |
 | [07-intent-capture-events](./modules/07-intent-capture-events.aps.md)                         | Resolve current ownership/availability after TS retirement (GH-215) | Blocked     | 6            | Historical TS implementation removed; current Rust equivalent absent |
 | [08-conversion-surface](./modules/08-conversion-surface.aps.md)                               | Release acceptance, CLI depth, distribution and docs                | In Progress | 12           | Rust runtime and C1/C3/C4 delivered                                  |
 | [09-public-direction-and-contribution](./modules/09-public-direction-and-contribution.aps.md) | Roadmap, contributor opportunities and one-way projection           | In Progress | 5            | PUBDIR-001/002 live                                                  |
@@ -52,8 +52,12 @@ Twenty-nine items remain active across five modules. See the
 - C0 merged and released, but the demo recording/embed and external-docs
   publication checklist are not closed. Release workflow failures remain visible.
 - KINTEG-007 ships Claude Code fixtures only; its full OpenCode/PocketFlow fixture
-  outcome is outstanding. KINTEG-015 remains Draft for a future minor; do not
-  advertise generic-event@1 or keyed retained append as available in 0.4.x.
+  outcome is outstanding. The KINTEG-015 design is accepted (D-011, #282) and
+  KINTEG-015a is Ready; 015b–015e stay Draft until their predecessor merges.
+  The spec's open questions (notably anvil's KFIT-005 confirmation and the
+  `kindling serve` quota surface) gate 015b onwards. No release is cut from
+  `main` between the 015a and 015d merges, and generic-event@1 is not advertised
+  until 015d; 0.4.x never supports it.
 - KINTENT-001..006 are Blocked on [GH-215](https://github.com/eddacraft/kindling/issues/215).
   Historical merges do not establish the feature in the supported Rust release.
 - PORT-020 preserves the deferred 1.0.0 decision. Current deprecation notices are
@@ -84,7 +88,7 @@ of delivered-item archives. [issues.md](./issues.md) records planning discoverie
 
 The installed APS CLI is 0.9.0, while this project pins 0.3.0 and retains a
 vendored CLI footprint. Non-strict lint is available; tooling migration is not
-part of this plan-only cleanup. There is no active Ready item after reconciliation.
+part of this plan-only cleanup. KINTEG-015a is the only Ready item (D-011).
 
 ## Decisions
 
@@ -98,6 +102,7 @@ part of this plan-only cleanup. There is no active Ready item after reconciliati
 - **D-009:** Architecture for anvil's KDS-004/005 unblockers — a list/enumerate read API (KINTEG-003) and a spool retention cap (KINTEG-009) — _decided 2026-06-26_ — Resolved by a planning council (architect + delivery-lead + adversarial-reviewer). **Read API:** `POST /v1/observations/list` (POST+JSON like every data route), keyset cursor over the stable `(ts ASC, id ASC)` order (the only scheme complete under concurrent appends), half-open `[since, until)` bounds, `kinds` as a list, server-clamped `limit`, redacted excluded by default with a v1 `includeRedacted` flag, **no server-side aggregation** (anvil's `top`/`unused`/`flags`/`principals` are policy — kindling stays mechanism), **no schema bump** (read-only, no DDL; stays v5; old daemon → 404). anvil pins `until = now_ms()` at enumeration start as the snapshot boundary. **Spool cap:** `max_bytes`/`max_age_ms` on `SpoolConfig` (now `#[non_exhaustive]` + builder; client **0.2 → 0.3**), **defaulting to `None`/unbounded** (the council split here — non-None defaults silently trim existing callers on upgrade; 7d/64 MiB are anvil's policy, wired explicitly); add `spooled_at` to `SpoolEntry` for a real age basis; trim the **oldest contiguous prefix only**, **only inside the `flush()` lock**, accepting that trim is intentional bounded retention loss (not infinite retention) — preserving drain order and never dropping an un-drained entry ahead of a kept newer one. Two independent PRs, KINTEG-009 first. See `plans/specs/2026-06-26-kindling-read-api-and-spool-cap-design.md`.
 - **D-007:** ~~npm ships the binary via per-platform `optionalDependencies`, not a postinstall download~~ — _decided 2026-06-22_ — _superseded by D-010_ — PR #104 (PORT-018). The esbuild/swc model (one `@eddacraft/kindling-<os>-<arch>[-musl]` package per host; the package manager auto-installs only the matching one) avoids postinstall network entirely, works under `--ignore-scripts`, and is lockfile-deterministic. The specifiers are injected at publish time rather than committed, so `pnpm install --frozen-lockfile` stays green before the platform packages exist on the registry. Supersedes the "npm postinstall that downloads the platform binary" mechanism noted in D-005; D-005's Rust-canonical direction is unchanged.
 - **D-010:** Stop publishing to npm; distribute via Rust installs, crates.io and GitHub Release assets — _decided 2026-10-21_ — Distribution is `cargo install eddacraft-kindling`, the Homebrew tap, `install.sh`, the crates on crates.io, and GitHub Release assets (the 7 binaries and the VS Code / Cursor / Windsurf VSIX). The four `packages/*` are marked `private` and kept as source: the thin client is bundled into the VSIX and will be bundled into a future OpenCode plugin that the binary installs (CONV C13); the PocketFlow TS adapter stays in-repo. `publish.yml`, the per-platform `@eddacraft/kindling-<platform>` package machinery and the thin client's platform-package lookup are removed. The npm `latest` of `@eddacraft/kindling` and the OpenCode and PocketFlow adapters is still the retired 0.1.x TypeScript engine, so they are deprecated with a notice pointing at the binary install (`scripts/deprecate.sh npm-channel`, user-gated). Rust PocketFlow support is out of scope. Supersedes the npm distribution parts of D-005 and all of D-007; D-005's Rust-canonical direction stands. Operator decision; the `NPM_TOKEN` secret and the `npm` environment are no longer used.
+- **D-011:** `generic-event@1` and keyed durable append for anvil KFIT-005 (KINTEG-015) — _decided 2026-11-19_ — Resolved by a planning council (architect, delivery lead, devil's advocate, security, reliability) and two review passes; merged as #282. Keys are unique per project DB on (schemaName, key). Events live in a separate, exportable `generic_events` table outside FTS and retrieval. `user_version` stays 6 as a `minReader` floor with schema revision 7 and a separate `wireVersion`, so released 0.4.x binaries keep working. Keyed writes are `synchronous=FULL`, with a durability barrier before any replay receipt. Ambiguous outcomes get one same-key re-append, then `Indeterminate`. Secrets are rejected, never masked. Forget leaves a tombstone. Release is final 0.5.0 with no RC, under a freeze between the 015a and 015d merges. See `plans/specs/2026-11-18-generic-event-keyed-append-design.md`.
 
 ## Historical maintenance
 

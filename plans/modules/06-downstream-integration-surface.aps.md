@@ -4,7 +4,7 @@
 | ------ | ------ | ----------- |
 | KINTEG | @aneki | In Progress |
 
-**Last reviewed:** 2026-11-13.
+**Last reviewed:** 2026-11-19.
 
 ## Purpose
 
@@ -35,7 +35,8 @@ adapter-fixture scope (KINTEG-007) and the next-minor generic-event contract
 
 - [x] Delivered dependencies reconciled against publication
 - [x] Open fixture acceptance and next-minor scope distinguished
-- [ ] KINTEG-015 design and release scope approved before implementation
+- [x] KINTEG-015 design and release scope approved before implementation
+      ([#282](https://github.com/eddacraft/kindling/pull/282), merged 2026-11-19)
 
 ## Work Items
 
@@ -167,7 +168,7 @@ adapter-fixture scope (KINTEG-007) and the next-minor generic-event contract
 - **Dependencies:** KINTEG-015 design approval (Ready Checklist)
 - **Repositories:** `eddacraft/kindling`
 - **Confidence:** high
-- **Status:** Draft
+- **Status:** Ready
 
 ### KINTEG-015b: Keyed durable write path, durability barrier, forget tombstone and export/import
 
