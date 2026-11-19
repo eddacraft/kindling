@@ -193,21 +193,42 @@ async fn via_daemon_subdir_routes_to_the_hook_project_db() {
     let expected = ws.db_for_root(&ws.git_root());
     let nested_db = ws.db_for_root(&ws.nested.to_string_lossy());
     let ws = std::sync::Arc::new(ws);
-    let out = tokio::task::spawn_blocking({
+    let (from_subdir, from_root) = tokio::task::spawn_blocking({
         let ws = ws.clone();
         move || {
-            ws.run(
+            let sub = ws.run(
                 &ws.nested,
                 &["--via-daemon", "log", "daemon subdir write", "--json"],
                 &[],
-            )
+            );
+            let root = ws.run(
+                &ws.repo,
+                &["--via-daemon", "log", "daemon root write", "--json"],
+                &[],
+            );
+            (sub, root)
         }
     })
     .await
     .unwrap();
     handle.abort();
+    let _ = handle.await;
 
-    assert_success(&out);
+    assert_success(&from_subdir);
+    assert_success(&from_root);
+
+    // The embedded CLI, from either directory, sees both daemon writes: the
+    // two modes resolve the same project database.
+    for cwd in [&ws.repo, &ws.nested] {
+        let out = ws.run(cwd, &["search", "daemon", "--json"], &[]);
+        assert_success(&out);
+        let text = stdout(&out);
+        assert!(
+            text.contains("daemon subdir write") && text.contains("daemon root write"),
+            "embedded search from {cwd:?} should see both daemon writes, got: {text}"
+        );
+    }
+
     assert!(
         expected.exists(),
         "daemon did not write the repo project DB: {expected:?}"
