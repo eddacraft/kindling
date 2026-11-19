@@ -474,8 +474,9 @@ retry. `Indeterminate` is always retry-safe with the same key; nothing is spoole
 `maxPayloadBytes` is fixed. `projectQuotaBytes` (optional, off by default) caps
 live payload bytes in `generic_event_usage`; tombstones free theirs. The low-disk
 floor is a cached, unadvertised free-space probe refreshed outside the lock. Its
-64 MiB default, the configuration surface and the probe dependency are
-**proposals** pending [open questions](#open-questions) 3–5.
+64 MiB default and the probe dependency are **proposals** pending
+[open questions](#open-questions) 3 and 5. The quota and floor are configured
+through `RuntimeConfig` only (open question 4, resolved).
 
 ### Concurrency and shutdown
 
@@ -770,9 +771,9 @@ anvil with the existing contract.
    and is not `#[non_exhaustive]`, so it needs a separate entry point. The shared
    `kindling serve` (auto-spawned or started by hooks) cannot receive a cap
    without a `serve` flag or config file, a Discuss-first CLI change.
-   **Proposed resolution 2026-11-19:** `RuntimeConfig`-only, off by default, no
-   `serve` flag in 0.5.0. anvil does not need a kindling cap (it accounts
-   itself). Pending the owner's confirmation, because it narrows Q-09.
+   **Resolved 2026-11-19 (owner):** `RuntimeConfig`-only, off by default, no
+   `serve` flag in 0.5.0. A consumer sharing `kindling serve` has no kindling
+   cap; anvil accounts its own budgets.
 5. **Free-space probe:** which crate, under `unsafe_code = "forbid"`? (`rustix` is
    locked for Unix; a Windows dependency may be Discuss-first.)
 6. **New CI:** approve a macOS test job and a nightly crash workflow (neither exists).

@@ -125,9 +125,9 @@ adapter-fixture scope (KINTEG-007) and the next-minor generic-event contract
 - **Dependencies:** None upstream. Design approval is recorded in the Ready
   Checklist (#282). This item is not coupled to C14.
 - **Repositories:** `eddacraft/kindling`
-- **Confidence:** medium. The main risks are macOS full-fsync cost, anvil's
-  confirmation of the per-project key domain, and the settings surface (open
-  question 4).
+- **Confidence:** medium. The main risk is macOS full-fsync cost; anvil has
+  confirmed the per-project key domain and the settings surface is resolved
+  (open questions 1 and 4).
 - **Status:** Draft
 
 ### KINTEG-015a: Generic-event types, detector profile and schema revision 7
@@ -190,8 +190,9 @@ adapter-fixture scope (KINTEG-007) and the next-minor generic-event contract
     report "not committed".
   - Lookup returns a row only when its recomputed digest matches.
   - The optional quota and the low-disk floor reject new rows but never a
-    replay. The floor's default value and its configuration are pending open
-    questions 3–5.
+    replay. The quota is set through `RuntimeConfig` only (open question 4,
+    resolved); the floor's default value and probe are pending open questions 3
+    and 5.
   - Bundles and imports follow
     [Export bundles](../specs/2026-11-18-generic-event-keyed-append-design.md#export-bundles)
     and [Import](../specs/2026-11-18-generic-event-keyed-append-design.md#import).
