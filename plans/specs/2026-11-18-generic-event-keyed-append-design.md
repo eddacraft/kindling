@@ -379,8 +379,11 @@ runs a **barrier** before answering any keyed or forget request from existing ro
 - **Barrier:** under `synchronous=FULL` with `checkpoint_fullfsync=ON`, run
   `PRAGMA wal_checkpoint(FULL)`; it succeeds only when the result shows
   `busy = 0` and `checkpointed = log` (WAL fully backfilled, DB file synced). If
-  readers block completion, it may fall back to a FULL-synced write transaction,
-  which fsyncs the WAL inode and the recovered frames still in the page cache.
+  readers block completion, it may fall back to a write transaction run through
+  `durable_write` (so `synchronous=FULL` and, on macOS, `fullfsync=ON` are set,
+  read back before `BEGIN` and restored on every path), which fsyncs the WAL
+  inode and the recovered frames still in the page cache. The pragma-state test
+  covers both the checkpoint and the fallback branch.
   After an I/O error only a completed checkpoint clears suspect, because Linux
   may have marked the failed pages clean. It may be skipped when
   `generic_events` is empty after WAL recovery.
@@ -477,10 +480,15 @@ floor is a cached, unadvertised free-space probe refreshed outside the lock. Its
   `Semaphore(1)` and move the `OwnedSemaphorePermit` into the `spawn_blocking`
   closure, so a dropped handler future cannot release it early. Import is
   in-process only, serialised by the SQLite write lock (if the daemon ever serves
-  it, same path). Ordinary handlers tolerate poison (`into_inner()`).
-- **True bound:** an ordinary append on the same project waits for at most one
-  keyed transaction or barrier attempt (≤ 1 s busy plus its fsyncs), plus one
-  barrier per open. Ordinary handlers still lock inline, so with concurrent
+  it, same path).
+- **Fair lock:** `std::sync::Mutex` grants waiters in no particular order, so a
+  queued keyed task could repeatedly win the lock ahead of an ordinary waiter.
+  The per-project service lock therefore becomes FIFO-fair, for example
+  `parking_lot::FairMutex` (`parking_lot` 0.12.5 is already in `Cargo.lock`);
+  it has no poisoning, which also removes the poison path for ordinary handlers.
+- **True bound:** with the fair lock and the keyed permit, an ordinary append on
+  the same project waits for at most one keyed transaction or barrier attempt
+  (≤ 1 s busy plus its fsyncs), plus one barrier per open. Ordinary handlers still lock inline, so with concurrent
   same-project requests ≥ `serve` workers, other projects, `/v1/health` and a
   `current_thread` embedding host can stall up to that bound.
 - **Shutdown:** `serve` shutdown and `Runtime::shutdown` wait for in-flight keyed

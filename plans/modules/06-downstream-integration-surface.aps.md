@@ -246,7 +246,8 @@ adapter-fixture scope (KINTEG-007) and the next-minor generic-event contract
     unknown features. With more concurrent ordinary appends than workers during
     an injected slow keyed commit, `/v1/health` still responds. When a client
     deadline fires mid-fsync, the ordinary wait stays within one keyed
-    transaction.
+    transaction. With several keyed requests queued, an ordinary append still
+    waits for at most one keyed transaction.
   - `cargo test -p kindling-client`: the recovery matrix (404, 413, 401, 503,
     507 or 500 on the recovery attempt returns `Indeterminate`); the send
     boundary; the negative tests (no receipt, spool untouched).
