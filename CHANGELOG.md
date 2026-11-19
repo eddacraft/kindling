@@ -20,6 +20,8 @@ ended with v0.4.0.
 
 ### Fixed
 
+- **Contributor package-manager tooling now requires pnpm 12.** Enable Corepack
+  with `corepack enable` so the repository's pinned pnpm version is used.
 - Project-root overrides now reject sibling directories with similar path prefixes, preventing incorrect repository selection.
 - Invalid project-root requests are rejected rather than queued for retry.
 - Installer fallback respects a pinned Kindling version and non-default Cargo installation locations.
