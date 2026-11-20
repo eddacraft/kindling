@@ -814,17 +814,15 @@ impl SqliteKindlingStore {
                 ":user_id": capsule.scope_ids.user_id,
             },
         )?;
-        if changes == 0 {
-            return Ok(false);
-        }
+        let mut changed = changes > 0;
         let mut stmt = self.conn.prepare(
             "INSERT OR IGNORE INTO capsule_observations (capsule_id, observation_id, seq)
              VALUES (?1, ?2, ?3)",
         )?;
         for (seq, obs_id) in capsule.observation_ids.iter().enumerate() {
-            stmt.execute((&capsule.id, obs_id, seq as i64))?;
+            changed |= stmt.execute((&capsule.id, obs_id, seq as i64))? > 0;
         }
-        Ok(true)
+        Ok(changed)
     }
 
     /// Insert a summary if its id is absent; returns whether a row was written.
