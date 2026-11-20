@@ -61,9 +61,16 @@ fn fresh_database_gets_canonical_schema() {
         .connection()
         .query_row("PRAGMA user_version", [], |row| row.get(0))
         .unwrap();
-    assert_eq!(user_version, schema_version().version);
+    assert_eq!(user_version, schema_version().min_reader);
 
-    // Migration history is seeded so the TS runner sees a complete schema.
+    // Migration history is seeded through the current revision.
+    let max_revision: i64 = store
+        .connection()
+        .query_row("SELECT MAX(version) FROM schema_migrations", [], |row| {
+            row.get(0)
+        })
+        .unwrap();
+    assert_eq!(max_revision, schema_version().version);
     assert_eq!(
         count(&store, "SELECT COUNT(*) FROM schema_migrations"),
         schema_version().version
