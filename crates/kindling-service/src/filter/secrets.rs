@@ -22,37 +22,21 @@ struct SecretPattern {
     class: &'static str,
 }
 
+use crate::filter::rules::OBSERVATION_MASKING_RULES;
+
 /// The secret patterns from the Node.js filter, in application order. The
 /// regexes and their order are unchanged from the Node filter (so masked output
 /// stays byte-for-byte identical); each is tagged with its evidence class.
 fn secret_patterns() -> &'static [SecretPattern] {
     static PATTERNS: OnceLock<Vec<SecretPattern>> = OnceLock::new();
     PATTERNS.get_or_init(|| {
-        [
-            // key/value assignments: api_key, token, secret, password, ...
-            (
-                r#"(?i)['"]?(?:[A-Za-z0-9_-]*(?:api[-_]?key|apikey|token|secret|password|passwd|pwd)[A-Za-z0-9_-]*|(?:private|access|auth|client|signing|encryption|ssh|master)[-_]?key)['"]?\s*[:=]\s*['"]?[^\s'"]{8,}['"]?"#,
-                "credentialAssignment",
-            ),
-            // Anthropic keys
-            (r"sk-ant-[A-Za-z0-9\-_]{20,}", "anthropicKey"),
-            // OpenAI keys
-            (r"sk-[A-Za-z0-9]{40,}", "openaiKey"),
-            // Bearer tokens
-            (r"(?i)Bearer\s+[A-Za-z0-9\-._~+/]{20,}", "bearerToken"),
-            // Basic auth
-            (r"(?i)Basic\s+[A-Za-z0-9+/]{20,}", "basicAuth"),
-            // GitHub tokens (PAT, OAuth, app, refresh)
-            (r"gh[pousr]_[A-Za-z0-9]{36,}", "githubToken"),
-            // AWS access key IDs
-            (r"AKIA[0-9A-Z]{16}", "awsAccessKeyId"),
-        ]
-        .iter()
-        .map(|(pattern, class)| SecretPattern {
-            regex: Regex::new(pattern).expect("secret pattern compiles"),
-            class,
-        })
-        .collect()
+        OBSERVATION_MASKING_RULES
+            .iter()
+            .map(|(pattern, class)| SecretPattern {
+                regex: Regex::new(pattern).expect("secret pattern compiles"),
+                class,
+            })
+            .collect()
     })
 }
 

@@ -326,10 +326,9 @@ async fn health_reports_version_and_schema() {
     assert_eq!(resp.status, StatusCode::OK);
     let body = resp.json();
     assert_eq!(body["version"], env!("CARGO_PKG_VERSION"));
-    assert_eq!(
-        body["schemaVersion"],
-        kindling_store::schema_version().version
-    );
+    assert_eq!(body["schemaVersion"], kindling_store::wire_version());
+    assert_eq!(body["schemaRevision"], kindling_store::schema_revision());
+    assert_eq!(body["features"], json!([]));
     assert_capability_block(&body);
     assert_eq!(body["projects"].as_array().unwrap().len(), 0);
 

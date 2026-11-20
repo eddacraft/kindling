@@ -32,7 +32,7 @@ fn message_input(content: &str) -> ObservationInput {
 }
 
 fn schema_version_u32() -> u32 {
-    kindling_store::schema_version().version as u32
+    kindling_store::wire_version()
 }
 
 struct TestDaemon {

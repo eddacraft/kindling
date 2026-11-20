@@ -14,7 +14,40 @@ import { join, resolve } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { resolveConfig, resolveProjectRoot } from '../src/config.js';
+import {
+  EXPECTED_SCHEMA_VERSION,
+  KNOWN_SCHEMA_REVISION,
+  MAX_WIRE_VERSION,
+  isSupportedWireVersion,
+  parseWireVersion,
+  resolveConfig,
+  resolveProjectRoot,
+} from '../src/config.js';
+
+describe('wireVersion range and parse trap', () => {
+  it('pins EXPECTED_SCHEMA_VERSION=6, MAX_WIRE_VERSION=6, KNOWN_SCHEMA_REVISION=7', () => {
+    expect(EXPECTED_SCHEMA_VERSION).toBe(6);
+    expect(MAX_WIRE_VERSION).toBe(6);
+    expect(KNOWN_SCHEMA_REVISION).toBe(7);
+  });
+
+  it('reads wireVersion when the first version field is 7', () => {
+    const raw = JSON.stringify({
+      version: 7,
+      minReader: 6,
+      wireVersion: 6,
+      minCompatible: 1,
+      ftsTokenizer: 'porter unicode61',
+    });
+    expect(parseWireVersion(raw)).toBe(6);
+  });
+
+  it('accepts wire version 6 and rejects 5 and 7', () => {
+    expect(isSupportedWireVersion(5)).toBe(false);
+    expect(isSupportedWireVersion(6)).toBe(true);
+    expect(isSupportedWireVersion(7)).toBe(false);
+  });
+});
 
 describe('resolveConfig().binaryPath', () => {
   const original = process.env.KINDLING_BIN;
