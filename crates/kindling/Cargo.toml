@@ -31,7 +31,7 @@ kindling-service = { path = "../kindling-service", version = "0.4.1" }
 kindling-client = { path = "../kindling-client", version = "0.4.1", features = ["spool"] }
 kindling-server = { path = "../kindling-server", version = "0.4.1" }
 clap = { version = "4", features = ["derive"] }
-rusqlite = { version = "0.41", features = ["bundled"] }
+rusqlite = { version = "0.43", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "net", "time", "io-std", "io-util"] }
