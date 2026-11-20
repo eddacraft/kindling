@@ -339,6 +339,11 @@ impl Client {
     /// filters with a keyset cursor). Returns one page; pass back
     /// [`ListObservationsResult::next_cursor`] as
     /// [`ListObservationsRequest::cursor`] until it is `None`.
+    ///
+    /// The cursor has snapshot-keyset semantics: an observation appended during
+    /// the traversal is returned only if its `(ts, id)` sorts after the cursor.
+    /// One written with an earlier, caller-supplied `ts` is seen by the next
+    /// fresh traversal, not by later pages of this one.
     pub async fn list_observations(
         &self,
         request: ListObservationsRequest,

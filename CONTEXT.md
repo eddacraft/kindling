@@ -113,7 +113,10 @@ result in the same order. Ties break on stable keys. This is a contract. See
 : An exhaustive, paginated read, as opposed to ranked retrieval. It returns every
 observation that matches a kinds, scope, and `[since, until)` filter, in
 `(ts ASC, id ASC)` order, using a keyset **cursor**. It does no aggregation:
-counting and grouping are downstream policy.
+counting and grouping are downstream policy. The cursor has snapshot semantics:
+an observation written during a traversal appears on a later page only if its
+`(ts, id)` sorts after the cursor. One written with an earlier `ts` appears in
+the next traversal instead.
 _Route:_ `POST /v1/observations/list`.
 
 **Token budget**

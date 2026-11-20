@@ -495,9 +495,24 @@ impl SqliteKindlingStore {
     ///
     /// Unlike [`Self::query_observations`] (ranked-adjacent, `ts DESC`), this
     /// enumerates the **full** matching set in the stable `(ts ASC, id ASC)`
-    /// order via a keyset cursor — the only scheme that is complete under
-    /// concurrent appends (a row inserted after the cursor passed its position is
-    /// picked up on a later page, never skipped or duplicated by an offset shift).
+    /// order via a keyset cursor. Unlike an offset, the cursor is a value in the
+    /// data, so a traversal over an unchanging set never skips or duplicates a
+    /// row.
+    ///
+    /// **Consistency (snapshot-keyset semantics).** `(ts, id)` is a semantic key,
+    /// not an insertion sequence: `ts` is the event time (caller-supplied or
+    /// defaulted) and `id` is caller-generated. A row inserted mid-traversal is
+    /// returned by a later page **only if its `(ts, id)` sorts after the
+    /// cursor**. A row with an older `ts` (backdated), or an equal `ts` and a
+    /// smaller `id`, sorts before the cursor and is not returned by that
+    /// traversal; a fresh traversal sees it. Observations appended through the
+    /// daemon with `ts` omitted are stamped under the per-project service lock,
+    /// so their `ts` is non-decreasing (barring a wall-clock regression) and
+    /// they usually sort after an existing cursor. The stamp has millisecond
+    /// resolution and the default `id` is a random UUID, so a row stamped in the
+    /// same millisecond as the cursor anchor is missed when its `id` sorts lower.
+    /// Caller-supplied timestamps and embedded multi-process writers carry no
+    /// ordering guarantee at all.
     ///
     /// Filters: `scope` (denormalized columns), `kinds` (empty = all), and a
     /// **half-open** `[since, until)` window on `ts`. `cursor` is the
