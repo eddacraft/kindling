@@ -18,6 +18,10 @@ ended with v0.4.0.
 
 - `kindling tui` browses local memory with editable search, pins first, and a wrapped, scrollable preview. Panels adapt to terminal width; press Esc or Ctrl-C to quit. Preview scrolling stops at the final page, and unsupported `--json` mode is rejected.
 
+### Changed
+
+- **Documented which tool results the Claude Code hooks capture.** Bash is the only tool whose result is stored: its output, with secrets masked and capped at about 10,000 characters. Other tools record their inputs (file path, pattern, URL, query, subagent task) but never their results. Error text and a subagent's final output are also stored, with secrets masked. Behaviour is unchanged. Unlike the retired adapter's `captureResults` option, there is no setting for this, including no switch to turn tool capture off (#217).
+
 ### Fixed
 
 - **Contributor package-manager tooling now requires pnpm 12.** Enable Corepack
@@ -25,10 +29,6 @@ ended with v0.4.0.
 - Project-root overrides now reject sibling directories with similar path prefixes, preventing incorrect repository selection.
 - Invalid project-root requests are rejected rather than queued for retry.
 - Installer fallback respects a pinned Kindling version and non-default Cargo installation locations.
-
-### Changed
-
-- **Documented which tool results the Claude Code hooks capture.** Only Bash output (stdout/stderr, secrets masked, capped at 10,000 characters) is stored. Other tools record their inputs (file path, pattern, URL, query) but never their results. Error text is captured, with secrets masked, for every tool. Behaviour is unchanged, and there is no setting for it: the retired adapter's `captureResults` option is not coming back (#217).
 
 ## [0.4.1] - 2026-11-10
 

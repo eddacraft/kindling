@@ -27,6 +27,31 @@ at each release; older distribution approaches may now be superseded.
   line count (the `unstable-rendered-line-info` feature) and are refreshed on
   resize. JSON output is rejected before opening the database.
 
+### Changed
+
+- **Tool-result capture contract for the Rust hook (#217).** The TS→Rust
+  port dropped the retired Claude adapter's `captureResults` setting.
+  `format_tool_content` in `crates/kindling/src/hook/mapping.rs` was left
+  reading `hook.result()` only in its Bash arm. That is now the documented
+  contract, not an accident of the port:
+  - Bash's result is captured, passing through `filter_tool_result`
+    (secret masking, `MAX_RESULT_LENGTH` cap). For a `{stdout, stderr}`
+    response that is the joined text; other shapes are stored as-is (string)
+    or pretty-printed (JSON).
+  - Every other tool captures sanitized inputs only.
+  - `tool_error` is captured, sanitized, for all tools.
+  - Provenance reads only Bash's exit code (`exitCode`/`exit_code`) from a
+    result.
+
+  No setting was restored. Non-Bash results (file contents, fetched pages,
+  search output) are large and likely to hold secrets. Unit tests pin the
+  contract, including unknown tools and result-borne exit codes.
+  `SKIP_RESULT_TOOLS` (`["WebSearch"]`) in `hook/filter.rs` is unreachable
+  from capture and is kept only for parity with the filter port. SubagentStop
+  output (`map_subagent_stop`, capped at 5,000) is a separate path. The old
+  `captureResults` gated all PostToolUse capture, and no replacement switch
+  exists.
+
 ### Fixed
 
 - **Contributor package-manager tooling now requires pnpm 12.** The exact
@@ -53,25 +78,6 @@ at each release; older distribution approaches may now be superseded.
   passes `--version` when `KINDLING_VERSION` is set, refuses a non-default
   `KINDLING_REPO`, and invokes the binary cargo installed (including a
   nonstandard `CARGO_HOME` or `CARGO_INSTALL_ROOT`).
-
-### Changed
-
-- **Tool-result capture contract for the Rust hook (#217).** The TS→Rust
-  port dropped the retired Claude adapter's `captureResults` setting.
-  `format_tool_content` in `crates/kindling/src/hook/mapping.rs` was left
-  reading `hook.result()` only in its Bash arm. That is now the documented
-  contract, not an accident of the port:
-  - Bash stdout/stderr is captured, passing through `filter_tool_result`
-    (secret masking, `MAX_RESULT_LENGTH` cap).
-  - Every other tool captures sanitized inputs only.
-  - `tool_error` is captured, sanitized, for all tools.
-  - Provenance reads only Bash's `exitCode` from a result.
-
-  No setting was restored. Non-Bash results (file contents, fetched pages,
-  search output) are large and likely to hold secrets. Unit tests pin the
-  contract, including unknown tools and result-borne exit codes.
-  `SKIP_RESULT_TOOLS` (`["WebSearch"]`) in `hook/filter.rs` is unreachable
-  from capture and is kept only for parity with the filter port.
 
 ## [0.4.1] - 2026-11-10
 

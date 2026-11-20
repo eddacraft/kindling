@@ -183,21 +183,26 @@ fn finish_subagent(
 ///
 /// # Tool-result capture contract
 ///
-/// - **Bash** is the only tool whose result is captured: its stdout/stderr
-///   (see [`bash_output_text`]), secret-masked and capped at
-///   [`MAX_RESULT_LENGTH`] by [`filter_tool_result`].
+/// - **Bash** is the only tool whose result is captured, secret-masked and
+///   capped at [`MAX_RESULT_LENGTH`] by [`filter_tool_result`]. For Claude
+///   Code's `{stdout, stderr}` response that is the stdout/stderr text (see
+///   [`bash_output_text`]). Any other shape is stored as the result itself: a
+///   string as-is, other JSON pretty-printed.
 /// - **Every other tool** (Read, Write, Edit, Glob, Grep, Task, WebFetch,
-///   WebSearch and unknown tools) records its sanitized inputs only: file path,
-///   pattern, URL, query or input keys. Its result is never read. File
-///   contents, fetched pages and search output are large and likely to carry
-///   secrets, so they stay out of memory.
+///   WebSearch and unknown tools) records its sanitized inputs only (file
+///   path, pattern, URL, query, subagent type and description, or input keys)
+///   and its result is never read. File contents, fetched pages and search
+///   output are large and likely to carry secrets.
 /// - **Error text** (`tool_error`) is captured, sanitized, for every tool.
-/// - Provenance reads one field from a result: Bash's `exitCode`
+/// - Provenance reads one value from a result: Bash's exit code
 ///   ([`extract_exit_code`]).
 ///
+/// This covers PostToolUse results only. A subagent's final output is stored
+/// separately by [`map_subagent_stop`].
+///
 /// There is no setting to change this. The retired Node adapter's
-/// `captureResults` option was not carried over. The contract is pinned by the
-/// `non_bash_tools_never_capture_their_result` tests below.
+/// `captureResults` switch was not carried over. The contract is pinned by the
+/// tool-result capture tests below.
 fn format_tool_content(hook: &HookInput, tool_name: &str) -> String {
     let empty = Value::Object(Map::new());
     let input = hook.tool_input.as_ref().unwrap_or(&empty);
@@ -683,17 +688,25 @@ mod tests {
                 json!(RESULT_SENTINEL),
                 json!({ "stdout": RESULT_SENTINEL, "content": RESULT_SENTINEL }),
             ] {
-                let obs = map_tool_use(&hook_with(tool, input.clone(), Some(result), None));
-                assert!(
-                    !obs.content.contains(RESULT_SENTINEL),
-                    "{tool} content captured its result: {:?}",
-                    obs.content
-                );
-                let prov = serde_json::to_string(&obs.provenance).unwrap();
-                assert!(
-                    !prov.contains(RESULT_SENTINEL),
-                    "{tool} provenance captured its result: {prov}"
-                );
+                // Claude Code sends `tool_response`; `tool_result` is the
+                // legacy key. Check both.
+                let legacy = hook_with(tool, input.clone(), Some(result.clone()), None);
+                let current = HookInput {
+                    tool_response: Some(result),
+                    ..hook_with(tool, input.clone(), None, None)
+                };
+                for obs in [map_tool_use(&legacy), map_tool_use(&current)] {
+                    assert!(
+                        !obs.content.contains(RESULT_SENTINEL),
+                        "{tool} content captured its result: {:?}",
+                        obs.content
+                    );
+                    let prov = serde_json::to_string(&obs.provenance).unwrap();
+                    assert!(
+                        !prov.contains(RESULT_SENTINEL),
+                        "{tool} provenance captured its result: {prov}"
+                    );
+                }
             }
         }
     }
