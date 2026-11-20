@@ -245,6 +245,8 @@ pub struct ScopeIds {
 }
 ```
 
+On the wire `scopeIds` is a keyed JSON object, for example `{ "sessionId": "s1", "repoId": "/repo" }`. Any field may be omitted, and `{}` means unscoped. A JSON array (`[]` or `["s1"]`) is rejected: the v1 API returns a 4xx and the Rust types fail to deserialize.
+
 `sessionId`, `repoId`, `agentId`, and `userId` are denormalized into real columns and are matched directly. **`taskId` has no column and is never used as a filter** — supplying it in `scopeIds` does not affect the result set (it is carried for provenance/grouping only).
 
 ### Scope Filtering
