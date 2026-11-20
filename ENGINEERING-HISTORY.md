@@ -43,6 +43,19 @@ at each release; older distribution approaches may now be superseded.
   line count (the `unstable-rendered-line-info` feature) and are refreshed on
   resize. JSON output is rejected before opening the database.
 
+### Security
+
+- **Development-tooling dependency alerts resolved (PR #299).** Two alerts
+  that Dependabot could not fix within the existing version ranges are now
+  closed, both under `@vscode/vsce`. `@azure/identity` refreshes to 4.14.1,
+  which pulls `@azure/msal-node` 7.2. A `minimatch@10: ^11.0.1` override in
+  `pnpm-workspace.yaml` lifts vsce's minimatch, since vsce 4.1.1 still requires
+  `^10.2.6`; drop the override once vsce allows minimatch 11. Both are dev
+  dependencies. The VSIX built with the override is byte-identical to the one
+  built from main (same 7 files and contents) on Node 22 and Node 24. The two
+  vitest-related alerts (`@vitest/mocker`, `tinypool`) were closed separately
+  by the Dependabot vitest 5.1 bump.
+
 ### Fixed
 
 - **Contributor package-manager tooling now requires pnpm 12.** The exact

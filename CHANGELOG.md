@@ -24,6 +24,10 @@ ended with v0.4.0.
 - SQLite schema advances additively to revision 7 (`generic_events` and `generic_event_usage` tables) while keeping `PRAGMA user_version` at 6 (`minReader`) so 0.4.x binaries remain compatible. Tools checking the exact schema revision should read `MAX(schema_migrations.version)` rather than `PRAGMA user_version`.
 - `/v1/health` and `kindling status --json` report `schemaVersion` from `wireVersion` (6) alongside `schemaRevision` (7); Rust and TypeScript clients validate `schemaVersion` against the supported wire range.
 
+### Security
+
+- Resolved Dependabot alerts in development tooling (`minimatch`, `@azure/msal-node`). None of these ship in kindling, its crates or the VSIX.
+
 ### Fixed
 
 - **Contributor package-manager tooling now requires pnpm 12.** Enable Corepack
