@@ -15,6 +15,22 @@ at each release; older distribution approaches may now be superseded.
 
 ### Added
 
+- **`generic-event@1` wire types, detector rule table, digest framing, and additive schema revision 7 (KINTEG-015a, D-011).**
+  Added `GenericEvent`, `GenericEventScope`, `GenericEventReceipt`,
+  `GenericEventLookup`, `GenericEventForget`, `GenericEventLimits`,
+  `RejectReason`, `ConflictKind`, `CommitFailure`, and `CapabilityFeature` to
+  `kindling-types` with strict padded RFC 4648 §4 base64 payload serialization
+  and `ts-rs` bindings (`payload: string`, all `i64`/`u64` as `number`).
+  Consolidated observation masking and the read-only `GenericEventDetector` v1
+  (`(?-u)` byte regexes) into `kindling-service/src/filter/rules.rs`, published
+  golden fixtures at `schema/fixtures/generic-event-detector-v1.json` and
+  `schema/fixtures/generic-event-digest-v1.json`, and added server-side framed
+  SHA-256 digest computation. Split `schema/version.json` into `version` (7),
+  `minReader` (6, pinned as `PRAGMA user_version`), and `wireVersion` (6,
+  reported as `Capability.schemaVersion` alongside `schemaRevision: 7`), with
+  idempotent additive migration 007 (`generic_events`, `generic_event_usage`,
+  and usage triggers) and wire-range checks in both the Rust and TypeScript
+  clients. No `generic-event` capability is advertised yet.
 - **Interactive memory browser (CONV C6, PR #263).** `kindling tui` uses
   `eddacraft-tui` 0.6, the canonical TUI library for eddacraft products, with
   shared themed containers, `TextInput`, text-entry key handling, `HelpBar`

@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "domainTag": "kindling.generic-event.v1",
+  "vectors": [
+    {
+      "name": "minimal",
+      "schemaName": "a",
+      "schemaVersion": 1,
+      "scope": {
+        "projectId": "000000000000"
+      },
+      "payloadEncoding": "hex",
+      "payload": "00",
+      "framedLength": 76,
+      "framedHex": "6b696e646c696e672e67656e657269632d6576656e742e7631000000000161000000010000000c30303030303030303030303000000000000000000000000000000000000000000000000100",
+      "digest": "sha256:43852a2e7ef09166831bb33fce56d5ad008c97be6e8d3770326316b1d6b48c6f"
+    },
+    {
+      "name": "all_scope",
+      "schemaName": "example.audit",
+      "schemaVersion": 3,
+      "scope": {
+        "projectId": "0123456789ab",
+        "sessionId": "sess-1",
+        "repoId": "repo-1",
+        "agentId": "agent-1",
+        "userId": "user-1",
+        "taskId": "task-1"
+      },
+      "payloadEncoding": "utf8",
+      "payload": "{\"k\":\"v\"}",
+      "framedLength": 127,
+      "digest": "sha256:d4391e955ce4cf16ae13fccb7bacb97f4263415f956f599c4e4beef35de9e57d"
+    },
+    {
+      "name": "max_payload",
+      "schemaName": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "schemaVersion": 4294967295,
+      "scope": {
+        "projectId": "ffffffffffff"
+      },
+      "payloadEncoding": "mod251",
+      "payloadLength": 262144,
+      "framedLength": 262346,
+      "digest": "sha256:cc16e8457b2d01706b41c43ac52af81f45132fe3ea7e9c8cca2124154b794457"
+    }
+  ]
+}

@@ -57,12 +57,12 @@ fn project_root(headers: &HeaderMap) -> Result<String, ApiError> {
 /// `GET /v1/health` — capability handshake plus touched project ids.
 /// Requires no project header.
 pub async fn health(State(state): State<AppState>) -> Json<Value> {
-    let schema = kindling_store::schema_version();
     let capability = build_capability(
         env!("CARGO_PKG_VERSION"),
-        schema.version as u32,
+        kindling_store::wire_version(),
         state.kindling_home().display().to_string(),
-    );
+    )
+    .with_schema_revision(kindling_store::schema_revision());
     let mut body = serde_json::to_value(capability).expect("capability serializes");
     if let Some(obj) = body.as_object_mut() {
         obj.insert("projects".to_string(), json!(state.known_project_ids()));
