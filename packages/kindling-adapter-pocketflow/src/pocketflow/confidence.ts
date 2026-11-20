@@ -128,7 +128,7 @@ export function calculateConfidence(
  * tracker.recordFailure('deploy-prod', 'Connection timeout');
  *
  * // Get confidence for a node
- * const confidence = tracker.getConfidence('run-tests'); // 0.6
+ * const confidence = tracker.getConfidence('run-tests'); // 0.95 (clamped to maxConfidence)
  *
  * // Get full state for observation provenance
  * const state = tracker.getState('run-tests');

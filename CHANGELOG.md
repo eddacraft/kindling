@@ -18,6 +18,10 @@ ended with v0.4.0.
 
 - `kindling tui` browses local memory with editable search, pins first, and a wrapped, scrollable preview. Panels adapt to terminal width; press Esc or Ctrl-C to quit. Preview scrolling stops at the final page, and unsupported `--json` mode is rejected.
 
+### Changed
+
+- The PocketFlow adapter's `ConfidenceConfig` no longer advertises `successIncrement` and `failureDecrement`, which never affected the confidence score. Remove them from any `ConfidenceTracker` configuration.
+
 ### Fixed
 
 - **Contributor package-manager tooling now requires pnpm 12.** Enable Corepack
@@ -25,7 +29,6 @@ ended with v0.4.0.
 - Project-root overrides now reject sibling directories with similar path prefixes, preventing incorrect repository selection.
 - Invalid project-root requests are rejected rather than queued for retry.
 - Installer fallback respects a pinned Kindling version and non-default Cargo installation locations.
-- The PocketFlow adapter's `ConfidenceConfig` no longer advertises `successIncrement` and `failureDecrement`, which never affected the confidence score. Remove them from any `ConfidenceTracker` configuration.
 
 ## [0.4.1] - 2026-11-10
 
