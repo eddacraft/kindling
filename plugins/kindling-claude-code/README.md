@@ -43,7 +43,7 @@ When you start a Claude Code session, kindling:
 
 1. **Opens a session capsule** to track all activity
 2. **Injects prior context** from previous sessions in this project
-3. **Captures tool calls** (Read, Write, Edit, Bash, etc.)
+3. **Captures tool calls** (Read, Write, Edit, Bash, etc.). See [Privacy](#privacy) for what is kept.
 4. **Captures your messages** as observations
 5. **Closes the capsule** when the session ends
 
@@ -110,6 +110,7 @@ Each project gets its own isolated database. No data is shared between projects 
 
 - **Local only** — no data leaves your machine
 - **Secret filtering** — API keys and tokens are automatically masked
+- **Tool results** — Bash is the only tool whose result is stored: its output (stdout/stderr, or the raw result if it has another shape), with known secret patterns masked and capped at about 10,000 characters. Recognised tools record selected inputs (file path, search pattern, URL, query, subagent task), and other tools, such as MCP tools, record only their argument names, not values. No other tool's result is stored, so files read with Read and pages fetched with WebFetch are not stored. Anything a Bash command prints, such as `cat` of a file, is stored. Error messages are kept for every tool, and a subagent's final output is kept (capped at about 5,000 characters), both with known secret patterns masked. There is no setting to turn tool capture off; disable the plugin to stop capture.
 - **Per-project isolation** — projects don't share data
 - **You control it** — delete `~/.kindling/` to clear all memory, or use `/memory forget` for individual items
 

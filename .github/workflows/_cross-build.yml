@@ -74,7 +74,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # Use the repo-pinned toolchain (rust-toolchain.toml -> 1.95.0) and add
       # the cross target's std. dtolnay/rust-toolchain honours the toml channel
@@ -165,7 +165,7 @@ jobs:
       # "exec format error".
       - name: Set up QEMU (arm64 emulation)
         if: matrix.exec_smoke == 'qemu'
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
         with:
           platforms: arm64
 
@@ -248,7 +248,7 @@ jobs:
       # Uniform artifact name so any caller downloads the whole set with the
       # `kindling-bin-*` glob.
       - name: Upload binary artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: kindling-bin-${{ matrix.target }}
           path: |

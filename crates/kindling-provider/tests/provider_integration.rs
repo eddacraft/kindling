@@ -972,3 +972,32 @@ fn search_inside_a_caller_transaction_sees_its_uncommitted_rows() {
         vec!["obs-in-tx"]
     );
 }
+
+/// GH-216: a TS-era row may hold an array-shaped `scope_ids` blob (with NULL
+/// denormalized columns). Search must still return it, as unscoped.
+#[test]
+fn ts_era_array_scope_ids_row_is_searchable_as_unscoped() {
+    let store = SqliteKindlingStore::open_in_memory().unwrap();
+    store
+        .insert_observation(&observation(
+            "obs-1",
+            "legacy migration note",
+            scope(Some("s1"), None),
+            NOW,
+        ))
+        .unwrap();
+    store
+        .connection()
+        .execute(
+            r#"UPDATE observations SET scope_ids = '["s1"]', session_id = NULL"#,
+            [],
+        )
+        .unwrap();
+
+    let results = search(&store, &options("migration", ScopeIds::default()));
+    assert_eq!(sorted_ids(&results), ["obs-1"]);
+    match &results[0].entity {
+        RetrievedEntity::Observation(obs) => assert_eq!(obs.scope_ids, ScopeIds::default()),
+        other => panic!("expected an observation, got {other:?}"),
+    }
+}

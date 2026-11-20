@@ -5,5 +5,7 @@
  *
  * All fields are optional to support partial scoping. Mirrors `ScopeIds`
  * in `packages/kindling-core/src/types/common.ts`.
+ *
+ * On the wire this is always a keyed JSON object; arrays are rejected.
  */
 export type ScopeIds = { sessionId?: string, repoId?: string, agentId?: string, userId?: string, taskId?: string, };

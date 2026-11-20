@@ -1,0 +1,169 @@
+{
+  "detectorVersion": 1,
+  "rules": [
+    {
+      "name": "anthropicKey",
+      "pattern": "(?:^|[^A-Za-z0-9_-])sk-ant-[A-Za-z0-9\\-_]{20,}",
+      "appliesToKey": true
+    },
+    {
+      "name": "openaiKey",
+      "pattern": "(?:^|[^A-Za-z0-9_-])sk-[A-Za-z0-9]{40,}",
+      "appliesToKey": true
+    },
+    {
+      "name": "githubToken",
+      "pattern": "(?:^|[^A-Za-z0-9_-])gh[pousr]_[A-Za-z0-9]{36,}",
+      "appliesToKey": true
+    },
+    {
+      "name": "awsAccessKeyId",
+      "pattern": "(?:^|[^A-Za-z0-9_-])AKIA[0-9A-Z]{16}",
+      "appliesToKey": true
+    },
+    {
+      "name": "bearerToken",
+      "pattern": "Bearer\\s+[A-Za-z0-9\\-._~+/]{20,}",
+      "appliesToKey": false
+    },
+    {
+      "name": "basicAuth",
+      "pattern": "Basic\\s+[A-Za-z0-9+/]{20,}={0,2}(?:[^A-Za-z0-9+/=]|$)",
+      "note": "match discarded if the value contains \"//\"",
+      "appliesToKey": false
+    },
+    {
+      "name": "privateKeyBlock",
+      "pattern": "-----BEGIN [A-Z ]*PRIVATE KEY-----",
+      "appliesToKey": false
+    },
+    {
+      "name": "credentialField",
+      "pattern": "(?i)(?:^|[^A-Za-z0-9_-])(?:password|passwd|secret|token|api[-_]?key|access[-_]?token|refresh[-_]?token|client[-_]?secret|secret[-_]?key|private[-_]?key)[\"']?\\s*[:=]\\s*[\"']?[^\\s\"']{8,}",
+      "appliesToKey": false
+    }
+  ],
+  "payloadVectors": {
+    "clean": [
+      {
+        "name": "ordinary json with sha256 hex",
+        "input": "{\"schema\":\"anvil.governance.v1\",\"digest\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\"}"
+      },
+      {
+        "name": "renamed idempotencyToken field avoids credentialField",
+        "input": "{\"idempotencyToken\":\"550e8400-e29b-41d4-a716-446655440000\"}"
+      },
+      {
+        "name": "basicAuth discarded when value contains double slash",
+        "input": "Basic aHR0cHM6Ly9leGFtcGxl//Y29tL2FwaS92MQ=="
+      },
+      {
+        "name": "short sk-ant prefix below minimum length",
+        "input": "sk-ant-tooshort12345"
+      },
+      {
+        "name": "short credentialField value below 8 chars",
+        "input": "{\"token\":\"1234567\"}"
+      },
+      {
+        "name": "case-sensitive bearer does not match lowercase",
+        "input": "bearer abcdefghijklmnopqrstuvwx"
+      },
+      {
+        "name": "public key block is not a private key block",
+        "input": "-----BEGIN PUBLIC KEY-----"
+      }
+    ],
+    "rejected": [
+      {
+        "name": "anthropic key",
+        "input": "{\"k\":\"sk-ant-00000000000000000000\"}",
+        "expectedClasses": ["anthropicKey"],
+        "expectedCount": 1
+      },
+      {
+        "name": "openai key",
+        "input": "sk-0000000000000000000000000000000000000000",
+        "expectedClasses": ["openaiKey"],
+        "expectedCount": 1
+      },
+      {
+        "name": "github token",
+        "input": "ghp_000000000000000000000000000000000000",
+        "expectedClasses": ["githubToken"],
+        "expectedCount": 1
+      },
+      {
+        "name": "aws access key id",
+        "input": "AKIA0000000000000000",
+        "expectedClasses": ["awsAccessKeyId"],
+        "expectedCount": 1
+      },
+      {
+        "name": "bearer token",
+        "input": "Authorization: Bearer aaaaaaaaaaaaaaaaaaaaaaaa",
+        "expectedClasses": ["bearerToken"],
+        "expectedCount": 1
+      },
+      {
+        "name": "basic auth",
+        "input": "Authorization: Basic YWRtaW46c3VwZXJzZWNyZXRwYXNz==",
+        "expectedClasses": ["basicAuth"],
+        "expectedCount": 1
+      },
+      {
+        "name": "private key block",
+        "input": "-----BEGIN RSA PRIVATE KEY-----\nMIIE...",
+        "expectedClasses": ["privateKeyBlock"],
+        "expectedCount": 1
+      },
+      {
+        "name": "credentialField known false positive token uuid",
+        "input": "{\"token\": \"550e8400-e29b-41d4-a716-446655440000\"}",
+        "expectedClasses": ["credentialField"],
+        "expectedCount": 1
+      },
+      {
+        "name": "credentialField case-insensitive api_key",
+        "input": "API_KEY=abcdefgh1234",
+        "expectedClasses": ["credentialField"],
+        "expectedCount": 1
+      }
+    ]
+  },
+  "keyVectors": {
+    "clean": [
+      "kfit/run-42/evt-7",
+      "task-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "desk-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "risk_sk-0000000000000000000000000000000000000000",
+      "token=abcdefgh1234"
+    ],
+    "rejected": [
+      {
+        "key": "approval:sk-0000000000000000000000000000000000000000",
+        "expectedClasses": ["openaiKey"]
+      },
+      {
+        "key": "run/sk-0000000000000000000000000000000000000000",
+        "expectedClasses": ["openaiKey"]
+      },
+      {
+        "key": "k.sk-0000000000000000000000000000000000000000",
+        "expectedClasses": ["openaiKey"]
+      },
+      {
+        "key": "AKIA0000000000000000",
+        "expectedClasses": ["awsAccessKeyId"]
+      },
+      {
+        "key": "ghp_000000000000000000000000000000000000",
+        "expectedClasses": ["githubToken"]
+      },
+      {
+        "key": "sk-ant-00000000000000000000",
+        "expectedClasses": ["anthropicKey"]
+      }
+    ]
+  }
+}
