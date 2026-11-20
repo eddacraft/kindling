@@ -964,8 +964,9 @@ fn list_keyset_cursor_paginates_without_skip_or_duplicate() {
         .unwrap();
     assert_eq!(ids(&page1), vec!["a", "b"]);
 
-    // A concurrent append AFTER the cursor anchor must surface on a later page,
-    // exactly once — never skipped, never duplicated.
+    // A concurrent append that sorts AFTER the cursor anchor in `(ts, id)` order
+    // surfaces on a later page, exactly once — never skipped, never duplicated.
+    // (Rows that sort before the anchor do not: see the snapshot tests below.)
     store
         .insert_observation(&obs_full("m", 25, ObservationKind::Command, "s", false))
         .unwrap();
@@ -994,6 +995,87 @@ fn list_keyset_cursor_paginates_without_skip_or_duplicate() {
     all.extend(ids(&page2));
     all.extend(ids(&page3));
     assert_eq!(all, vec!["a", "b", "c", "m", "d", "e"]);
+}
+
+/// Walk every remaining page after `cursor` (page size 2) and return the ids.
+fn list_rest(store: &SqliteKindlingStore, cursor: Option<(i64, String)>) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut cursor = cursor;
+    loop {
+        let page = store
+            .list_observations(
+                None,
+                &[],
+                None,
+                None,
+                cursor.as_ref().map(|(ts, id)| (*ts, id.as_str())),
+                false,
+                2,
+            )
+            .unwrap();
+        let Some(last) = page.last() else {
+            return out;
+        };
+        cursor = Some((last.ts, last.id.clone()));
+        out.extend(ids(&page));
+    }
+}
+
+/// GH-186: the keyset cursor has snapshot semantics over the semantic
+/// `(ts, id)` key. A row inserted mid-traversal whose `ts` is older than the
+/// cursor (a backdated, caller-supplied timestamp) sorts before the anchor and
+/// is NOT surfaced by a later page — only by a fresh traversal.
+#[test]
+fn list_keyset_cursor_does_not_surface_backdated_insert() {
+    let store = SqliteKindlingStore::open_in_memory().unwrap();
+    for (id, ts) in [("a", 10), ("b", 20), ("c", 30), ("d", 40)] {
+        store
+            .insert_observation(&obs_full(id, ts, ObservationKind::Command, "s", false))
+            .unwrap();
+    }
+
+    let page1 = store
+        .list_observations(None, &[], None, None, None, false, 2)
+        .unwrap();
+    assert_eq!(ids(&page1), vec!["a", "b"]);
+
+    // Backdated insert: ts=15 sorts between a and b, behind the (20, b) anchor.
+    store
+        .insert_observation(&obs_full("x", 15, ObservationKind::Command, "s", false))
+        .unwrap();
+
+    let anchor = page1.last().map(|o| (o.ts, o.id.clone()));
+    assert_eq!(list_rest(&store, anchor), vec!["c", "d"]);
+
+    // A fresh traversal sees it in its stable position.
+    assert_eq!(list_rest(&store, None), vec!["a", "x", "b", "c", "d"]);
+}
+
+/// GH-186: an equal-`ts` row with a smaller `id` than the cursor anchor sorts
+/// before the anchor and is NOT surfaced by a later page of that traversal.
+#[test]
+fn list_keyset_cursor_does_not_surface_equal_ts_smaller_id_insert() {
+    let store = SqliteKindlingStore::open_in_memory().unwrap();
+    for (id, ts) in [("a", 10), ("m", 20), ("d", 30)] {
+        store
+            .insert_observation(&obs_full(id, ts, ObservationKind::Command, "s", false))
+            .unwrap();
+    }
+
+    let page1 = store
+        .list_observations(None, &[], None, None, None, false, 2)
+        .unwrap();
+    assert_eq!(ids(&page1), vec!["a", "m"]);
+
+    // Same ts as the (20, m) anchor, but "c" < "m".
+    store
+        .insert_observation(&obs_full("c", 20, ObservationKind::Command, "s", false))
+        .unwrap();
+
+    let anchor = page1.last().map(|o| (o.ts, o.id.clone()));
+    assert_eq!(list_rest(&store, anchor), vec!["d"]);
+
+    assert_eq!(list_rest(&store, None), vec!["a", "c", "m", "d"]);
 }
 
 #[test]

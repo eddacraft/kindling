@@ -53,6 +53,22 @@ at each release; older distribution approaches may now be superseded.
   passes `--version` when `KINDLING_VERSION` is set, refuses a non-default
   `KINDLING_REPO`, and invokes the binary cargo installed (including a
   nonstandard `CARGO_HOME` or `CARGO_INSTALL_ROOT`).
+- **List cursor consistency contract corrected to snapshot-keyset semantics (GH-186).**
+  `list_observations` documented its `(ts ASC, id ASC)` keyset cursor as
+  complete under concurrent appends. That only holds for a monotonic insertion
+  key; `ts` is the event time (caller-supplied or defaulted) and `id` is
+  caller-generated, so a row inserted mid-traversal with an older `ts`, or an
+  equal `ts` and smaller `id`, sorts before the cursor and is not returned by
+  that traversal. The store, service, client, types and `CONTEXT.md` docs now
+  state the real contract, and two store tests pin both cases. Even the
+  daemon path with `ts` omitted is not complete: `ts` is stamped under the
+  per-project service mutex and is non-decreasing, but at millisecond
+  resolution with a random UUID `id`, so a row stamped in the cursor anchor's
+  millisecond with a lower `id` is missed. True change-stream completeness would need an
+  insertion-sequence key (`rowid` is unstable across `VACUUM` and reuse; a new
+  monotonic column is a schema migration) and is deferred until a consumer
+  needs it. Stamping `ts` at spool time would turn every post-outage replay
+  into a backdated insert, so it is coupled to that key.
 
 ## [0.4.1] - 2026-11-10
 
