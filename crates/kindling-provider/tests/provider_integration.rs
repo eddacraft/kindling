@@ -698,3 +698,32 @@ fn genuine_backend_errors_are_not_swallowed() {
         "expected a backend no-such-table error, got {err}"
     );
 }
+
+/// GH-216: a TS-era row may hold an array-shaped `scope_ids` blob (with NULL
+/// denormalized columns). Search must still return it, as unscoped.
+#[test]
+fn ts_era_array_scope_ids_row_is_searchable_as_unscoped() {
+    let store = SqliteKindlingStore::open_in_memory().unwrap();
+    store
+        .insert_observation(&observation(
+            "obs-1",
+            "legacy migration note",
+            scope(Some("s1"), None),
+            NOW,
+        ))
+        .unwrap();
+    store
+        .connection()
+        .execute(
+            r#"UPDATE observations SET scope_ids = '["s1"]', session_id = NULL"#,
+            [],
+        )
+        .unwrap();
+
+    let results = search(&store, &options("migration", ScopeIds::default()));
+    assert_eq!(sorted_ids(&results), ["obs-1"]);
+    match &results[0].entity {
+        RetrievedEntity::Observation(obs) => assert_eq!(obs.scope_ids, ScopeIds::default()),
+        other => panic!("expected an observation, got {other:?}"),
+    }
+}

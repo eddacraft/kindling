@@ -4,10 +4,19 @@
 
 export type * from './CandidateResult.js';
 export type * from './Capability.js';
+export type * from './CapabilityFeature.js';
 export type * from './Capsule.js';
 export type * from './CapsuleInput.js';
 export type * from './CapsuleStatus.js';
 export type * from './CapsuleType.js';
+export type * from './CommitFailure.js';
+export type * from './ConflictKind.js';
+export type * from './GenericEvent.js';
+export type * from './GenericEventForget.js';
+export type * from './GenericEventLimits.js';
+export type * from './GenericEventLookup.js';
+export type * from './GenericEventReceipt.js';
+export type * from './GenericEventScope.js';
 export type * from './KindRegistryEntry.js';
 export type * from './ListObservationsRequest.js';
 export type * from './ListObservationsResult.js';
@@ -21,6 +30,7 @@ export type * from './PinTargetType.js';
 export type * from './ProviderSearchOptions.js';
 export type * from './ProviderSearchResult.js';
 export type * from './RedactionEvidence.js';
+export type * from './RejectReason.js';
 export type * from './RetrieveOptions.js';
 export type * from './RetrieveProvenance.js';
 export type * from './RetrieveResult.js';

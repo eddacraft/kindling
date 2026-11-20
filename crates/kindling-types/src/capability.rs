@@ -25,16 +25,51 @@ pub struct KindRegistryEntry {
     pub required_fields: Vec<String>,
 }
 
+/// One optional capability feature advertised by `/v1/health`.
+///
+/// Unknown feature entries or `limits` shapes must never fail health parsing,
+/// so `limits` is stored as raw JSON and typed by consumers only for features
+/// they recognize (e.g. `generic-event` v1 → [`crate::GenericEventLimits`]).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-rs", derive(TS), ts(export, export_to = "../bindings/"))]
+#[serde(rename_all = "camelCase")]
+pub struct CapabilityFeature {
+    pub name: String,
+    pub version: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts-rs", ts(optional))]
+    pub limits: Option<serde_json::Value>,
+}
+
 /// Capability block surfaced by health and `kindling status --json`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-rs", derive(TS), ts(export, export_to = "../bindings/"))]
 #[serde(rename_all = "camelCase")]
 pub struct Capability {
     pub version: String,
     pub schema_version: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts-rs", ts(optional))]
+    pub schema_revision: Option<u32>,
     pub supported_kinds: Vec<String>,
     pub storage_path: String,
     pub kind_registry: Vec<KindRegistryEntry>,
+    #[serde(default)]
+    pub features: Vec<CapabilityFeature>,
+}
+
+impl Capability {
+    /// Attach the store's additive schema revision stamp (`MAX(schema_migrations.version)`).
+    pub fn with_schema_revision(mut self, revision: u32) -> Self {
+        self.schema_revision = Some(revision);
+        self
+    }
+
+    /// Attach advertised capability feature entries.
+    pub fn with_features(mut self, features: Vec<CapabilityFeature>) -> Self {
+        self.features = features;
+        self
+    }
 }
 
 impl ObservationKind {
@@ -111,8 +146,10 @@ pub fn build_capability(
     Capability {
         version: version.into(),
         schema_version,
+        schema_revision: None,
         supported_kinds: supported_kind_names(),
         storage_path: storage_path.into(),
         kind_registry: kind_registry(),
+        features: Vec::new(),
     }
 }

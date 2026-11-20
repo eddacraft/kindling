@@ -17,7 +17,7 @@ const PROJECT: &str = "/tmp/kindling-runtime-test/project-a";
 
 /// The store's canonical schema version (the daemon reports this on health).
 fn schema_version_u32() -> u32 {
-    kindling_store::schema_version().version as u32
+    kindling_store::wire_version()
 }
 
 fn message_input(content: &str) -> ObservationInput {

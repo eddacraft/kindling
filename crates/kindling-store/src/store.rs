@@ -495,9 +495,24 @@ impl SqliteKindlingStore {
     ///
     /// Unlike [`Self::query_observations`] (ranked-adjacent, `ts DESC`), this
     /// enumerates the **full** matching set in the stable `(ts ASC, id ASC)`
-    /// order via a keyset cursor — the only scheme that is complete under
-    /// concurrent appends (a row inserted after the cursor passed its position is
-    /// picked up on a later page, never skipped or duplicated by an offset shift).
+    /// order via a keyset cursor. Unlike an offset, the cursor is a value in the
+    /// data, so a traversal over an unchanging set never skips or duplicates a
+    /// row.
+    ///
+    /// **Consistency (snapshot-keyset semantics).** `(ts, id)` is a semantic key,
+    /// not an insertion sequence: `ts` is the event time (caller-supplied or
+    /// defaulted) and `id` is caller-generated. A row inserted mid-traversal is
+    /// returned by a later page **only if its `(ts, id)` sorts after the
+    /// cursor**. A row with an older `ts` (backdated), or an equal `ts` and a
+    /// smaller `id`, sorts before the cursor and is not returned by that
+    /// traversal; a fresh traversal sees it. Observations appended through the
+    /// daemon with `ts` omitted are stamped under the per-project service lock,
+    /// so their `ts` is non-decreasing (barring a wall-clock regression) and
+    /// they usually sort after an existing cursor. The stamp has millisecond
+    /// resolution and the default `id` is a random UUID, so a row stamped in the
+    /// same millisecond as the cursor anchor is missed when its `id` sorts lower.
+    /// Caller-supplied timestamps and embedded multi-process writers carry no
+    /// ordering guarantee at all.
     ///
     /// Filters: `scope` (denormalized columns), `kinds` (empty = all), and a
     /// **half-open** `[since, until)` window on `ts`. `cursor` is the
@@ -1233,7 +1248,7 @@ impl RawObservation {
             content: self.content,
             provenance: serde_json::from_str(&self.provenance)?,
             ts: self.ts,
-            scope_ids: serde_json::from_str(&self.scope_ids)?,
+            scope_ids: decode_stored_scope_ids(&self.scope_ids)?,
             redacted: self.redacted == 1,
         })
     }
@@ -1270,7 +1285,7 @@ impl RawCapsule {
             status: capsule_status_from_str(&self.status)?,
             opened_at: self.opened_at,
             closed_at: self.closed_at,
-            scope_ids: serde_json::from_str(&self.scope_ids)?,
+            scope_ids: decode_stored_scope_ids(&self.scope_ids)?,
             observation_ids,
             // The capsules table has no summary_id column; the relationship
             // lives in summaries.capsule_id (matches the TS store).
@@ -1331,7 +1346,25 @@ impl RawPin {
             reason: self.reason,
             created_at: self.created_at,
             expires_at: self.expires_at,
-            scope_ids: serde_json::from_str(&self.scope_ids)?,
+            scope_ids: decode_stored_scope_ids(&self.scope_ids)?,
         })
     }
+}
+
+/// Decode a row's stored `scope_ids` JSON blob.
+///
+/// The retired TS store wrote `JSON.stringify(scopeIds)` and its validator
+/// allowed an array, so a TS-era row can hold `'[]'` or `'["x"]'`. TS read
+/// `.sessionId` from that array as `undefined` and wrote NULL denormalized
+/// columns, so such a row means "no scope". `ScopeIds` rejects arrays on the
+/// wire (GH-216); reading one from disk yields an empty scope instead of an
+/// error. Any other malformed value is still an error. Kept in step with the
+/// copy in `kindling-provider`.
+fn decode_stored_scope_ids(raw: &str) -> serde_json::Result<ScopeIds> {
+    serde_json::from_str(raw).or_else(|err| {
+        match serde_json::from_str::<Vec<serde_json::Value>>(raw) {
+            Ok(_) => Ok(ScopeIds::default()),
+            Err(_) => Err(err),
+        }
+    })
 }
