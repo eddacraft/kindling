@@ -45,6 +45,17 @@ at each release; older distribution approaches may now be superseded.
 
 ### Fixed
 
+- **`kindling search` filters see past the default candidate limit.**
+  With `--kind`, `--after` or `--before`, the CLI passed
+  `max_candidates: None` intending "the full ranked set", but `None` means the
+  orchestrator default of 10, so filters ran over 10 candidates. It now fetches
+  up to `FILTER_CANDIDATE_CAP` (10,000, or `--max` if larger), not
+  `u32::MAX`: every candidate is hydrated and, via the daemon, sent over the
+  socket, so an unbounded fetch would grow with the project's memory. When
+  a filtered fetch fills the cap, the text output (or stderr with `--json`)
+  notes that only the top matches were filtered. Split out of #306 (GH-188) at
+  review, independent of the ranking change.
+
 - **Contributor package-manager tooling now requires pnpm 12.** The exact
   package-manager pin is recorded in `package.json`; dependency overrides and
   build permissions live in `pnpm-workspace.yaml`.

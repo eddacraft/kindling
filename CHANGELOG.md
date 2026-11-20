@@ -26,6 +26,7 @@ ended with v0.4.0.
 
 ### Fixed
 
+- `kindling search --kind`, `--after` and `--before` now filter up to the top 10,000 matches. Before, they filtered only the first 10, so matches could be missing even with a large `--max`. When the cap is reached, the output says so.
 - **Contributor package-manager tooling now requires pnpm 12.** Enable Corepack
   with `corepack enable` so the repository's pinned pnpm version is used.
 - Project-root overrides now reject sibling directories with similar path prefixes, preventing incorrect repository selection.
