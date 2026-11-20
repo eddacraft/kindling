@@ -180,6 +180,24 @@ fn finish_subagent(
 /// All captured tool arguments and error text are run through hook filtering so
 /// sensitive values (secrets, shell variable assignments, URL credentials/query
 /// strings) are sanitized before observation creation.
+///
+/// # Tool-result capture contract
+///
+/// - **Bash** is the only tool whose result is captured: its stdout/stderr
+///   (see [`bash_output_text`]), secret-masked and capped at
+///   [`MAX_RESULT_LENGTH`] by [`filter_tool_result`].
+/// - **Every other tool** (Read, Write, Edit, Glob, Grep, Task, WebFetch,
+///   WebSearch and unknown tools) records its sanitized inputs only: file path,
+///   pattern, URL, query or input keys. Its result is never read. File
+///   contents, fetched pages and search output are large and likely to carry
+///   secrets, so they stay out of memory.
+/// - **Error text** (`tool_error`) is captured, sanitized, for every tool.
+/// - Provenance reads one field from a result: Bash's `exitCode`
+///   ([`extract_exit_code`]).
+///
+/// There is no setting to change this. The retired Node adapter's
+/// `captureResults` option was not carried over. The contract is pinned by the
+/// `non_bash_tools_never_capture_their_result` tests below.
 fn format_tool_content(hook: &HookInput, tool_name: &str) -> String {
     let empty = Value::Object(Map::new());
     let input = hook.tool_input.as_ref().unwrap_or(&empty);
@@ -623,5 +641,123 @@ mod tests {
         let task_obs = map_tool_use(&task_hook);
         assert!(!task_obs.content.contains("abcdef123456789"));
         assert!(!task_obs.content.contains("token=secret12345"));
+    }
+
+    // --- Tool-result capture contract (GH-217) -----------------------------
+    //
+    // Only Bash results are captured. Every other tool records its sanitized
+    // inputs and provenance, never its result. Error text is captured for every
+    // tool. See `format_tool_content`.
+
+    const RESULT_SENTINEL: &str = "RESULT-SENTINEL-do-not-store";
+
+    /// Input fixtures for every non-Bash tool the mapping knows, plus one it
+    /// does not.
+    fn non_bash_tools() -> Vec<(&'static str, Value)> {
+        vec![
+            ("Read", json!({ "file_path": "/repo/a.rs" })),
+            (
+                "Write",
+                json!({ "file_path": "/repo/a.rs", "content": "x" }),
+            ),
+            (
+                "Edit",
+                json!({ "file_path": "/repo/a.rs", "old_string": "a", "new_string": "b" }),
+            ),
+            ("Glob", json!({ "pattern": "**/*.rs" })),
+            ("Grep", json!({ "pattern": "fn main", "path": "/repo" })),
+            (
+                "Task",
+                json!({ "subagent_type": "researcher", "description": "look" }),
+            ),
+            ("WebFetch", json!({ "url": "https://example.com/page" })),
+            ("WebSearch", json!({ "query": "kindling" })),
+            ("SomeFutureTool", json!({ "arg": "v" })),
+        ]
+    }
+
+    #[test]
+    fn non_bash_tools_never_capture_their_result() {
+        for (tool, input) in non_bash_tools() {
+            for result in [
+                json!(RESULT_SENTINEL),
+                json!({ "stdout": RESULT_SENTINEL, "content": RESULT_SENTINEL }),
+            ] {
+                let obs = map_tool_use(&hook_with(tool, input.clone(), Some(result), None));
+                assert!(
+                    !obs.content.contains(RESULT_SENTINEL),
+                    "{tool} content captured its result: {:?}",
+                    obs.content
+                );
+                let prov = serde_json::to_string(&obs.provenance).unwrap();
+                assert!(
+                    !prov.contains(RESULT_SENTINEL),
+                    "{tool} provenance captured its result: {prov}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn non_bash_tools_ignore_result_exit_code() {
+        for (tool, input) in non_bash_tools() {
+            let obs = map_tool_use(&hook_with(
+                tool,
+                input,
+                Some(json!({ "exitCode": 3 })),
+                None,
+            ));
+            let prov = obs.provenance.unwrap();
+            assert!(
+                !prov.contains_key("exitCode"),
+                "{tool} provenance read exitCode from its result"
+            );
+        }
+    }
+
+    #[test]
+    fn bash_result_is_captured_masked_and_capped() {
+        let secret = "ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        let output = format!(
+            "{RESULT_SENTINEL} {secret}\n{}",
+            "x".repeat(MAX_RESULT_LENGTH)
+        );
+        let obs = map_tool_use(&hook_with(
+            "Bash",
+            json!({ "command": "make" }),
+            Some(json!({ "stdout": output, "stderr": "", "exitCode": 2 })),
+            None,
+        ));
+        assert!(obs.content.contains(RESULT_SENTINEL));
+        assert!(!obs.content.contains(secret), "secret in Bash result kept");
+        assert!(
+            obs.content.contains("[Truncated "),
+            "Bash result not capped"
+        );
+        assert_eq!(obs.provenance.unwrap()["exitCode"], json!(2));
+    }
+
+    #[test]
+    fn error_text_is_captured_and_masked_for_every_tool() {
+        let mut tools = non_bash_tools();
+        tools.push(("Bash", json!({ "command": "make" })));
+        for (tool, input) in tools {
+            let obs = map_tool_use(&hook_with(
+                tool,
+                input,
+                None,
+                Some("failed with api_key=abcdef123456789"),
+            ));
+            assert!(
+                obs.content.contains("\n\nError: failed with "),
+                "{tool} dropped its error text: {:?}",
+                obs.content
+            );
+            assert!(
+                !obs.content.contains("abcdef123456789"),
+                "{tool} error text kept a secret"
+            );
+            assert_eq!(obs.provenance.unwrap()["hasError"], json!(true));
+        }
     }
 }

@@ -43,7 +43,7 @@ When you start a Claude Code session, kindling:
 
 1. **Opens a session capsule** to track all activity
 2. **Injects prior context** from previous sessions in this project
-3. **Captures tool calls** (Read, Write, Edit, Bash, etc.)
+3. **Captures tool calls** (Read, Write, Edit, Bash, etc.). See [Privacy](#privacy) for what is kept.
 4. **Captures your messages** as observations
 5. **Closes the capsule** when the session ends
 
@@ -110,6 +110,7 @@ Each project gets its own isolated database. No data is shared between projects 
 
 - **Local only** — no data leaves your machine
 - **Secret filtering** — API keys and tokens are automatically masked
+- **Tool results** — only Bash output (stdout/stderr) is stored, with secrets masked and capped at 10,000 characters. Other tools record their inputs (file path, search pattern, URL, query) but never their results, so file contents and fetched pages stay out of memory. Error messages are kept for every tool, with secrets masked.
 - **Per-project isolation** — projects don't share data
 - **You control it** — delete `~/.kindling/` to clear all memory, or use `/memory forget` for individual items
 

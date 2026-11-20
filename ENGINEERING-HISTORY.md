@@ -54,6 +54,25 @@ at each release; older distribution approaches may now be superseded.
   `KINDLING_REPO`, and invokes the binary cargo installed (including a
   nonstandard `CARGO_HOME` or `CARGO_INSTALL_ROOT`).
 
+### Changed
+
+- **Tool-result capture contract for the Rust hook (#217).** The TS→Rust
+  port dropped the retired Claude adapter's `captureResults` setting.
+  `format_tool_content` in `crates/kindling/src/hook/mapping.rs` was left
+  reading `hook.result()` only in its Bash arm. That is now the documented
+  contract, not an accident of the port:
+  - Bash stdout/stderr is captured, passing through `filter_tool_result`
+    (secret masking, `MAX_RESULT_LENGTH` cap).
+  - Every other tool captures sanitized inputs only.
+  - `tool_error` is captured, sanitized, for all tools.
+  - Provenance reads only Bash's `exitCode` from a result.
+
+  No setting was restored. Non-Bash results (file contents, fetched pages,
+  search output) are large and likely to hold secrets. Unit tests pin the
+  contract, including unknown tools and result-borne exit codes.
+  `SKIP_RESULT_TOOLS` (`["WebSearch"]`) in `hook/filter.rs` is unreachable
+  from capture and is kept only for parity with the filter port.
+
 ## [0.4.1] - 2026-11-10
 
 ### Security

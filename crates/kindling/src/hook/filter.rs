@@ -41,6 +41,11 @@ pub const MAX_CONTENT_LENGTH: usize = 50_000;
 pub const MAX_RESULT_LENGTH: usize = 10_000;
 
 /// Tools whose full results are never captured. Mirrors `SKIP_RESULT_TOOLS`.
+///
+/// Hook capture never reaches this list: only Bash results go through
+/// [`filter_tool_result`] (see the capture contract on
+/// `hook::mapping::format_tool_content`). It is kept for parity with the
+/// filter port.
 const SKIP_RESULT_TOOLS: &[&str] = &["WebSearch"];
 
 /// The adapter's `SECRET_PATTERNS`, in application order.

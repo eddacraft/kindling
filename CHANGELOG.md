@@ -26,6 +26,10 @@ ended with v0.4.0.
 - Invalid project-root requests are rejected rather than queued for retry.
 - Installer fallback respects a pinned Kindling version and non-default Cargo installation locations.
 
+### Changed
+
+- **Documented which tool results the Claude Code hooks capture.** Only Bash output (stdout/stderr, secrets masked, capped at 10,000 characters) is stored. Other tools record their inputs (file path, pattern, URL, query) but never their results. Error text is captured, with secrets masked, for every tool. Behaviour is unchanged, and there is no setting for it: the retired adapter's `captureResults` option is not coming back (#217).
+
 ## [0.4.1] - 2026-11-10
 
 ### Security
