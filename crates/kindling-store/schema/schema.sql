@@ -1,14 +1,16 @@
 -- kindling SQLite Schema Contract
 -- =================================
--- Canonical DDL reflecting the state after all migrations (through 006).
+-- Canonical DDL reflecting the state after all migrations (through 007).
 -- Both the TypeScript store (better-sqlite3) and the Rust crate MUST produce
 -- an identical structure when creating a fresh database.
 --
 -- See README.md in this directory for update rules and breaking-change policy.
 
--- Runtime schema version — readable from any SQLite client via:
+-- Runtime minimum-reader floor — readable from any SQLite client via:
 --   PRAGMA user_version;
--- Must match the "version" field in version.json.
+-- Must match the "minReader" field in version.json. The current schema
+-- revision is MAX(schema_migrations.version) and matches "version" in
+-- version.json.
 PRAGMA user_version = 6;
 
 -- ============================================================================
@@ -31,7 +33,8 @@ INSERT OR IGNORE INTO schema_migrations (version, name, applied_at) VALUES
   (3, '003_indexes',               0),
   (4, '004_denormalize_scopes',    0),
   (5, '005_pragma_user_version',   0),
-  (6, '006_scoped_keyset_indexes', 0);
+  (6, '006_scoped_keyset_indexes', 0),
+  (7, '007_generic_events',        0);
 
 -- Atomic units of captured context.
 CREATE TABLE IF NOT EXISTS observations (
@@ -210,3 +213,68 @@ CREATE INDEX IF NOT EXISTS idx_pins_expires_at         ON pins(expires_at)    WH
 CREATE INDEX IF NOT EXISTS idx_pins_target             ON pins(target_type, target_id);
 CREATE INDEX IF NOT EXISTS idx_pins_session_id         ON pins(session_id)    WHERE session_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_pins_repo_id            ON pins(repo_id)       WHERE repo_id IS NOT NULL;
+
+-- ============================================================================
+-- Generic Events (revision 7, additive — decoupled from core tables and FTS)
+-- ============================================================================
+
+-- Opaque, versioned keyed generic events. No foreign key, trigger, or CHECK
+-- coupling to observations, capsules, summaries, pins, or FTS tables.
+CREATE TABLE IF NOT EXISTS generic_events (
+  event_id          TEXT    PRIMARY KEY,
+  envelope_version  INTEGER NOT NULL,
+  schema_name       TEXT    NOT NULL,
+  event_key         TEXT    NOT NULL,
+  schema_version    INTEGER NOT NULL,
+  project_id        TEXT    NOT NULL,
+  session_id        TEXT,
+  repo_id           TEXT,
+  agent_id          TEXT,
+  user_id           TEXT,
+  task_id           TEXT,
+  digest            TEXT    NOT NULL,
+  payload           BLOB,                -- NULL once tombstoned by forget
+  committed_at      INTEGER NOT NULL,    -- epoch milliseconds
+  redacted_at       INTEGER,             -- epoch milliseconds, set once
+  detector_version  INTEGER NOT NULL,
+  UNIQUE(schema_name, event_key)
+);
+
+-- Single-row usage counter for live generic_events payload bytes and row count.
+CREATE TABLE IF NOT EXISTS generic_event_usage (
+  id            INTEGER PRIMARY KEY CHECK(id = 1),
+  payload_bytes INTEGER NOT NULL DEFAULT 0,
+  event_count   INTEGER NOT NULL DEFAULT 0
+);
+
+INSERT OR IGNORE INTO generic_event_usage (id, payload_bytes, event_count)
+  VALUES (1, 0, 0);
+
+-- Maintain generic_event_usage on INSERT, UPDATE, and DELETE.
+CREATE TRIGGER IF NOT EXISTS generic_events_usage_insert
+AFTER INSERT ON generic_events
+BEGIN
+  UPDATE generic_event_usage
+     SET payload_bytes = payload_bytes + COALESCE(length(CAST(NEW.payload AS BLOB)), 0),
+         event_count   = event_count + 1
+   WHERE id = 1;
+END;
+
+CREATE TRIGGER IF NOT EXISTS generic_events_usage_update
+AFTER UPDATE ON generic_events
+BEGIN
+  UPDATE generic_event_usage
+     SET payload_bytes = payload_bytes
+                       - COALESCE(length(CAST(OLD.payload AS BLOB)), 0)
+                       + COALESCE(length(CAST(NEW.payload AS BLOB)), 0)
+   WHERE id = 1;
+END;
+
+CREATE TRIGGER IF NOT EXISTS generic_events_usage_delete
+AFTER DELETE ON generic_events
+BEGIN
+  UPDATE generic_event_usage
+     SET payload_bytes = payload_bytes - COALESCE(length(CAST(OLD.payload AS BLOB)), 0),
+         event_count   = event_count - 1
+   WHERE id = 1;
+END;

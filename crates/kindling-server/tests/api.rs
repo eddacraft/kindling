@@ -326,10 +326,9 @@ async fn health_reports_version_and_schema() {
     assert_eq!(resp.status, StatusCode::OK);
     let body = resp.json();
     assert_eq!(body["version"], env!("CARGO_PKG_VERSION"));
-    assert_eq!(
-        body["schemaVersion"],
-        kindling_store::schema_version().version
-    );
+    assert_eq!(body["schemaVersion"], kindling_store::wire_version());
+    assert_eq!(body["schemaRevision"], kindling_store::schema_revision());
+    assert_eq!(body["features"], json!([]));
     assert_capability_block(&body);
     assert_eq!(body["projects"].as_array().unwrap().len(), 0);
 
@@ -1083,4 +1082,88 @@ async fn append_response_carries_redaction_evidence() {
     let body = resp.json();
     assert_eq!(body["redaction"]["count"], 0);
     assert!(body["redaction"]["classes"].as_array().unwrap().is_empty());
+}
+
+/// GH-216: `scopeIds` is a keyed object on every v1 route that accepts it. The
+/// retired TS validator accepted arrays, and serde's derived `Deserialize`
+/// would bind `["s1"]` to `sessionId` by position. Each body is first sent
+/// with an object `scopeIds` and must succeed, so the array is what gets
+/// rejected and not some other field.
+#[tokio::test]
+async fn array_scope_ids_are_rejected_on_every_route() {
+    let daemon = TestDaemon::start().await;
+    let mut c = daemon.connect().await;
+
+    // A target for the pin route.
+    let resp = c
+        .send(
+            "POST",
+            "/v1/observations",
+            Some(PROJECT_A),
+            Some(json!({
+                "kind": "message",
+                "content": "pin target",
+                "scopeIds": { "sessionId": "s1" },
+            })),
+        )
+        .await;
+    assert_eq!(resp.status, StatusCode::CREATED, "seed observation");
+    let obs_id = resp.json()["id"].as_str().unwrap().to_string();
+
+    let routes = [
+        (
+            "/v1/capsules",
+            json!({ "kind": "pocketflow_node", "intent": "scope shape" }),
+        ),
+        (
+            "/v1/observations",
+            json!({ "kind": "message", "content": "scope shape" }),
+        ),
+        ("/v1/observations/list", json!({})),
+        ("/v1/retrieve", json!({ "query": "scope" })),
+        (
+            "/v1/pins",
+            json!({ "targetType": "observation", "targetId": obs_id }),
+        ),
+        ("/v1/context/session-start", json!({})),
+        ("/v1/context/pre-compact", json!({})),
+    ];
+
+    for (path, base) in routes {
+        let with_scope = |scope: serde_json::Value| {
+            let mut body = base.clone();
+            body["scopeIds"] = scope;
+            body
+        };
+
+        let control = c
+            .send(
+                "POST",
+                path,
+                Some(PROJECT_A),
+                Some(with_scope(json!({ "sessionId": "s1" }))),
+            )
+            .await;
+        assert!(
+            control.status.is_success(),
+            "{path}: object scopeIds must be accepted, got {}",
+            control.status
+        );
+
+        for array in [json!([]), json!(["s1"])] {
+            let resp = c
+                .send(
+                    "POST",
+                    path,
+                    Some(PROJECT_A),
+                    Some(with_scope(array.clone())),
+                )
+                .await;
+            assert!(
+                resp.status.is_client_error(),
+                "{path}: scopeIds {array} must be rejected with a 4xx, got {}",
+                resp.status
+            );
+        }
+    }
 }

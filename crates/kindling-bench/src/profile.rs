@@ -1,11 +1,11 @@
 //! Workload sizes for quick checks, representative local runs, and stress runs.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Profile {
-    pub name: &'static str,
+    pub name: String,
     pub cold_starts: usize,
     pub warmup_operations: usize,
     pub write_operations: usize,
@@ -22,7 +22,7 @@ impl Profile {
     pub fn from_name(name: &str) -> Option<Self> {
         match name {
             "smoke" => Some(Self {
-                name: "smoke",
+                name: "smoke".to_string(),
                 cold_starts: 3,
                 warmup_operations: 20,
                 write_operations: 200,
@@ -34,7 +34,7 @@ impl Profile {
                 spool_operations: 100,
             }),
             "standard" => Some(Self {
-                name: "standard",
+                name: "standard".to_string(),
                 cold_starts: 10,
                 warmup_operations: 100,
                 write_operations: 2_000,
@@ -46,7 +46,7 @@ impl Profile {
                 spool_operations: 1_000,
             }),
             "stress" => Some(Self {
-                name: "stress",
+                name: "stress".to_string(),
                 cold_starts: 25,
                 warmup_operations: 500,
                 write_operations: 20_000,

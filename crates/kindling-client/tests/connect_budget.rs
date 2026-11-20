@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 use kindling_client::{Client, ClientConfig, ClientError, Spawner, Transport};
 
 fn schema_version_u32() -> u32 {
-    kindling_store::schema_version().version as u32
+    kindling_store::wire_version()
 }
 
 const PROJECT: &str = "/tmp/kindling-client-test/connect-budget";
