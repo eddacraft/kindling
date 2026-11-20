@@ -17,10 +17,16 @@ ended with v0.4.0.
 ### Added
 
 - `kindling tui` browses local memory with editable search, pins first, and a wrapped, scrollable preview. Panels adapt to terminal width; press Esc or Ctrl-C to quit. Preview scrolling stops at the final page, and unsupported `--json` mode is rejected.
+- `generic-event@1` wire types, `Capability.features` and `schemaRevision` fields, and golden digest/detector fixtures (not yet advertised; full endpoints ship in 0.5.0).
+
+### Changed
+
+- SQLite schema advances additively to revision 7 (`generic_events` and `generic_event_usage` tables) while keeping `PRAGMA user_version` at 6 (`minReader`) so 0.4.x binaries remain compatible. Tools checking the exact schema revision should read `MAX(schema_migrations.version)` rather than `PRAGMA user_version`.
+- `/v1/health` and `kindling status --json` report `schemaVersion` from `wireVersion` (6) alongside `schemaRevision` (7); Rust and TypeScript clients validate `schemaVersion` against the supported wire range.
 
 ### Security
 
-- Resolved Dependabot alerts in development tooling (`minimatch`, `tinypool`, `@vitest/mocker`, `@azure/msal-node`). None of these ship in kindling, its crates or the VSIX.
+- Resolved Dependabot alerts in development tooling (`minimatch`, `@azure/msal-node`). None of these ship in kindling, its crates or the VSIX.
 
 ### Fixed
 

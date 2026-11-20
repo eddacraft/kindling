@@ -14,7 +14,7 @@ use tokio::task::JoinHandle;
 
 /// The store's canonical schema version, as `u32` (the client's type).
 pub fn schema_version_u32() -> u32 {
-    kindling_store::schema_version().version as u32
+    kindling_store::wire_version()
 }
 
 /// A running in-process daemon on a temp socket.
