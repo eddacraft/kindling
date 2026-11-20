@@ -301,7 +301,7 @@
             },
             "redacted": false
           },
-          "score": 0.8176392543,
+          "score": 0.8551399388,
           "matchContext": "database xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx..."
         },
         {
@@ -317,7 +317,7 @@
             },
             "redacted": false
           },
-          "score": 0.8076392543,
+          "score": 0.8451399388,
           "matchContext": "database 🔥 yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy..."
         },
         {
@@ -1088,22 +1088,6 @@
         "candidates": [
           {
             "entity": {
-              "id": "obs-4",
-              "kind": "message",
-              "content": "database database database heavy term frequency note",
-              "provenance": {},
-              "ts": 1746112000000,
-              "scopeIds": {
-                "sessionId": "sess-1",
-                "repoId": "repo-1"
-              },
-              "redacted": false
-            },
-            "score": 0.7,
-            "matchContext": "database database database heavy term frequency note"
-          },
-          {
-            "entity": {
               "id": "obs-5",
               "kind": "tool_call",
               "content": "database xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
@@ -1117,8 +1101,24 @@
               },
               "redacted": false
             },
-            "score": 0.28,
+            "score": 0.8551399388,
             "matchContext": "database xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx..."
+          },
+          {
+            "entity": {
+              "id": "obs-6",
+              "kind": "message",
+              "content": "database 🔥 yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+              "provenance": {},
+              "ts": 1749740800000,
+              "scopeIds": {
+                "sessionId": "sess-1",
+                "repoId": "repo-1"
+              },
+              "redacted": false
+            },
+            "score": 0.8451399388,
+            "matchContext": "database 🔥 yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy..."
           }
         ],
         "provenance": {

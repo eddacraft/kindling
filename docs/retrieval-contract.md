@@ -159,7 +159,7 @@ Retrieval results are organized in a **three-tier structure**:
 - Excludes redacted observations (unless `include_redacted = true`)
 - Excludes entities already in pins or current summary (deduplication)
 
-**Ordering:** By relevance score (highest first)
+**Ordering:** By relevance score (highest first); ties are broken as described under [Local FTS Provider](#local-fts-provider)
 
 **Characteristics:**
 
@@ -213,8 +213,9 @@ The default provider uses SQLite FTS5 (tokenizer `porter unicode61`) blended wit
 score = (fts_relevance * 0.7) + (recency * 0.3)
 
 where:
-  fts_relevance = BM25 score from FTS5, normalized to [0, 1]
-                  across observations + summaries
+  fts_relevance = BM25 score from FTS5, min-max normalized to [0, 1]
+                  across every match of both observations and summaries
+                  that survives scope, redaction and exclude filtering
   recency       = MAX(0, 1 - (age_ms / max_age_ms))
   max_age_ms    = 30-day window
   age_ms        = retrieve_at - entity.ts
@@ -224,8 +225,16 @@ where:
 
 - **FTS-based:** Uses `observations_fts` and `summaries_fts`
 - **Recency-weighted:** Recent entities score higher (30-day window)
+- **Exact:** Every filtered match is scored before the result bound is applied,
+  so the provider returns the true top `max_candidates` by score. A result's
+  score does not depend on the bound, and a smaller bound always returns a
+  prefix of a larger one.
+- **Totally ordered:** Equal scores are ordered observations before summaries,
+  then by BM25 rank (most relevant first), then by entity `id`.
 - **Deterministic:** Same query + scope + data + `retrieve_at` → same results
-- **Fast:** Leverages SQLite FTS5 indexes
+- **Fast:** Leverages SQLite FTS5 indexes. The cost of a search grows with the
+  number of matching entities (all are scored); only the returned entities are
+  read in full.
 
 The provider takes an explicit `retrieve_at` (the `now` clock) so recency scoring is testable and reproducible; nothing reads the wall clock implicitly.
 
@@ -294,7 +303,10 @@ This ensures session isolation (no cross-session leakage) and repository isolati
 1. **Pins and Current Summary:** Always returned (non-evictable, not bounded)
 2. **Candidates:** Bounded to `max_candidates` from the provider, ordered by score
 
-The engine returns the top-scoring candidates up to `max_candidates`. Deciding how
+The engine returns the top-scoring candidates up to `max_candidates`: the bound is
+applied after scoring, so it never changes which entities score highest or what
+their scores are. Pinned entities and the current summary are excluded before
+scoring, so they do not take part in normalization. Deciding how
 many of those to actually feed into a prompt — and any token accounting — is left
 to the consumer (an adapter or a downstream context-assembly system), which can
 apply whatever tokenizer it prefers (e.g., `tiktoken`).

@@ -698,3 +698,277 @@ fn genuine_backend_errors_are_not_swallowed() {
         "expected a backend no-such-table error, got {err}"
     );
 }
+
+// ===== Exact composite ranking =====
+//
+// `max_results` must bound the output of the documented composite score, not
+// a BM25 shortlist taken before scoring. These tests pin three properties:
+// a better composite candidate is never dropped, scores do not depend on the
+// limit, and every limited result is a prefix of the unlimited ranking.
+
+/// Non-matching rows so the query term is rare enough for BM25 to have a
+/// positive IDF (FTS5 floors IDF when most documents contain the term).
+fn insert_background(store: &SqliteKindlingStore, count: usize) {
+    for i in 0..count {
+        store
+            .insert_observation(&observation(
+                &format!("bg-{i}"),
+                "unrelated background content about deployment",
+                scope(Some("s1"), None),
+                NOW - 40 * DAY_MS,
+            ))
+            .unwrap();
+    }
+}
+
+/// Strong-but-old, medium-but-old, and weak-but-recent matches for "needle".
+fn shortlist_fixture() -> SqliteKindlingStore {
+    let store = SqliteKindlingStore::open_in_memory().unwrap();
+    insert_background(&store, 6);
+    store
+        .insert_observation(&observation(
+            "obs-strong-old",
+            "needle needle needle needle",
+            scope(Some("s1"), None),
+            NOW - 29 * DAY_MS,
+        ))
+        .unwrap();
+    store
+        .insert_observation(&observation(
+            "obs-medium-old",
+            "a needle in a long haystack of words",
+            scope(Some("s1"), None),
+            NOW - 29 * DAY_MS,
+        ))
+        .unwrap();
+    store
+        .insert_observation(&observation(
+            "obs-weak-recent",
+            "one needle buried among many many other unrelated haystack words here",
+            scope(Some("s1"), None),
+            NOW,
+        ))
+        .unwrap();
+    store
+}
+
+fn with_limit(query: &str, limit: Option<u32>) -> ProviderSearchOptions {
+    ProviderSearchOptions {
+        max_results: limit,
+        ..options(query, ScopeIds::default())
+    }
+}
+
+fn ids(results: &[ProviderSearchResult]) -> Vec<&str> {
+    results.iter().map(entity_id).collect()
+}
+
+#[test]
+fn recent_candidate_outside_bm25_shortlist_is_not_dropped() {
+    let store = shortlist_fixture();
+
+    // Preconditions: BM25 alone ranks strong > medium > weak, but the composite
+    // score puts the recent weak match above the old medium one.
+    let full = search(&store, &with_limit("needle", None));
+    assert_eq!(
+        ids(&full),
+        vec!["obs-strong-old", "obs-weak-recent", "obs-medium-old"],
+        "fixture must rank the recent weak match above the old medium match"
+    );
+
+    let limited = search(&store, &with_limit("needle", Some(2)));
+    assert_eq!(ids(&limited), vec!["obs-strong-old", "obs-weak-recent"]);
+}
+
+#[test]
+fn scores_do_not_depend_on_max_results() {
+    let store = shortlist_fixture();
+    let full = search(&store, &with_limit("needle", None));
+
+    for limit in 1..=full.len() as u32 {
+        let limited = search(&store, &with_limit("needle", Some(limit)));
+        for result in &limited {
+            let expected = full
+                .iter()
+                .find(|f| entity_id(f) == entity_id(result))
+                .expect("limited result must appear in the full ranking");
+            assert_eq!(
+                result.score,
+                expected.score,
+                "score of {} changed at max_results={limit}",
+                entity_id(result)
+            );
+        }
+    }
+}
+
+/// Observations and summaries with relevance and recency pulling in opposite
+/// directions, so the full ranking interleaves the two types.
+fn mixed_fixture() -> SqliteKindlingStore {
+    let store = SqliteKindlingStore::open_in_memory().unwrap();
+    insert_background(&store, 6);
+    let observations = [
+        ("obs-a", "needle needle needle", 25),
+        ("obs-b", "needle needle and some more text", 1),
+        (
+            "obs-c",
+            "a needle with plenty of surrounding filler text words",
+            0,
+        ),
+        ("obs-d", "needle needle needle needle needle", 29),
+        ("obs-e", "the needle", 15),
+    ];
+    for (id, content, age_days) in observations {
+        store
+            .insert_observation(&observation(
+                id,
+                content,
+                scope(Some("s1"), None),
+                NOW - age_days * DAY_MS,
+            ))
+            .unwrap();
+    }
+    let summaries = [
+        ("sum-a", "cap-a", "needle needle summary", 20),
+        (
+            "sum-b",
+            "cap-b",
+            "summary mentioning a needle once among other words",
+            0,
+        ),
+        ("sum-c", "cap-c", "needle", 28),
+        ("sum-d", "cap-d", "unrelated summary text", 0),
+        ("sum-e", "cap-e", "deployment notes for the release", 10),
+        ("sum-f", "cap-f", "refactored the storage layer", 12),
+        ("sum-g", "cap-g", "investigated flaky daemon startup", 14),
+    ];
+    for (id, capsule_id, content, age_days) in summaries {
+        store
+            .create_capsule(&capsule(capsule_id, scope(Some("s1"), None)))
+            .unwrap();
+        store
+            .insert_summary(&summary(id, capsule_id, content, NOW - age_days * DAY_MS))
+            .unwrap();
+    }
+    store
+}
+
+#[test]
+fn limited_results_are_a_prefix_of_the_full_ranking_across_types() {
+    let store = mixed_fixture();
+    let full = search(&store, &with_limit("needle", None));
+    let full_ids = ids(&full);
+
+    // Precondition: the ranking really interleaves the two entity types.
+    let kinds: Vec<bool> = full
+        .iter()
+        .map(|r| matches!(r.entity, RetrievedEntity::Summary(_)))
+        .collect();
+    assert!(
+        kinds.windows(2).any(|w| w[0] != w[1])
+            && kinds.windows(3).any(|w| w[0] == w[2] && w[0] != w[1]),
+        "fixture must interleave observations and summaries: {full_ids:?}"
+    );
+
+    for limit in 1..=full.len() as u32 {
+        let limited = search(&store, &with_limit("needle", Some(limit)));
+        assert_eq!(
+            ids(&limited),
+            full_ids[..limit as usize].to_vec(),
+            "max_results={limit} is not a prefix of the full ranking"
+        );
+    }
+}
+
+#[test]
+fn equal_scores_are_ordered_by_id() {
+    let store = SqliteKindlingStore::open_in_memory().unwrap();
+    insert_background(&store, 6);
+    // Inserted in reverse id order: rowid order must not decide ties.
+    for id in ["obs-c", "obs-b", "obs-a"] {
+        store
+            .insert_observation(&observation(
+                id,
+                "identical needle content",
+                scope(Some("s1"), None),
+                NOW,
+            ))
+            .unwrap();
+    }
+
+    let results = search(&store, &with_limit("needle", None));
+    assert_eq!(ids(&results), vec!["obs-a", "obs-b", "obs-c"]);
+    assert!(results.windows(2).all(|w| w[0].score == w[1].score));
+}
+
+#[test]
+fn retrieve_returns_top_composite_candidates_within_max_candidates() {
+    let store = shortlist_fixture();
+    let provider = LocalFtsProvider::from_store(&store);
+    let options = kindling_types::RetrieveOptions {
+        query: "needle".to_string(),
+        scope_ids: ScopeIds::default(),
+        token_budget: None,
+        max_candidates: Some(2),
+        include_redacted: None,
+    };
+
+    let result = kindling_provider::retrieve_at(&store, &provider, &options, NOW).unwrap();
+    let candidate_ids: Vec<&str> = result
+        .candidates
+        .iter()
+        .map(|c| match &c.entity {
+            RetrievedEntity::Observation(obs) => obs.id.as_str(),
+            RetrievedEntity::Summary(sum) => sum.id.as_str(),
+        })
+        .collect();
+    assert_eq!(candidate_ids, vec!["obs-strong-old", "obs-weak-recent"]);
+}
+
+#[test]
+fn ranking_does_not_depend_on_the_query_plan() {
+    // ANALYZE gives the planner statistics, which can change the join order
+    // (for example, driving summaries from a selective capsule scope index).
+    // The ranking is computed in Rust, so it must not change.
+    let scoped = ScopeIds {
+        session_id: Some("s1".to_string()),
+        ..ScopeIds::default()
+    };
+    let store = mixed_fixture();
+    let before = search(&store, &options("needle", scoped.clone()));
+    store.connection().execute_batch("ANALYZE").unwrap();
+    let after = search(&store, &options("needle", scoped));
+
+    assert!(!before.is_empty());
+    assert_eq!(ids(&after), ids(&before));
+    let scores = |r: &[ProviderSearchResult]| r.iter().map(|x| x.score).collect::<Vec<_>>();
+    assert_eq!(scores(&after), scores(&before));
+}
+
+#[test]
+fn zero_max_results_returns_nothing() {
+    let store = shortlist_fixture();
+    assert!(search(&store, &with_limit("needle", Some(0))).is_empty());
+}
+
+#[test]
+fn search_inside_a_caller_transaction_sees_its_uncommitted_rows() {
+    let store = shortlist_fixture();
+    let tx = store.connection().unchecked_transaction().unwrap();
+    store
+        .insert_observation(&observation(
+            "obs-in-tx",
+            "needle needle needle needle needle",
+            scope(Some("s1"), None),
+            NOW,
+        ))
+        .unwrap();
+
+    let results = search(&store, &with_limit("needle", Some(1)));
+    assert_eq!(ids(&results), vec!["obs-in-tx"]);
+    drop(tx); // rolls back
+    assert_ne!(
+        ids(&search(&store, &with_limit("needle", Some(1)))),
+        vec!["obs-in-tx"]
+    );
+}

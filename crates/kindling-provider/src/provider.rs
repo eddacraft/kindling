@@ -12,15 +12,26 @@
 //! score = (fts_relevance * 0.7) + (recency_score * 0.3)
 //! ```
 //!
-//! where `fts_relevance` is the BM25 rank normalized to `[0, 1]` across all
-//! results and `recency_score = MAX(0, 1.0 - age_ms / max_age_ms)`.
+//! where `fts_relevance` is the BM25 rank normalized to `[0, 1]` across the
+//! full filtered match set (both entity types, after scope, redaction and
+//! `exclude_ids` filtering) and `recency_score = MAX(0, 1.0 - age_ms /
+//! max_age_ms)`.
+//!
+//! Ranking is exact: every filtered match is scored before `max_results` is
+//! applied, so a result's score does not depend on the limit and a limited
+//! result list is always a prefix of the unlimited one. Equal scores are
+//! ordered observations first, then by BM25 rank (best first), then by `id`.
+//! Only the returned rows are read in full; the candidate scan and that read
+//! share one read snapshot.
 //!
 //! The one deliberate API deviation from TypeScript: the TS provider reads
 //! `Date.now()` internally, while [`RetrievalProvider::search`] takes `now`
 //! explicitly so retrieval is deterministic and testable.
 
+use std::cmp::Ordering;
+
 use rusqlite::types::Value as SqlValue;
-use rusqlite::{params_from_iter, Connection};
+use rusqlite::{params_from_iter, Connection, OptionalExtension};
 
 use kindling_store::SqliteKindlingStore;
 use kindling_types::{
@@ -56,29 +67,36 @@ pub trait RetrievalProvider {
     ) -> ProviderResult<Vec<ProviderSearchResult>>;
 }
 
-/// Row returned by the raw observations query (pre-normalization).
-struct RawObsRow {
-    id: String,
-    kind: String,
-    content: String,
-    provenance: String,
-    ts: Timestamp,
-    scope_ids: String,
-    redacted: i64,
-    fts_rank: f64,
-    recency: f64,
+/// Entity type of a candidate. The derived order is the tie-break order:
+/// observations before summaries.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum EntityType {
+    Observation,
+    Summary,
 }
 
-/// Row returned by the raw summaries query (pre-normalization).
-struct RawSumRow {
+/// A filtered FTS match before hydration: just enough to score and order it.
+#[derive(Debug)]
+struct Candidate {
+    entity_type: EntityType,
+    rowid: i64,
     id: String,
-    capsule_id: String,
-    content: String,
-    confidence: f64,
-    evidence_refs: String,
-    created_at: Timestamp,
     fts_rank: f64,
     recency: f64,
+    score: f64,
+}
+
+/// Total result order: score descending, then observations before summaries,
+/// then BM25 rank ascending (FTS5 rank is negative; lower is more relevant),
+/// then `id`. `id` is the primary key, so no two candidates compare equal.
+/// BM25 ranks are compared only within one entity type, because the two FTS
+/// indexes have different corpus statistics.
+fn result_order(a: &Candidate, b: &Candidate) -> Ordering {
+    b.score
+        .total_cmp(&a.score)
+        .then(a.entity_type.cmp(&b.entity_type))
+        .then(a.fts_rank.total_cmp(&b.fts_rank))
+        .then_with(|| a.id.cmp(&b.id))
 }
 
 /// FTS5 + recency retrieval over a kindling SQLite database.
@@ -99,70 +117,25 @@ impl<'conn> LocalFtsProvider<'conn> {
         Self::new(store.connection())
     }
 
-    /// Search observations: raw rows with `fts_rank` and `recency`. BM25
-    /// normalization happens in the caller across all entity types.
-    fn search_observations_raw(
+    /// Every filtered match of one entity type, unscored. FTS syntax errors
+    /// yield no candidates (malformed user queries are not provider failures).
+    fn candidates(
         &self,
-        query: &str,
-        scope: &ScopeIds,
-        exclude_ids: &[Id],
-        include_redacted: bool,
+        entity_type: EntityType,
+        options: &ProviderSearchOptions,
         now: Timestamp,
-        limit: u32,
-    ) -> ProviderResult<Vec<RawObsRow>> {
-        let (scope_clauses, scope_params) = build_scope_filters(scope, "o");
-        let exclude_filter = exclude_id_filter("o", exclude_ids);
-        let redacted_filter = if include_redacted {
-            ""
-        } else {
-            "AND o.redacted = 0"
-        };
-        let scope_filter = if scope_clauses.is_empty() {
-            String::new()
-        } else {
-            format!("AND {}", scope_clauses.join(" AND "))
-        };
-
-        let sql = format!(
-            "WITH fts_hits AS (
-               SELECT rowid, rank FROM observations_fts WHERE content MATCH ?
-             )
-             SELECT
-               o.id, o.kind, o.content, o.provenance, o.ts, o.scope_ids, o.redacted,
-               f.rank AS fts_rank,
-               MAX(0.0, 1.0 - CAST(? - o.ts AS REAL) / ?) AS recency
-             FROM fts_hits f
-             JOIN observations o ON f.rowid = o.rowid
-             WHERE 1=1
-               {redacted_filter}
-               {scope_filter}
-               {exclude_filter}
-             ORDER BY f.rank ASC
-             LIMIT ?"
-        );
-
-        let mut params: Vec<SqlValue> = vec![
-            SqlValue::Text(query.to_string()),
-            SqlValue::Integer(now),
-            SqlValue::Integer(MAX_AGE_MS),
-        ];
-        params.extend(scope_params);
-        params.extend(exclude_ids.iter().map(|id| SqlValue::Text(id.clone())));
-        params.push(SqlValue::Integer(i64::from(limit)));
-
-        let result = (|| -> Result<Vec<RawObsRow>, rusqlite::Error> {
+    ) -> ProviderResult<Vec<Candidate>> {
+        let (sql, params) = candidate_query(entity_type, options, now);
+        let result = (|| -> Result<Vec<Candidate>, rusqlite::Error> {
             let mut stmt = self.conn.prepare(&sql)?;
             let rows = stmt.query_map(params_from_iter(params), |row| {
-                Ok(RawObsRow {
-                    id: row.get(0)?,
-                    kind: row.get(1)?,
-                    content: row.get(2)?,
-                    provenance: row.get(3)?,
-                    ts: row.get(4)?,
-                    scope_ids: row.get(5)?,
-                    redacted: row.get(6)?,
-                    fts_rank: row.get(7)?,
-                    recency: row.get(8)?,
+                Ok(Candidate {
+                    entity_type,
+                    rowid: row.get(0)?,
+                    id: row.get(1)?,
+                    fts_rank: row.get(2)?,
+                    recency: row.get(3)?,
+                    score: 0.0,
                 })
             })?;
             rows.collect()
@@ -175,73 +148,84 @@ impl<'conn> LocalFtsProvider<'conn> {
         }
     }
 
-    /// Search summaries: raw rows with `fts_rank` and `recency`. BM25
-    /// normalization happens in the caller across all entity types.
-    fn search_summaries_raw(
-        &self,
-        query: &str,
-        scope: &ScopeIds,
-        exclude_ids: &[Id],
-        now: Timestamp,
-        limit: u32,
-    ) -> ProviderResult<Vec<RawSumRow>> {
-        let (scope_clauses, scope_params) = build_scope_filters(scope, "c");
-        let exclude_filter = exclude_id_filter("s", exclude_ids);
-        let scope_filter = if scope_clauses.is_empty() {
-            String::new()
-        } else {
-            format!("AND {}", scope_clauses.join(" AND "))
+    /// Read a ranked candidate's full row. Runs in the same snapshot as the
+    /// candidate scan, so the row must exist and carry the same `id`; anything
+    /// else means the database changed underneath us and is an error.
+    fn hydrate(&self, candidate: Candidate) -> ProviderResult<ProviderSearchResult> {
+        let entity = match candidate.entity_type {
+            EntityType::Observation => {
+                let row = self
+                    .conn
+                    .prepare_cached(
+                        "SELECT o.id, o.kind, o.content, o.provenance, o.ts, o.scope_ids, o.redacted
+                         FROM observations o WHERE o.rowid = ?1",
+                    )?
+                    .query_row([candidate.rowid], |row| {
+                        Ok((
+                            row.get::<_, String>(0)?,
+                            row.get::<_, String>(1)?,
+                            row.get::<_, String>(2)?,
+                            row.get::<_, String>(3)?,
+                            row.get::<_, Timestamp>(4)?,
+                            row.get::<_, String>(5)?,
+                            row.get::<_, i64>(6)?,
+                        ))
+                    })
+                    .optional()?;
+                let (id, kind, content, provenance, ts, scope_ids, redacted) =
+                    row.ok_or_else(|| missing_row(&candidate))?;
+                check_id(&candidate, &id)?;
+                RetrievedEntity::Observation(Observation {
+                    id,
+                    kind: parse_observation_kind(&kind)?,
+                    provenance: serde_json::from_str(&provenance)?,
+                    ts,
+                    scope_ids: serde_json::from_str(&scope_ids)?,
+                    redacted: redacted == 1,
+                    content,
+                })
+            }
+            EntityType::Summary => {
+                let row = self
+                    .conn
+                    .prepare_cached(
+                        "SELECT s.id, s.capsule_id, s.content, s.confidence, s.evidence_refs, s.created_at
+                         FROM summaries s WHERE s.rowid = ?1",
+                    )?
+                    .query_row([candidate.rowid], |row| {
+                        Ok((
+                            row.get::<_, String>(0)?,
+                            row.get::<_, String>(1)?,
+                            row.get::<_, String>(2)?,
+                            row.get::<_, f64>(3)?,
+                            row.get::<_, String>(4)?,
+                            row.get::<_, Timestamp>(5)?,
+                        ))
+                    })
+                    .optional()?;
+                let (id, capsule_id, content, confidence, evidence_refs, created_at) =
+                    row.ok_or_else(|| missing_row(&candidate))?;
+                check_id(&candidate, &id)?;
+                RetrievedEntity::Summary(Summary {
+                    id,
+                    capsule_id,
+                    confidence,
+                    created_at,
+                    evidence_refs: serde_json::from_str(&evidence_refs)?,
+                    content,
+                })
+            }
         };
 
-        let sql = format!(
-            "WITH fts_hits AS (
-               SELECT rowid, rank FROM summaries_fts WHERE content MATCH ?
-             )
-             SELECT
-               s.id, s.capsule_id, s.content, s.confidence, s.evidence_refs, s.created_at,
-               f.rank AS fts_rank,
-               MAX(0.0, 1.0 - CAST(? - s.created_at AS REAL) / ?) AS recency
-             FROM fts_hits f
-             JOIN summaries s ON f.rowid = s.rowid
-             JOIN capsules c ON s.capsule_id = c.id
-             WHERE 1=1
-               {scope_filter}
-               {exclude_filter}
-             ORDER BY f.rank ASC
-             LIMIT ?"
-        );
-
-        let mut params: Vec<SqlValue> = vec![
-            SqlValue::Text(query.to_string()),
-            SqlValue::Integer(now),
-            SqlValue::Integer(MAX_AGE_MS),
-        ];
-        params.extend(scope_params);
-        params.extend(exclude_ids.iter().map(|id| SqlValue::Text(id.clone())));
-        params.push(SqlValue::Integer(i64::from(limit)));
-
-        let result = (|| -> Result<Vec<RawSumRow>, rusqlite::Error> {
-            let mut stmt = self.conn.prepare(&sql)?;
-            let rows = stmt.query_map(params_from_iter(params), |row| {
-                Ok(RawSumRow {
-                    id: row.get(0)?,
-                    capsule_id: row.get(1)?,
-                    content: row.get(2)?,
-                    confidence: row.get(3)?,
-                    evidence_refs: row.get(4)?,
-                    created_at: row.get(5)?,
-                    fts_rank: row.get(6)?,
-                    recency: row.get(7)?,
-                })
-            })?;
-            rows.collect()
-        })();
-
-        match result {
-            Ok(rows) => Ok(rows),
-            Err(err) if is_fts_syntax_error(&err) => Ok(Vec::new()),
-            Err(err) => Err(err.into()),
-        }
+        let content = match &entity {
+            RetrievedEntity::Observation(obs) => &obs.content,
+            RetrievedEntity::Summary(sum) => &sum.content,
+        };
+        Ok(ProviderSearchResult {
+            score: candidate.score,
+            match_context: Some(match_context(content)),
+            entity,
+        })
     }
 }
 
@@ -255,42 +239,38 @@ impl RetrievalProvider for LocalFtsProvider<'_> {
         options: &ProviderSearchOptions,
         now: Timestamp,
     ) -> ProviderResult<Vec<ProviderSearchResult>> {
-        let max_results = options.max_results.unwrap_or(DEFAULT_MAX_RESULTS);
-        let exclude_ids = options.exclude_ids.as_deref().unwrap_or(&[]);
-        let include_redacted = options.include_redacted.unwrap_or(false);
+        let max_results = options.max_results.unwrap_or(DEFAULT_MAX_RESULTS) as usize;
+        if max_results == 0 {
+            return Ok(Vec::new());
+        }
 
-        let obs_raw = self.search_observations_raw(
-            &options.query,
-            &options.scope_ids,
-            exclude_ids,
-            include_redacted,
-            now,
-            max_results,
-        )?;
-        let sum_raw = self.search_summaries_raw(
-            &options.query,
-            &options.scope_ids,
-            exclude_ids,
-            now,
-            max_results,
-        )?;
+        // One read snapshot for the candidate scan and hydration, so a row
+        // cannot be redacted, removed or renumbered between the two. A caller
+        // already inside a transaction on this connection has a consistent
+        // view; nesting is not possible, and not needed. Dropping the
+        // transaction ends it (rollback is a no-op for reads).
+        let _snapshot = if self.conn.is_autocommit() {
+            Some(self.conn.unchecked_transaction()?)
+        } else {
+            None
+        };
 
-        // Normalize BM25 ranks across BOTH result sets so scores are
-        // comparable. FTS5 rank is negative; more negative = more relevant.
+        let mut candidates = self.candidates(EntityType::Observation, options, now)?;
+        candidates.extend(self.candidates(EntityType::Summary, options, now)?);
+
+        // Normalize BM25 ranks across the full filtered match set of BOTH
+        // entity types, so scores are comparable and independent of
+        // `max_results`. FTS5 rank is negative; more negative = more relevant.
         let mut min_rank = f64::INFINITY;
         let mut max_rank = f64::NEG_INFINITY;
-        for rank in obs_raw
-            .iter()
-            .map(|r| r.fts_rank)
-            .chain(sum_raw.iter().map(|r| r.fts_rank))
-        {
-            min_rank = min_rank.min(rank);
-            max_rank = max_rank.max(rank);
+        for candidate in &candidates {
+            min_rank = min_rank.min(candidate.fts_rank);
+            max_rank = max_rank.max(candidate.fts_rank);
         }
         let rank_range = if min_rank <= max_rank {
             max_rank - min_rank
         } else {
-            0.0 // no rows at all; loop below never runs
+            0.0 // no candidates at all; loop below never runs
         };
         let normalize_fts = |rank: f64| -> f64 {
             if rank_range == 0.0 {
@@ -301,48 +281,136 @@ impl RetrievalProvider for LocalFtsProvider<'_> {
         };
         let score_of = |fts_rank: f64, recency: f64| -> f64 {
             let score = (normalize_fts(fts_rank) * 0.7 + recency * 0.3).clamp(0.0, 1.0);
-            (score * 1e10).round() / 1e10
+            let score = (score * 1e10).round() / 1e10;
+            // A non-finite BM25 rank (only possible with a reconfigured FTS5
+            // `rank`) must not sort ahead of everything as NaN does.
+            if score.is_finite() {
+                score
+            } else {
+                0.0
+            }
         };
-
-        let mut results: Vec<ProviderSearchResult> =
-            Vec::with_capacity(obs_raw.len() + sum_raw.len());
-
-        for row in obs_raw {
-            results.push(ProviderSearchResult {
-                score: score_of(row.fts_rank, row.recency),
-                match_context: Some(match_context(&row.content)),
-                entity: RetrievedEntity::Observation(Observation {
-                    id: row.id,
-                    kind: parse_observation_kind(&row.kind)?,
-                    provenance: serde_json::from_str(&row.provenance)?,
-                    ts: row.ts,
-                    scope_ids: serde_json::from_str(&row.scope_ids)?,
-                    redacted: row.redacted == 1,
-                    content: row.content,
-                }),
-            });
+        for candidate in &mut candidates {
+            candidate.score = score_of(candidate.fts_rank, candidate.recency);
         }
 
-        for row in sum_raw {
-            results.push(ProviderSearchResult {
-                score: score_of(row.fts_rank, row.recency),
-                match_context: Some(match_context(&row.content)),
-                entity: RetrievedEntity::Summary(Summary {
-                    id: row.id,
-                    capsule_id: row.capsule_id,
-                    confidence: row.confidence,
-                    created_at: row.created_at,
-                    evidence_refs: serde_json::from_str(&row.evidence_refs)?,
-                    content: row.content,
-                }),
-            });
+        // Top `max_results` by the total order, without sorting the rest.
+        if candidates.len() > max_results {
+            candidates.select_nth_unstable_by(max_results - 1, result_order);
+            candidates.truncate(max_results);
         }
+        candidates.sort_by(result_order);
 
-        // Stable sort, descending score: ties keep observations-then-summaries
-        // insertion order, matching the TS provider's stable Array.sort.
-        results.sort_by(|a, b| b.score.total_cmp(&a.score));
-        results.truncate(max_results as usize);
-        Ok(results)
+        candidates
+            .into_iter()
+            .map(|candidate| self.hydrate(candidate))
+            .collect()
+    }
+}
+
+/// SQL + parameters listing every filtered FTS match of one entity type as
+/// `(rowid, id, fts_rank, recency)`, in no particular order.
+///
+/// Rust orders the results, so the query has no `ORDER BY`: sorting by rank
+/// in SQL only added cost, and leaving the join order to the planner lets a
+/// selective scope drive from its index. Correctness never depends on the
+/// plan (see the `ranking_does_not_depend_on_the_query_plan` test).
+fn candidate_query(
+    entity_type: EntityType,
+    options: &ProviderSearchOptions,
+    now: Timestamp,
+) -> (String, Vec<SqlValue>) {
+    let exclude_ids = options.exclude_ids.as_deref().unwrap_or(&[]);
+    let include_redacted = options.include_redacted.unwrap_or(false);
+
+    let scope_prefix = match entity_type {
+        EntityType::Observation => "o",
+        EntityType::Summary => "c", // summaries are scoped through their capsule
+    };
+    let (scope_clauses, scope_params) = build_scope_filters(&options.scope_ids, scope_prefix);
+    let scope_filter = and_clauses(&scope_clauses);
+
+    let sql = match entity_type {
+        EntityType::Observation => {
+            let redacted_filter = if include_redacted {
+                ""
+            } else {
+                "AND o.redacted = 0"
+            };
+            format!(
+                "WITH fts_hits AS (
+                   SELECT rowid, rank FROM observations_fts WHERE content MATCH ?
+                 )
+                 SELECT
+                   o.rowid, o.id,
+                   f.rank AS fts_rank,
+                   MAX(0.0, 1.0 - CAST(? - o.ts AS REAL) / ?) AS recency
+                 FROM fts_hits f
+                 JOIN observations o ON f.rowid = o.rowid
+                 WHERE 1=1
+                   {redacted_filter}
+                   {scope_filter}
+                   {exclude_filter}",
+                exclude_filter = exclude_id_filter("o", exclude_ids),
+            )
+        }
+        EntityType::Summary => {
+            format!(
+                "WITH fts_hits AS (
+                   SELECT rowid, rank FROM summaries_fts WHERE content MATCH ?
+                 )
+                 SELECT
+                   s.rowid, s.id,
+                   f.rank AS fts_rank,
+                   MAX(0.0, 1.0 - CAST(? - s.created_at AS REAL) / ?) AS recency
+                 FROM fts_hits f
+                 JOIN summaries s ON f.rowid = s.rowid
+                 JOIN capsules c ON s.capsule_id = c.id
+                 WHERE 1=1
+                   {scope_filter}
+                   {exclude_filter}",
+                exclude_filter = exclude_id_filter("s", exclude_ids),
+            )
+        }
+    };
+
+    let mut params: Vec<SqlValue> = vec![
+        SqlValue::Text(options.query.clone()),
+        SqlValue::Integer(now),
+        SqlValue::Integer(MAX_AGE_MS),
+    ];
+    params.extend(scope_params);
+    params.extend(exclude_ids.iter().map(|id| SqlValue::Text(id.clone())));
+    (sql, params)
+}
+
+/// `AND a AND b …` for `clauses`, or empty.
+fn and_clauses(clauses: &[String]) -> String {
+    if clauses.is_empty() {
+        String::new()
+    } else {
+        format!("AND {}", clauses.join(" AND "))
+    }
+}
+
+fn missing_row(candidate: &Candidate) -> ProviderError {
+    ProviderError::UnexpectedRowValue {
+        column: "rowid",
+        value: format!("{} (row for {} vanished)", candidate.rowid, candidate.id),
+    }
+}
+
+fn check_id(candidate: &Candidate, hydrated_id: &str) -> ProviderResult<()> {
+    if hydrated_id == candidate.id {
+        Ok(())
+    } else {
+        Err(ProviderError::UnexpectedRowValue {
+            column: "id",
+            value: format!(
+                "{hydrated_id} (expected {} at rowid {})",
+                candidate.id, candidate.rowid
+            ),
+        })
     }
 }
 
