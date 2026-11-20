@@ -89,6 +89,9 @@ excluded). `--after` and `--before` bound the observation timestamp and accept
 either epoch milliseconds or a relative `<N> <unit> ago` phrase (for example
 `30 minutes ago`, `2 days ago`, `1 week ago`).
 
+Filters apply to the top 10,000 text matches. If a filtered search reaches that
+limit, the output says so; narrow the query to reach weaker matches.
+
 ## Browse in a local viewer
 
 Export your database to a self-contained HTML page and inspect it offline:

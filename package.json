@@ -29,8 +29,9 @@
   "license": "Apache-2.0",
   "engines": {
     "node": ">=24",
-    "pnpm": ">=8.0.0"
+    "pnpm": "^12.20.0"
   },
+  "packageManager": "pnpm@12.20.0",
   "scripts": {
     "build": "pnpm -r run build",
     "test": "pnpm -r run test",
@@ -51,32 +52,12 @@
     ]
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
+    "@types/node": "^26.6.6",
     "husky": "^9.1.7",
-    "lint-staged": "^16.2.7",
-    "oxfmt": "^0.78.0",
-    "oxlint": "^1.93.0",
+    "lint-staged": "^17.6.1",
+    "oxfmt": "^0.79.0",
+    "oxlint": "^1.94.0",
     "typescript": "^5.3.0",
-    "vitest": "^3.2.6"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "better-sqlite3",
-      "esbuild"
-    ],
-    "overrides": {
-      "esbuild": ">=0.27.0 <0.27.3",
-      "vite": "^7.3.5",
-      "rollup": "^4.59.0",
-      "postcss": "^8.5.23",
-      "flatted": "^3.4.2",
-      "js-yaml@4": "^4.3.1",
-      "minimatch@9": "^9.0.7",
-      "@humanfs/node": "^0.16.8",
-      "picomatch": "^4.0.4",
-      "yaml": "^2.8.3",
-      "brace-expansion@1": "^1.1.16",
-      "brace-expansion@2": "^2.1.2"
-    }
+    "vitest": "^5.1.0"
   }
 }

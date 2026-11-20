@@ -332,9 +332,13 @@ Track reliability over time:
 const tracker = new ConfidenceTracker({
   historySize: 10, // Keep last 10 invocations
   baseConfidence: 0.5, // Starting confidence
-  successIncrement: 0.1, // Boost per success
-  failureDecrement: 0.15, // Penalty per failure
+  minConfidence: 0.1, // Floor
+  maxConfidence: 0.95, // Ceiling
+  recencyWeight: 0.7, // Weight of the last 5 runs vs the overall success rate
 });
+
+// Confidence is the overall success rate blended with the recent rate,
+// minus 0.1 per consecutive failure (capped at 0.3), then clamped.
 
 // After successful invocation
 tracker.recordSuccess('my-node');

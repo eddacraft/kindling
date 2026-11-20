@@ -7,34 +7,61 @@ use std::process::{Child, Command, ExitStatus, Stdio};
 use std::sync::Arc;
 use std::time::Duration;
 
-/// The canonical schema version this client expects the daemon to report.
+/// Lower bound of the daemon wire version (`wireVersion` in `schema/version.json`)
+/// this client accepts from `/v1/health` (`Capability.schemaVersion`).
 ///
 /// Sourced at compile time from a vendored copy of `schema/version.json` — the
 /// same single source of truth `kindling-store` embeds — so the client, store,
 /// and daemon never disagree about the wire/schema contract.
 ///
-/// The vendored copy (`crates/kindling-client/schema/version.json`) lives
-/// inside the crate directory so `cargo publish` packages it. It is kept in
-/// lock-step with the repo-root canonical `schema/version.json` by
-/// `scripts/sync-vendored-schema.sh`, enforced by the `vendored-schema` CI
-/// drift gate.
-pub const EXPECTED_SCHEMA_VERSION: u32 = parse_schema_version();
+/// Kept under the historical `EXPECTED_SCHEMA_VERSION` name as the lower bound
+/// of the supported wire range `[EXPECTED_SCHEMA_VERSION, MAX_WIRE_VERSION]`.
+pub const EXPECTED_SCHEMA_VERSION: u32 = parse_wire_version(SCHEMA_VERSION_JSON);
+
+/// Upper bound of the daemon wire version (`Capability.schemaVersion`) this
+/// client accepts. Additive features never raise `wireVersion`.
+pub const MAX_WIRE_VERSION: u32 = EXPECTED_SCHEMA_VERSION;
+
+/// Latest additive schema revision (`"version"` in `schema/version.json`)
+/// known to this build.
+pub const KNOWN_SCHEMA_REVISION: u32 = parse_schema_revision(SCHEMA_VERSION_JSON);
+
+const _: () = assert!(EXPECTED_SCHEMA_VERSION == 6);
+const _: () = assert!(KNOWN_SCHEMA_REVISION == 7);
 
 const SCHEMA_VERSION_JSON: &str = include_str!("../schema/version.json");
 
-/// Minimal compile-time-friendly extraction of the integer `"version"` field
-/// from `schema/version.json`.
+/// Extract the integer `"wireVersion"` field from a `version.json` payload.
+pub(crate) const fn parse_wire_version(json: &str) -> u32 {
+    parse_json_u32(json, b"\"wireVersion\"")
+}
+
+/// Extract the integer `"version"` (schema revision) field from a `version.json` payload.
+pub(crate) const fn parse_schema_revision(json: &str) -> u32 {
+    parse_json_u32(json, b"\"version\"")
+}
+
+/// True when `actual` (daemon `Capability.schemaVersion`) falls within the
+/// client's accepted wire range `[min_expected, max(min_expected, MAX_WIRE_VERSION)]`.
+pub const fn is_supported_wire_version(actual: u32, min_expected: u32) -> bool {
+    let max_supported = if MAX_WIRE_VERSION > min_expected {
+        MAX_WIRE_VERSION
+    } else {
+        min_expected
+    };
+    actual >= min_expected && actual <= max_supported
+}
+
+/// Minimal compile-time-friendly extraction of an integer JSON field from
+/// `schema/version.json`.
 ///
 /// We avoid pulling `serde_json` into a `const` context (it is not const) by
-/// scanning the embedded JSON for the `"version"` key and parsing the integer
-/// that follows. The format is a hand-maintained, stable contract file, so a
-/// targeted scan is sufficient and keeps this dependency-free and `const`.
-const fn parse_schema_version() -> u32 {
-    let bytes = SCHEMA_VERSION_JSON.as_bytes();
-    let key = b"\"version\"";
+/// scanning the embedded JSON for the exact key and parsing the integer that
+/// follows.
+const fn parse_json_u32(json: &str, key: &[u8]) -> u32 {
+    let bytes = json.as_bytes();
     let mut i = 0;
     while i + key.len() <= bytes.len() {
-        // Match the `"version"` key.
         let mut matched = true;
         let mut k = 0;
         while k < key.len() {
@@ -74,7 +101,7 @@ const fn parse_schema_version() -> u32 {
         }
         i += 1;
     }
-    panic!("schema/version.json does not contain an integer \"version\" field");
+    panic!("schema/version.json does not contain the expected integer field");
 }
 
 /// Default file name of the daemon socket under the kindling home.
@@ -378,9 +405,30 @@ mod tests {
     }
 
     #[test]
-    fn expected_schema_version_parses_to_six() {
-        // schema/version.json currently pins version 6.
+    fn expected_schema_version_parses_to_six_and_revision_to_seven() {
         assert_eq!(EXPECTED_SCHEMA_VERSION, 6);
+        assert_eq!(MAX_WIRE_VERSION, 6);
+        assert_eq!(KNOWN_SCHEMA_REVISION, 7);
+    }
+
+    #[test]
+    fn parse_trap_reads_wire_version_when_first_version_is_seven() {
+        let json = r#"{
+  "version": 7,
+  "minReader": 6,
+  "wireVersion": 6,
+  "minCompatible": 1,
+  "ftsTokenizer": "porter unicode61"
+}"#;
+        assert_eq!(parse_wire_version(json), 6);
+        assert_eq!(parse_schema_revision(json), 7);
+    }
+
+    #[test]
+    fn wire_version_range_accepts_six_and_rejects_five_and_seven() {
+        assert!(!is_supported_wire_version(5, EXPECTED_SCHEMA_VERSION));
+        assert!(is_supported_wire_version(6, EXPECTED_SCHEMA_VERSION));
+        assert!(!is_supported_wire_version(7, EXPECTED_SCHEMA_VERSION));
     }
 
     #[cfg(unix)]

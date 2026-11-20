@@ -25,6 +25,8 @@ mod context;
 mod error;
 mod export;
 pub mod filter;
+#[doc(hidden)]
+pub mod generic_event;
 mod service;
 mod validation;
 

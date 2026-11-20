@@ -65,7 +65,7 @@ jobs:
       contents: write
     steps:
       - name: Download built binaries
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: kindling-bin-*
           merge-multiple: true
@@ -75,7 +75,7 @@ jobs:
         run: ls -lR dist
 
       - name: Attach to GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             dist/*.tar.gz
@@ -96,15 +96,13 @@ jobs:
       contents: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
+        uses: pnpm/action-setup@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
@@ -137,7 +135,7 @@ jobs:
           ls -l dist-vsix
 
       - name: Attach to GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             dist-vsix/*.vsix
@@ -156,7 +154,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout kindling
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Generate kindling formula
         env:
@@ -173,7 +171,7 @@ jobs:
           ./scripts/generate-homebrew-formula.sh "$TAG"
 
       - name: Checkout homebrew-tap
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: eddacraft/homebrew-tap
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
@@ -185,7 +183,7 @@ jobs:
           cp packaging/homebrew/kindling.rb homebrew-tap/Formula/kindling.rb
 
       - name: Open PR in homebrew-tap
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           path: homebrew-tap

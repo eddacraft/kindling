@@ -59,9 +59,10 @@ pub fn run(args: StatusArgs) -> CliResult {
 
     let capability = build_capability(
         env!("CARGO_PKG_VERSION"),
-        kindling_store::schema_version().version as u32,
+        kindling_store::wire_version(),
         db_path.to_string_lossy(),
-    );
+    )
+    .with_schema_revision(kindling_store::schema_revision());
 
     let output = StatusOutput {
         capability,
