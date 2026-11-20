@@ -12,6 +12,7 @@
 pub mod capability;
 pub mod capsule;
 pub mod common;
+pub mod generic_event;
 pub mod list;
 pub mod observation;
 pub mod pin;
@@ -20,11 +21,19 @@ pub mod retrieval;
 pub mod summary;
 
 pub use capability::{
-    build_capability, kind_registry, supported_kind_names, Capability, KindRegistryEntry,
-    OBSERVATION_REQUIRED_FIELDS,
+    build_capability, kind_registry, supported_kind_names, Capability, CapabilityFeature,
+    KindRegistryEntry, OBSERVATION_REQUIRED_FIELDS,
 };
 pub use capsule::{Capsule, CapsuleInput, CapsuleStatus, CapsuleType};
 pub use common::{Id, ScopeIds, Timestamp, ValidationError};
+pub use generic_event::{
+    validate_event_key, validate_generic_event_envelope, validate_generic_event_scope_ids,
+    validate_schema_name, validate_scope_value, CommitFailure, ConflictKind, GenericEvent,
+    GenericEventForget, GenericEventLimits, GenericEventLookup, GenericEventReceipt,
+    GenericEventScope, RejectReason, GENERIC_EVENT_ENVELOPE_VERSION, GENERIC_EVENT_FEATURE_NAME,
+    GENERIC_EVENT_FEATURE_VERSION, GENERIC_EVENT_MAX_KEY_BYTES, GENERIC_EVENT_MAX_PAYLOAD_BYTES,
+    GENERIC_EVENT_MAX_SCHEMA_NAME_BYTES, GENERIC_EVENT_MAX_SCOPE_VALUE_BYTES,
+};
 pub use list::{ListObservationsRequest, ListObservationsResult};
 pub use observation::{Observation, ObservationInput, ObservationKind};
 pub use pin::{is_pin_active, Pin, PinInput, PinTargetType};

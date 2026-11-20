@@ -45,23 +45,20 @@ export interface ConfidenceConfig {
   historySize: number;
   /** Base confidence for new nodes (default: 0.5) */
   baseConfidence: number;
-  /** Confidence increase per success (default: 0.1) */
-  successIncrement: number;
-  /** Confidence decrease per failure (default: 0.15) */
-  failureDecrement: number;
   /** Minimum confidence floor (default: 0.1) */
   minConfidence: number;
   /** Maximum confidence ceiling (default: 0.95) */
   maxConfidence: number;
-  /** Weight for recent executions vs older ones (default: 0.7) */
+  /**
+   * Weight (0.0 - 1.0) given to the recent success rate over the overall
+   * success rate when blending them (default: 0.7)
+   */
   recencyWeight: number;
 }
 
 const DEFAULT_CONFIG: ConfidenceConfig = {
   historySize: 10,
   baseConfidence: 0.5,
-  successIncrement: 0.1,
-  failureDecrement: 0.15,
   minConfidence: 0.1,
   maxConfidence: 0.95,
   recencyWeight: 0.7,
@@ -70,10 +67,13 @@ const DEFAULT_CONFIG: ConfidenceConfig = {
 /**
  * Calculates confidence score from execution history.
  *
- * The algorithm considers:
- * - Overall success rate
- * - Recent execution trends (weighted more heavily)
- * - Consecutive failure penalty
+ * The score is rate-based, not a running tally:
+ * 1. With no executions, return `baseConfidence`.
+ * 2. Overall rate = successes / total executions.
+ * 3. Recent rate = success rate of the newest 5 history entries.
+ * 4. Blend: `overall * (1 - recencyWeight) + recent * recencyWeight`.
+ * 5. Subtract a consecutive-failure penalty of 0.1 per failure, capped at 0.3.
+ * 6. Clamp to `[minConfidence, maxConfidence]` and round to 2 decimal places.
  *
  * @param state - Current confidence state
  * @param config - Confidence calculation config
@@ -128,7 +128,7 @@ export function calculateConfidence(
  * tracker.recordFailure('deploy-prod', 'Connection timeout');
  *
  * // Get confidence for a node
- * const confidence = tracker.getConfidence('run-tests'); // 0.6
+ * const confidence = tracker.getConfidence('run-tests'); // 0.95 (clamped to maxConfidence)
  *
  * // Get full state for observation provenance
  * const state = tracker.getState('run-tests');

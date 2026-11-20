@@ -66,7 +66,7 @@ Each crate keeps its unit tests inline and its integration tests in
 | Suite                                                                           | Guards                                                                              |
 | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | `kindling-store/tests/golden_file.rs`                                           | Fresh-database DDL matches the schema contract.                                     |
-| `kindling-provider/tests/ts_parity.rs`                                          | Ranking matches the original TS provider (fixtures).                                |
+| `kindling-provider/tests/ts_parity.rs`                                          | Ranking matches frozen golden fixtures from the retired TS provider.                |
 | `kindling-service/tests/filter_node_fixtures.rs`                                | Secret masking and truncation match the Node hook filter byte for byte.             |
 | `kindling-types/tests/ts_export.rs`, `registry.rs`                              | Bindings export and the kind registry stays consistent with `ObservationKind::ALL`. |
 | `kindling-server/tests/api.rs`                                                  | The v1 HTTP API over a real socket.                                                 |
@@ -145,6 +145,12 @@ Then update the schema version in `architecture.md`.
 4. Add a test in `crates/kindling/tests/cli.rs`.
 5. Update the subcommand list in [architecture.md](architecture.md#eddacraft-kindling-binary)
    and `crates/kindling/README.md`.
+
+The terminal UI uses `eddacraft-tui`, the canonical TUI library for eddacraft
+products. Reuse its widgets, theme, keyboard handling and lifecycle guard when
+adding terminal surfaces; keep direct ratatui/crossterm dependencies aligned
+with the shared library. Browser interaction and rendering tests run without a
+terminal in `commands::tui::tests`.
 
 ### Change hook behaviour
 

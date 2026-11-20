@@ -18,6 +18,14 @@ use crate::commands::{resolve_repo, scope_from};
 use crate::output::{format_json, format_timestamp, truncate};
 use crate::{build_client, open_service, runtime, CliError, CliResult};
 
+/// Candidate limit for a filtered search (`--kind` / `--after` / `--before`).
+///
+/// Filters run client-side over the ranked set, so the retrieve call must
+/// fetch past `--max`. It is capped rather than unbounded because every
+/// candidate is read in full and, via the daemon, sent over the socket. When
+/// the cap is reached the output says so (see [`cap_note`]).
+const FILTER_CANDIDATE_CAP: u32 = 10_000;
+
 pub fn run(args: SearchArgs, via_daemon: bool) -> CliResult {
     let repo = resolve_repo(args.repo.as_deref(), args.all_repos);
     let scope = scope_from(args.session.as_deref(), repo.as_deref());
@@ -39,14 +47,21 @@ pub fn run(args: SearchArgs, via_daemon: bool) -> CliResult {
     };
     let has_filters = kind.is_some() || after.is_some() || before.is_some();
 
+    // When filtering, fetch up to the cap and let `apply_filters` re-limit, so
+    // a filter never drops matches that the pre-filter `--max` would have cut
+    // off. `None` would mean the orchestrator's default of 10, so the limit is
+    // always explicit.
+    let fetch_limit = if has_filters {
+        FILTER_CANDIDATE_CAP.max(args.max)
+    } else {
+        args.max
+    };
+
     let options = RetrieveOptions {
         query: args.query.clone(),
         scope_ids: scope,
         token_budget: None,
-        // When filtering, retrieve the full ranked set and let `apply_filters`
-        // re-limit, so a filter never drops matches that the pre-filter `--max`
-        // would have cut off.
-        max_candidates: if has_filters { None } else { Some(args.max) },
+        max_candidates: Some(fetch_limit),
         include_redacted: None,
     };
 
@@ -58,12 +73,17 @@ pub fn run(args: SearchArgs, via_daemon: bool) -> CliResult {
         service.retrieve(options)?
     };
 
+    let note = cap_note(has_filters, result.candidates.len(), fetch_limit);
     if has_filters {
         apply_filters(&mut result, kind, after, before, args.max);
     }
 
     if args.common.json {
         println!("{}", format_json(&result, true)?);
+        // Keep stdout valid JSON; the note is diagnostic.
+        if let Some(note) = &note {
+            eprintln!("{note}");
+        }
     } else {
         println!("\nSearch Results for: \"{}\"", args.query);
         println!("{}", "=".repeat(50));
@@ -108,6 +128,10 @@ pub fn run(args: SearchArgs, via_daemon: bool) -> CliResult {
             println!("No results found.");
         }
 
+        if let Some(note) = &note {
+            println!("\n{note}");
+        }
+
         println!();
     }
     Ok(())
@@ -145,6 +169,17 @@ fn kind_label(kind: kindling_types::ObservationKind) -> String {
 }
 
 // --- C7: search filters -----------------------------------------------------
+
+/// The note shown when a filtered search fetched a full `fetch_limit` of
+/// candidates, so matches ranked below the cap were never filtered.
+fn cap_note(has_filters: bool, fetched: usize, fetch_limit: u32) -> Option<String> {
+    (has_filters && fetched >= fetch_limit as usize).then(|| {
+        format!(
+            "Note: --kind/--after/--before filtered only the top {fetch_limit} matches; \
+             narrow the query to reach matches ranked below them."
+        )
+    })
+}
 
 /// Current time in epoch milliseconds (same clock the service uses).
 fn now_ms() -> Timestamp {
@@ -282,6 +317,15 @@ fn entity_matches(
 mod tests {
     use super::*;
     use kindling_types::{Observation, ScopeIds, Summary};
+
+    #[test]
+    fn cap_note_only_when_a_filtered_fetch_fills_the_limit() {
+        assert!(cap_note(true, 10_000, 10_000).is_some());
+        assert!(cap_note(true, 9_999, 10_000).is_none());
+        assert!(cap_note(false, 10_000, 10_000).is_none());
+        let note = cap_note(true, 20_000, 20_000).unwrap();
+        assert!(note.contains("top 20000 matches"), "{note}");
+    }
 
     fn obs(kind: ObservationKind, ts: Timestamp) -> RetrievedEntity {
         RetrievedEntity::Observation(Observation {

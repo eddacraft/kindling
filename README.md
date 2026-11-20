@@ -93,7 +93,7 @@ kindling is not published to npm. The `@eddacraft/kindling` packages on npm are 
 
 ```toml
 [dependencies]
-kindling-client = "0.4"     # daemon-backed; default for integrations
+kindling-client = "0.4" # daemon-backed; default for integrations
 # kindling-runtime = "0.4"  # bundles the daemon in your binary; no `kindling` on PATH needed
 # kindling-service = "0.4"  # embedded, in-process, zero IPC
 ```
@@ -112,6 +112,7 @@ Search returns three tiers: **pins** (always first), **current summary**, then *
 kindling init                              # create the database (--claude-code to check hooks)
 kindling demo                              # load sample memory (own DB; pass --db to search it)
 kindling browse                            # open HTML viewer
+kindling tui                               # browse memory in the terminal
 kindling log "root cause: cache eviction"
 kindling search "authentication error"     # scoped to the current git repo
 kindling search "authentication error" --all-repos
@@ -124,6 +125,13 @@ kindling capsule open --intent "debug leak"
 kindling export ./backup.json              # and: kindling import ./backup.json
 kindling serve                             # daemon (clients auto-spawn it)
 ```
+
+`kindling tui` opens the terminal browser; `kindling browse` opens the HTML viewer.
+In the terminal, type to filter, use Up/Down to select observations, Left/Right
+and Home/End to edit the query, and Page Up/Page Down to scroll the preview.
+Press Esc or Ctrl-C to quit. The interactive browser rejects `--json`; use
+`kindling list observations --json` for machine-readable output. To browse the sample memory, run
+`kindling tui --db ~/.kindling/demo/kindling.db` after `kindling demo`.
 
 Full CLI reference: [docs.eddacraft.ai/kindling/reference/cli](https://docs.eddacraft.ai/kindling/reference/cli)
 
@@ -195,7 +203,7 @@ substantial.
 | **Rust via `rustup`** | pinned to 1.95.0 in [`rust-toolchain.toml`](rust-toolchain.toml); MSRV 1.89 | the engine crates and the `kindling` binary (most work)                          |
 | **C compiler**        | `cc`/`clang`/`gcc` (Xcode CLT on macOS, MSVC/MinGW on Windows)              | building the bundled SQLite (`rusqlite` with `bundled`); no system SQLite needed |
 | **Node.js**           | 24 (see [`.nvmrc`](.nvmrc))                                                 | the thin TS client, adapters, Claude Code plugin tests, and git hooks            |
-| **pnpm**              | 10 (lockfile v9; `corepack enable` works)                                   | same as Node.js                                                                  |
+| **pnpm**              | 12.20.0 (see `package.json`; `corepack enable` works)                       | same as Node.js                                                                  |
 | direnv _(optional)_   | any                                                                         | puts the repo's planning CLI (`.aps/bin`) on `PATH` via [`.envrc`](.envrc)       |
 
 Install `rustup` from [rustup.rs](https://rustup.rs) rather than a distro Rust

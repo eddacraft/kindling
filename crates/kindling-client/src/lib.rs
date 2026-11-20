@@ -66,8 +66,9 @@ mod transport;
 
 pub use body::{CloseCapsuleBody, CreatePinBody};
 pub use config::{
-    default_port_path, default_socket_path, default_spawn_log_path, ClientConfig, Spawner,
-    Transport, EXPECTED_SCHEMA_VERSION,
+    default_port_path, default_socket_path, default_spawn_log_path, is_supported_wire_version,
+    ClientConfig, Spawner, Transport, EXPECTED_SCHEMA_VERSION, KNOWN_SCHEMA_REVISION,
+    MAX_WIRE_VERSION,
 };
 
 pub use error::ClientError;
@@ -83,10 +84,12 @@ use serde::Deserialize;
 /// the API sends or returns as `kindling_client::<Type>`. `kindling-types`
 /// stays an internal transitive dependency you never have to name.
 pub use kindling_types::{
-    build_capability, kind_registry, supported_kind_names, CandidateResult, Capability, Capsule,
-    CapsuleStatus, CapsuleType, Id, KindRegistryEntry, ListObservationsRequest,
-    ListObservationsResult, Observation, ObservationInput, ObservationKind, Pin, PinResult,
-    PinTargetType, ProviderSearchOptions, ProviderSearchResult, RedactionEvidence, RetrieveOptions,
+    build_capability, kind_registry, supported_kind_names, CandidateResult, Capability,
+    CapabilityFeature, Capsule, CapsuleStatus, CapsuleType, CommitFailure, ConflictKind,
+    GenericEvent, GenericEventForget, GenericEventLimits, GenericEventLookup, GenericEventReceipt,
+    GenericEventScope, Id, KindRegistryEntry, ListObservationsRequest, ListObservationsResult,
+    Observation, ObservationInput, ObservationKind, Pin, PinResult, PinTargetType,
+    ProviderSearchOptions, ProviderSearchResult, RedactionEvidence, RejectReason, RetrieveOptions,
     RetrieveProvenance, RetrieveResult, RetrievedEntity, ScopeIds, Summary, Timestamp,
 };
 
@@ -120,18 +123,22 @@ pub struct AppendResult {
 pub const PROJECT_HEADER: &str = "x-kindling-project";
 
 /// Result of `GET /v1/health`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Health {
     /// Daemon package version (`CARGO_PKG_VERSION` of `kindling-server`).
     pub version: String,
-    /// Schema version the daemon's store reports.
+    /// Wire contract version (`wireVersion`) the daemon reports.
     pub schema_version: u32,
+    /// Latest additive schema revision (`MAX(schema_migrations.version)`), if reported.
+    pub schema_revision: Option<u32>,
     /// Snake-case observation kinds the daemon supports.
     pub supported_kinds: Vec<String>,
     /// Daemon kindling home root (global storage path).
     pub storage_path: String,
     /// Machine-readable kind registry (kinds + required fields).
     pub kind_registry: Vec<KindRegistryEntry>,
+    /// Optional capability features advertised by the daemon.
+    pub features: Vec<CapabilityFeature>,
     /// Project ids the daemon has touched this session.
     pub projects: Vec<String>,
 }
@@ -142,9 +149,13 @@ pub struct Health {
 struct HealthBody {
     version: String,
     schema_version: u32,
+    #[serde(default)]
+    schema_revision: Option<u32>,
     supported_kinds: Vec<String>,
     storage_path: String,
     kind_registry: Vec<KindRegistryEntry>,
+    #[serde(default)]
+    features: Vec<CapabilityFeature>,
     #[serde(default)]
     projects: Vec<String>,
 }
@@ -211,7 +222,7 @@ impl Client {
             .await?;
 
         let expected = self.config.expected_schema_version;
-        if body.schema_version != expected {
+        if !is_supported_wire_version(body.schema_version, expected) {
             return Err(ClientError::SchemaMismatch {
                 expected,
                 actual: body.schema_version,
@@ -220,9 +231,11 @@ impl Client {
         Ok(Health {
             version: body.version,
             schema_version: body.schema_version,
+            schema_revision: body.schema_revision,
             supported_kinds: body.supported_kinds,
             storage_path: body.storage_path,
             kind_registry: body.kind_registry,
+            features: body.features,
             projects: body.projects,
         })
     }
@@ -326,6 +339,11 @@ impl Client {
     /// filters with a keyset cursor). Returns one page; pass back
     /// [`ListObservationsResult::next_cursor`] as
     /// [`ListObservationsRequest::cursor`] until it is `None`.
+    ///
+    /// The cursor has snapshot-keyset semantics: an observation appended during
+    /// the traversal is returned only if its `(ts, id)` sorts after the cursor.
+    /// One written with an earlier, caller-supplied `ts` is seen by the next
+    /// fresh traversal, not by later pages of this one.
     pub async fn list_observations(
         &self,
         request: ListObservationsRequest,

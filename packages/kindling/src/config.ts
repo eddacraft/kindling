@@ -18,9 +18,8 @@ import { fileURLToPath } from 'node:url';
 const SOCKET_FILE = 'kindling.sock';
 
 /**
- * The schema version this client expects the daemon to report, read from the
- * canonical `schema/version.json` — the same single source of truth the Rust
- * store/client embed, so the TS client never disagrees about the contract.
+ * Lower bound of the daemon wire version (`wireVersion` in `schema/version.json`)
+ * this client accepts from `/v1/health` (`Capability.schemaVersion`).
  *
  * Resolved at module load by walking up from this file to the repo/package
  * root. A vendored copy is bundled into `dist/` at build time (see
@@ -29,7 +28,39 @@ const SOCKET_FILE = 'kindling.sock';
  */
 export const EXPECTED_SCHEMA_VERSION: number = loadExpectedSchemaVersion();
 
-function loadExpectedSchemaVersion(): number {
+/** Upper bound of the daemon wire version this client accepts. */
+export const MAX_WIRE_VERSION: number = EXPECTED_SCHEMA_VERSION;
+
+/** Latest additive schema revision (`version` in `schema/version.json`) known to this build. */
+export const KNOWN_SCHEMA_REVISION: number = loadKnownSchemaRevision();
+
+/**
+ * Parse `wireVersion` from a `schema/version.json` string.
+ *
+ * Reads `wireVersion` rather than `version` so additive schema revisions
+ * (where `version` rises above `wireVersion`) do not break wire compatibility.
+ */
+export function parseWireVersion(raw: string): number {
+  const parsed = JSON.parse(raw) as { wireVersion?: unknown };
+  if (typeof parsed.wireVersion === 'number') {
+    return parsed.wireVersion;
+  }
+  throw new Error('schema/version.json does not contain a numeric wireVersion field');
+}
+
+/**
+ * True when `actual` (daemon `Capability.schemaVersion`) falls within the
+ * client's accepted wire range `[minExpected, Math.max(minExpected, MAX_WIRE_VERSION)]`.
+ */
+export function isSupportedWireVersion(
+  actual: number,
+  minExpected: number = EXPECTED_SCHEMA_VERSION,
+): boolean {
+  const maxSupported = Math.max(minExpected, MAX_WIRE_VERSION);
+  return actual >= minExpected && actual <= maxSupported;
+}
+
+function readSchemaVersionJson(): string {
   const here = dirname(fileURLToPath(import.meta.url));
   // Candidate locations, in order:
   //   1. bundled next to the build output: dist/schema/version.json
@@ -42,16 +73,24 @@ function loadExpectedSchemaVersion(): number {
   ];
   for (const candidate of candidates) {
     try {
-      const raw = readFileSync(candidate, 'utf8');
-      const parsed = JSON.parse(raw) as { version?: unknown };
-      if (typeof parsed.version === 'number') {
-        return parsed.version;
-      }
+      return readFileSync(candidate, 'utf8');
     } catch {
       // try next candidate
     }
   }
   throw new Error('could not locate schema/version.json to determine the expected schema version');
+}
+
+function loadExpectedSchemaVersion(): number {
+  return parseWireVersion(readSchemaVersionJson());
+}
+
+function loadKnownSchemaRevision(): number {
+  const parsed = JSON.parse(readSchemaVersionJson()) as { version?: unknown };
+  if (typeof parsed.version === 'number') {
+    return parsed.version;
+  }
+  throw new Error('schema/version.json does not contain a numeric version field');
 }
 
 /**

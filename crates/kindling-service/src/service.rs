@@ -370,6 +370,11 @@ impl KindlingService {
     /// and a half-open `[since, until)` time window; paginates with an opaque
     /// keyset cursor over the store's stable `(ts ASC, id ASC)` order.
     ///
+    /// The cursor has snapshot-keyset semantics: a row inserted mid-traversal
+    /// is returned only if its `(ts, id)` sorts after the cursor, so a
+    /// backdated `ts` is not seen until a fresh traversal. See
+    /// `SqliteKindlingStore::list_observations` for the full contract.
+    ///
     /// `limit` is clamped to `[1, 1000]` (default 100). A malformed `cursor`
     /// yields a validation error (`400`). `scope_ids.task_id` is ignored — task
     /// id is not a retrieval-filterable dimension.

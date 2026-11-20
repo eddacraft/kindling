@@ -6,6 +6,10 @@
 //! observations matching a `(kind, scope, time-range)` filter, in the stable
 //! `(ts ASC, id ASC)` order the store guarantees, via a keyset cursor — so a
 //! consumer can compute exact counts / set-differences over every matching row.
+//!
+//! The cursor has snapshot-keyset semantics: a row inserted mid-traversal is
+//! returned only if its `(ts, id)` sorts after the cursor. A row with an
+//! earlier (backdated) `ts` appears in the next fresh traversal instead.
 
 use serde::{Deserialize, Serialize};
 

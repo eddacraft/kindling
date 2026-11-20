@@ -1015,3 +1015,136 @@ fn search_kind_filter_applies_before_max_limit() {
     // Provenance reflects the filtered, re-limited result.
     assert_eq!(v["provenance"]["returnedCandidates"], json!(3));
 }
+
+#[test]
+fn search_kind_filter_sees_matches_beyond_the_default_candidate_limit() {
+    let env = CliEnv::new();
+    // Twelve messages match "common" more strongly than the three commands, so
+    // a filtered search must look past the default 10 candidates to find them.
+    for i in 0..12 {
+        assert_success(&env.run_db(&[
+            "log",
+            &format!("common common common noise {i}"),
+            "--kind",
+            "message",
+        ]));
+    }
+    for i in 0..3 {
+        assert_success(&env.run_db(&[
+            "log",
+            &format!("common cmd {i} with a much longer tail of words"),
+            "--kind",
+            "command",
+        ]));
+    }
+
+    let out = env.run_db(&["search", "common", "--kind", "command", "--json"]);
+    assert_success(&out);
+    let contents = candidate_contents(&json_stdout(&out));
+    assert_eq!(
+        contents.len(),
+        3,
+        "expected 3 command matches: {contents:?}"
+    );
+    assert!(
+        !support::stderr(&out).contains("filtered only the top"),
+        "15 matches is far below the cap, so no cap note: {}",
+        support::stderr(&out)
+    );
+}
+
+#[test]
+fn search_filter_notes_when_the_candidate_cap_is_hit() {
+    // Seed one observation, export it, and clone it past the 10,000-candidate
+    // cap so the import builds a large match set in one transaction.
+    let src = CliEnv::new();
+    assert_success(&src.run_db(&["log", "common seed", "--kind", "message"]));
+    let bundle_path = src.path("bundle.json");
+    let bundle_str = bundle_path.to_string_lossy().into_owned();
+    assert_success(&src.run_db(&["export", &bundle_str, "--json"]));
+
+    let mut bundle: serde_json::Value = serde_json::from_str(&read(&bundle_path)).unwrap();
+    let seed = bundle["dataset"]["observations"][0].clone();
+    let observations: Vec<serde_json::Value> = (0..10_001)
+        .map(|i| {
+            let mut o = seed.clone();
+            o["id"] = json!(format!("obs-{i:05}"));
+            o["content"] = json!(format!("common message {i}"));
+            o
+        })
+        .collect();
+    bundle["dataset"]["observations"] = json!(observations);
+    std::fs::write(&bundle_path, serde_json::to_string(&bundle).unwrap()).unwrap();
+    assert_success(&src.run_db(&["import", &bundle_str, "--json"]));
+
+    // JSON mode: stdout stays valid JSON; the note goes to stderr.
+    let out = src.run_db(&["search", "common", "--kind", "command", "--json"]);
+    assert_success(&out);
+    assert!(candidate_contents(&json_stdout(&out)).is_empty());
+    let err = support::stderr(&out);
+    assert!(
+        err.contains("filtered only the top 10000 matches"),
+        "expected a cap note on stderr, got: {err}"
+    );
+
+    // Text mode: the note is part of the printed results.
+    let out = src.run_db(&["search", "common", "--kind", "command"]);
+    assert_success(&out);
+    assert!(
+        stdout(&out).contains("filtered only the top 10000 matches"),
+        "expected a cap note in the output, got: {}",
+        stdout(&out)
+    );
+}
+
+// --- C6: kindling tui -------------------------------------------------------
+
+#[test]
+fn tui_with_empty_db_prints_hint() {
+    let env = CliEnv::new();
+    let out = env.run_db(&["tui"]);
+    assert_success(&out);
+    assert!(stdout(&out).contains("No memory to browse"));
+}
+
+#[test]
+fn tui_without_terminal_errors_cleanly() {
+    let env = CliEnv::new();
+    assert_success(&env.run_db(&["log", "hello", "--kind", "message"]));
+
+    // Captured (non-TTY) stdout makes the TUI refuse, with a clean error
+    // rather than a panic.
+    let out = env.run_db(&["tui"]);
+    assert!(!out.status.success());
+    assert!(
+        support::stderr(&out).contains("interactive terminal"),
+        "stderr: {}",
+        support::stderr(&out)
+    );
+}
+
+#[test]
+fn tui_rejects_json_before_opening_database() {
+    let env = CliEnv::new();
+    let db = env.db();
+    assert!(!std::path::Path::new(&db).exists());
+    let out = env.run_db(&["tui", "--json"]);
+    assert!(!out.status.success(), "JSON mode must be rejected");
+    assert!(stdout(&out).is_empty());
+    let err: serde_json::Value = serde_json::from_slice(&out.stderr).unwrap();
+    assert!(err["error"]
+        .as_str()
+        .unwrap()
+        .contains("does not support --json"));
+    assert!(
+        !std::path::Path::new(&db).exists(),
+        "rejection must not create a database"
+    );
+    assert_success(&env.run_db(&["log", "hello", "--kind", "message"]));
+    let out = env.run_db(&["tui", "--json"]);
+    let err: serde_json::Value = serde_json::from_slice(&out.stderr).unwrap();
+    assert!(err["error"]
+        .as_str()
+        .unwrap()
+        .contains("does not support --json"));
+}
