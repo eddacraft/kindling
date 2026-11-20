@@ -23,14 +23,11 @@ ended with v0.4.0.
 
 - SQLite schema advances additively to revision 7 (`generic_events` and `generic_event_usage` tables) while keeping `PRAGMA user_version` at 6 (`minReader`) so 0.4.x binaries remain compatible. Tools checking the exact schema revision should read `MAX(schema_migrations.version)` rather than `PRAGMA user_version`.
 - `/v1/health` and `kindling status --json` report `schemaVersion` from `wireVersion` (6) alongside `schemaRevision` (7); Rust and TypeScript clients validate `schemaVersion` against the supported wire range.
+- **Documented which tool results the Claude Code hooks capture.** Bash output is the only tool result stored (known secret patterns masked, capped at about 10,000 characters); other tools keep inputs only. Behaviour is unchanged, and there is no setting: the retired adapter's `captureResults`, `captureUserMessages` and `captureSubagents` switches have no replacement. See the plugin's [Privacy](plugins/kindling-claude-code/README.md#privacy) section for detail (#217).
 
 ### Security
 
 - Resolved Dependabot alerts in development tooling (`minimatch`, `@azure/msal-node`). None of these ship in kindling, its crates or the VSIX.
-
-### Changed
-
-- **Documented which tool results the Claude Code hooks capture.** Bash is the only tool whose result is stored: its output, with secrets masked and capped at about 10,000 characters. Other tools record their inputs (file path, pattern, URL, query, subagent task) but never their results. Error text and a subagent's final output are also stored, with secrets masked. Behaviour is unchanged. Unlike the retired adapter's `captureResults` option, there is no setting for this, including no switch to turn tool capture off (#217).
 
 ### Fixed
 
