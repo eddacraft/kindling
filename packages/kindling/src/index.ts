@@ -40,6 +40,10 @@ export {
 // Configuration + resolution helpers.
 export {
   EXPECTED_SCHEMA_VERSION,
+  MAX_WIRE_VERSION,
+  KNOWN_SCHEMA_REVISION,
+  isSupportedWireVersion,
+  parseWireVersion,
   defaultSocketPath,
   resolveProjectRoot,
   resolveConfig,

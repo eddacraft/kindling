@@ -168,7 +168,7 @@ fn tcp_transport_requires_bearer_secret() {
 
 /// The store's canonical schema version, as `u32` (the client's type).
 fn schema_version_u32() -> u32 {
-    kindling_store::schema_version().version as u32
+    kindling_store::wire_version()
 }
 
 #[test]

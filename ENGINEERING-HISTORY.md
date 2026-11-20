@@ -15,6 +15,22 @@ at each release; older distribution approaches may now be superseded.
 
 ### Added
 
+- **`generic-event@1` wire types, detector rule table, digest framing, and additive schema revision 7 (KINTEG-015a, D-011).**
+  Added `GenericEvent`, `GenericEventScope`, `GenericEventReceipt`,
+  `GenericEventLookup`, `GenericEventForget`, `GenericEventLimits`,
+  `RejectReason`, `ConflictKind`, `CommitFailure`, and `CapabilityFeature` to
+  `kindling-types` with strict padded RFC 4648 §4 base64 payload serialization
+  and `ts-rs` bindings (`payload: string`, all `i64`/`u64` as `number`).
+  Consolidated observation masking and the read-only `GenericEventDetector` v1
+  (`(?-u)` byte regexes) into `kindling-service/src/filter/rules.rs`, published
+  golden fixtures at `schema/fixtures/generic-event-detector-v1.json` and
+  `schema/fixtures/generic-event-digest-v1.json`, and added server-side framed
+  SHA-256 digest computation. Split `schema/version.json` into `version` (7),
+  `minReader` (6, pinned as `PRAGMA user_version`), and `wireVersion` (6,
+  reported as `Capability.schemaVersion` alongside `schemaRevision: 7`), with
+  idempotent additive migration 007 (`generic_events`, `generic_event_usage`,
+  and usage triggers) and wire-range checks in both the Rust and TypeScript
+  clients. No `generic-event` capability is advertised yet.
 - **Interactive memory browser (CONV C6, PR #263).** `kindling tui` uses
   `eddacraft-tui` 0.6, the canonical TUI library for eddacraft products, with
   shared themed containers, `TextInput`, text-entry key handling, `HelpBar`
@@ -27,7 +43,56 @@ at each release; older distribution approaches may now be superseded.
   line count (the `unstable-rendered-line-info` feature) and are refreshed on
   resize. JSON output is rejected before opening the database.
 
+### Changed
+
+- **Tool-result capture contract for the Rust hook (#217).** The TS→Rust
+  port dropped the retired Claude adapter's `captureResults` setting.
+  `format_tool_content` in `crates/kindling/src/hook/mapping.rs` was left
+  reading `hook.result()` only in its Bash arm. That is now the documented
+  contract, not an accident of the port:
+  - Bash's result is captured, passing through `filter_tool_result`
+    (secret masking, `MAX_RESULT_LENGTH` cap). For a `{stdout, stderr}`
+    response that is the joined text; other shapes are stored as-is (string)
+    or pretty-printed (JSON).
+  - Every other tool captures sanitized inputs only.
+  - `tool_error` is captured, sanitized, for all tools.
+  - Provenance reads only Bash's exit code (`exitCode`/`exit_code`) from a
+    result.
+
+  No setting was restored. Non-Bash results (file contents, fetched pages,
+  search output) are large and likely to hold secrets. Unit tests pin the
+  contract, including unknown tools and result-borne exit codes.
+  `SKIP_RESULT_TOOLS` (`["WebSearch"]`) in `hook/filter.rs` is unreachable
+  from capture and is kept only for parity with the filter port. SubagentStop
+  output (`map_subagent_stop`, capped at 5,000) is a separate path. The old
+  `captureResults` gated all PostToolUse capture, and no replacement switch
+  exists.
+
+### Security
+
+- **Development-tooling dependency alerts resolved (PR #299).** Two alerts
+  that Dependabot could not fix within the existing version ranges are now
+  closed, both under `@vscode/vsce`. `@azure/identity` refreshes to 4.14.1,
+  which pulls `@azure/msal-node` 7.2. A `minimatch@10: ^11.0.1` override in
+  `pnpm-workspace.yaml` lifts vsce's minimatch, since vsce 4.1.1 still requires
+  `^10.2.6`; drop the override once vsce allows minimatch 11. Both are dev
+  dependencies. The VSIX built with the override is byte-identical to the one
+  built from main (same 7 files and contents) on Node 22 and Node 24. The two
+  vitest-related alerts (`@vitest/mocker`, `tinypool`) were closed separately
+  by the Dependabot vitest 5.1 bump.
+
 ### Fixed
+
+- **`kindling search` filters see past the default candidate limit.**
+  With `--kind`, `--after` or `--before`, the CLI passed
+  `max_candidates: None` intending "the full ranked set", but `None` means the
+  orchestrator default of 10, so filters ran over 10 candidates. It now fetches
+  up to `FILTER_CANDIDATE_CAP` (10,000, or `--max` if larger), not
+  `u32::MAX`: every candidate is hydrated and, via the daemon, sent over the
+  socket, so an unbounded fetch would grow with the project's memory. When
+  a filtered fetch fills the cap, the text output (or stderr with `--json`)
+  notes that only the top matches were filtered. Split out of #306 (GH-188) at
+  review, independent of the ranking change.
 
 - **Contributor package-manager tooling now requires pnpm 12.** The exact
   package-manager pin is recorded in `package.json`; dependency overrides and
@@ -71,6 +136,14 @@ at each release; older distribution approaches may now be superseded.
   schema migration) and is deferred until a consumer
   needs it. Stamping `ts` at spool time would turn every post-outage replay
   into a backdated insert, so it is coupled to that key.
+- **PocketFlow confidence config drops unused increment options (GH-201).**
+  `ConfidenceConfig.successIncrement` and `failureDecrement` described a
+  running-tally model, but `calculateConfidence` is rate-based: the overall
+  success rate blended with the newest five runs by `recencyWeight`, minus
+  0.1 per consecutive failure (capped at 0.3), clamped to the configured
+  bounds. The fields were never read, so they are removed rather than wired in;
+  the doc comment now states the algorithm and `recencyWeight` has test
+  coverage.
 
 ## [0.4.1] - 2026-11-10
 

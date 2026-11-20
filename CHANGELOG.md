@@ -17,9 +17,25 @@ ended with v0.4.0.
 ### Added
 
 - `kindling tui` browses local memory with editable search, pins first, and a wrapped, scrollable preview. Panels adapt to terminal width; press Esc or Ctrl-C to quit. Preview scrolling stops at the final page, and unsupported `--json` mode is rejected.
+- `generic-event@1` wire types, `Capability.features` and `schemaRevision` fields, and golden digest/detector fixtures (not yet advertised; full endpoints ship in 0.5.0).
+
+### Changed
+
+- SQLite schema advances additively to revision 7 (`generic_events` and `generic_event_usage` tables) while keeping `PRAGMA user_version` at 6 (`minReader`) so 0.4.x binaries remain compatible. Tools checking the exact schema revision should read `MAX(schema_migrations.version)` rather than `PRAGMA user_version`.
+- `/v1/health` and `kindling status --json` report `schemaVersion` from `wireVersion` (6) alongside `schemaRevision` (7); Rust and TypeScript clients validate `schemaVersion` against the supported wire range.
+- **Documented which tool results the Claude Code hooks capture.** Bash output is the only tool result stored (known secret patterns masked, capped at about 10,000 characters); other tools keep inputs only. Behaviour is unchanged, and there is no setting: the retired adapter's `captureResults`, `captureUserMessages` and `captureSubagents` switches have no replacement. See the plugin's [Privacy](plugins/kindling-claude-code/README.md#privacy) section for detail (#217).
+
+### Security
+
+- Resolved Dependabot alerts in development tooling (`minimatch`, `@azure/msal-node`). None of these ship in kindling, its crates or the VSIX.
+
+### Changed
+
+- The PocketFlow adapter's `ConfidenceConfig` no longer advertises `successIncrement` and `failureDecrement`, which never affected the confidence score. Remove them from any `ConfidenceTracker` configuration.
 
 ### Fixed
 
+- `kindling search --kind`, `--after` and `--before` now filter up to the top 10,000 matches. Before, they filtered only the first 10, so matches could be missing even with a large `--max`. When the cap is reached, the output says so.
 - **Contributor package-manager tooling now requires pnpm 12.** Enable Corepack
   with `corepack enable` so the repository's pinned pnpm version is used.
 - Project-root overrides now reject sibling directories with similar path prefixes, preventing incorrect repository selection.

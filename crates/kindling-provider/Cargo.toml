@@ -19,7 +19,7 @@ workspace = true
 [dependencies]
 kindling-store = { path = "../kindling-store", version = "0.4.1" }
 kindling-types = { path = "../kindling-types", version = "0.4.1" }
-rusqlite = { version = "0.41", features = ["bundled"] }
+rusqlite = { version = "0.43", features = ["bundled"] }
 serde_json = "1"
 thiserror = "2"
 
