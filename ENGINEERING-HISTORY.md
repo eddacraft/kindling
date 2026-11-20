@@ -53,6 +53,14 @@ at each release; older distribution approaches may now be superseded.
   passes `--version` when `KINDLING_VERSION` is set, refuses a non-default
   `KINDLING_REPO`, and invokes the binary cargo installed (including a
   nonstandard `CARGO_HOME` or `CARGO_INSTALL_ROOT`).
+- **PocketFlow confidence config drops unused increment options (GH-201).**
+  `ConfidenceConfig.successIncrement` and `failureDecrement` described a
+  running-tally model, but `calculateConfidence` is rate-based: the overall
+  success rate blended with the newest five runs by `recencyWeight`, minus
+  0.1 per consecutive failure (capped at 0.3), clamped to the configured
+  bounds. The fields were never read, so they are removed rather than wired in;
+  the doc comment now states the algorithm and `recencyWeight` has test
+  coverage.
 
 ## [0.4.1] - 2026-11-10
 
