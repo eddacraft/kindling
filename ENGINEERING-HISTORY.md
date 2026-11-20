@@ -83,6 +83,18 @@ at each release; older distribution approaches may now be superseded.
 
 ### Fixed
 
+- **SessionStart context resolves the UTC offset per observation (GH-209, PR #274).**
+  The handler resolved one local offset at request time and applied it to
+  every historical timestamp, a regression from the PORT-009 port: the Node
+  hook's `new Date(ts).toLocaleString()` resolves each instant separately.
+  The new `inject::format_session_start_with(ctx, offset_of)` calls the
+  resolver once per observation, and the handler passes
+  `local_offset_seconds`. The published 0.4.1 signature,
+  `format_session_start(ctx, offset_seconds: i32)`, stays as a
+  `#[deprecated]` wrapper, so the fix ships as a patch release with no semver
+  break. Unit tests pin both sides of the 2023-11-05 06:00 UTC
+  America/New_York fall-back (1:59:59 AM EDT, then 1:00:00 AM EST) with a
+  fixed resolver; no process `TZ` mutation.
 - **`kindling search` filters see past the default candidate limit.**
   With `--kind`, `--after` or `--before`, the CLI passed
   `max_candidates: None` intending "the full ranked set", but `None` means the

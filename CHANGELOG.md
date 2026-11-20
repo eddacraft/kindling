@@ -26,12 +26,21 @@ ended with v0.4.0.
 - **Documented which tool results the Claude Code hooks capture.** Bash output is the only tool result stored (known secret patterns masked, capped at about 10,000 characters); other tools keep inputs only. Behaviour is unchanged, and there is no setting: the retired adapter's `captureResults`, `captureUserMessages` and `captureSubagents` switches have no replacement. See the plugin's [Privacy](plugins/kindling-claude-code/README.md#privacy) section for detail (#217).
 - The PocketFlow adapter's `ConfidenceConfig` no longer advertises `successIncrement` and `failureDecrement`, which never affected the confidence score. Remove them from any `ConfidenceTracker` configuration.
 
+### Deprecated
+
+- `kindling_server::inject::format_session_start` is deprecated in favour of
+  `format_session_start_with`, which takes a per-timestamp offset resolver.
+  The old function still compiles and behaves as before.
+
 ### Security
 
 - Resolved Dependabot alerts in development tooling (`minimatch`, `@azure/msal-node`). None of these ship in kindling, its crates or the VSIX.
 
 ### Fixed
 
+- SessionStart context renders each observation's timestamp in the
+  daylight-saving offset that applied at that time, rather than an hour off
+  for observations from the other side of a DST change.
 - `kindling search --kind`, `--after` and `--before` now filter up to the top 10,000 matches. Before, they filtered only the first 10, so matches could be missing even with a large `--max`. When the cap is reached, the output says so.
 - **Contributor package-manager tooling now requires pnpm 12.** Enable Corepack
   with `corepack enable` so the repository's pinned pnpm version is used.
