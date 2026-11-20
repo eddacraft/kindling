@@ -62,11 +62,13 @@ at each release; older distribution approaches may now be superseded.
   that traversal. The store, service, client, types and `CONTEXT.md` docs now
   state the real contract, and two store tests pin both cases. Even the
   daemon path with `ts` omitted is not complete: `ts` is stamped under the
-  per-project service mutex and is non-decreasing, but at millisecond
-  resolution with a random UUID `id`, so a row stamped in the cursor anchor's
-  millisecond with a lower `id` is missed. True change-stream completeness would need an
-  insertion-sequence key (`rowid` is unstable across `VACUUM` and reuse; a new
-  monotonic column is a schema migration) and is deferred until a consumer
+  per-project service mutex and is non-decreasing (barring a wall-clock
+  regression, since `now_ms()` reads `SystemTime` without enforcing
+  monotonicity), but at millisecond resolution with a random UUID `id`, so a
+  row stamped in the cursor anchor's millisecond with a lower `id` is missed.
+  True change-stream completeness would need an insertion-sequence key
+  (`rowid` is unstable across `VACUUM` and reuse; a new monotonic column is a
+  schema migration) and is deferred until a consumer
   needs it. Stamping `ts` at spool time would turn every post-outage replay
   into a backdated insert, so it is coupled to that key.
 
