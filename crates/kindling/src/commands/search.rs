@@ -45,8 +45,9 @@ pub fn run(args: SearchArgs, via_daemon: bool) -> CliResult {
         token_budget: None,
         // When filtering, retrieve the full ranked set and let `apply_filters`
         // re-limit, so a filter never drops matches that the pre-filter `--max`
-        // would have cut off.
-        max_candidates: if has_filters { None } else { Some(args.max) },
+        // would have cut off. `None` would mean the orchestrator's default of
+        // 10, not "unbounded", so ask for everything explicitly.
+        max_candidates: Some(if has_filters { u32::MAX } else { args.max }),
         include_redacted: None,
     };
 

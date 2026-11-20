@@ -1016,6 +1016,38 @@ fn search_kind_filter_applies_before_max_limit() {
     assert_eq!(v["provenance"]["returnedCandidates"], json!(3));
 }
 
+#[test]
+fn search_kind_filter_sees_matches_beyond_the_default_candidate_limit() {
+    let env = CliEnv::new();
+    // Twelve messages match "common" more strongly than the three commands, so
+    // a filtered search must look past the default 10 candidates to find them.
+    for i in 0..12 {
+        assert_success(&env.run_db(&[
+            "log",
+            &format!("common common common noise {i}"),
+            "--kind",
+            "message",
+        ]));
+    }
+    for i in 0..3 {
+        assert_success(&env.run_db(&[
+            "log",
+            &format!("common cmd {i} with a much longer tail of words"),
+            "--kind",
+            "command",
+        ]));
+    }
+
+    let out = env.run_db(&["search", "common", "--kind", "command", "--json"]);
+    assert_success(&out);
+    let contents = candidate_contents(&json_stdout(&out));
+    assert_eq!(
+        contents.len(),
+        3,
+        "expected 3 command matches: {contents:?}"
+    );
+}
+
 // --- C6: kindling tui -------------------------------------------------------
 
 #[test]
