@@ -28,6 +28,10 @@ ended with v0.4.0.
 
 - Resolved Dependabot alerts in development tooling (`minimatch`, `@azure/msal-node`). None of these ship in kindling, its crates or the VSIX.
 
+### Changed
+
+- The PocketFlow adapter's `ConfidenceConfig` no longer advertises `successIncrement` and `failureDecrement`, which never affected the confidence score. Remove them from any `ConfidenceTracker` configuration.
+
 ### Fixed
 
 - **Contributor package-manager tooling now requires pnpm 12.** Enable Corepack
