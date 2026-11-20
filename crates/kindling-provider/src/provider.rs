@@ -315,6 +315,14 @@ impl RetrievalProvider for LocalFtsProvider<'_> {
 /// in SQL only added cost, and leaving the join order to the planner lets a
 /// selective scope drive from its index. Correctness never depends on the
 /// plan (see the `ranking_does_not_depend_on_the_query_plan` test).
+///
+/// The scan reads `ts` (or `created_at`), `redacted` and the scope columns from
+/// the base row for every match, not just the rowid, because ranking and
+/// filtering need them before the limit is applied. Those columns sit after
+/// `content` in the row, so for large content they are behind its overflow
+/// pages: that read is the dominant cost of this query. Deferring them to
+/// [`LocalFtsProvider::hydrate`] would break exact ranking, since hydration
+/// sees only the rows already chosen.
 fn candidate_query(
     entity_type: EntityType,
     options: &ProviderSearchOptions,

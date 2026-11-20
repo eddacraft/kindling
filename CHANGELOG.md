@@ -20,7 +20,7 @@ ended with v0.4.0.
 
 ### Fixed
 
-- **Search now returns the true best matches.** Retrieval scored only each type's top text matches before blending in recency, so a recent but weaker match could be left out, and a result's score changed with `maxCandidates`. Every matching observation and summary is now scored first, so results and scores no longer depend on the limit. Results may be ordered differently than before, especially for queries with more matches than `maxCandidates` (default 10).
+- **Search now returns the true best matches.** Retrieval scored only each type's top text matches before blending in recency, so a recent but weaker match could be left out, and a result's score changed with `maxCandidates`. Every matching observation and summary is now scored first, so results and scores no longer depend on the limit. For queries with more matches than `maxCandidates` (default 10), both the order and the scores themselves may change, so anyone filtering on a score threshold may see different results.
 - `kindling search --kind`, `--after` and `--before` now filter every match. Before, they filtered only the first 10 candidates, so matches could be missing even with a large `--max`.
 - **Contributor package-manager tooling now requires pnpm 12.** Enable Corepack
   with `corepack enable` so the repository's pinned pnpm version is used.
