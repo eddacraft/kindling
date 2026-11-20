@@ -38,6 +38,8 @@ ended with v0.4.0.
 - Project-root overrides now reject sibling directories with similar path prefixes, preventing incorrect repository selection.
 - Invalid project-root requests are rejected rather than queued for retry.
 - Installer fallback respects a pinned Kindling version and non-default Cargo installation locations.
+- The CLI now opens the same project database as the Claude Code hooks when run from a repository subdirectory, so hook-captured memory is visible and CLI writes no longer split across per-directory databases. This applies embedded and with `--via-daemon`; `--db`, `KINDLING_DB_PATH` and `KINDLING_REPO_ROOT` still take precedence.
+  - **Upgrade note:** data the CLI previously wrote while run from a subdirectory stays in that subdirectory's database and is not migrated. On Windows this also applies to data written from the repository root, because Git reports the root with forward slashes. To bring it across, run `kindling export` with `--db` set to the old database, then `kindling import` from the repository.
 - API requests that send `scopeIds` as a JSON array are now rejected with a 4xx. Previously `[]` was treated as an empty scope and `["x"]` was silently read as `{ "sessionId": "x" }`. Send `scopeIds` as an object.
 - The observation list documentation no longer promises that an observation written mid-traversal is always returned. A later page returns it only if its timestamp and id sort after the cursor; one written with an earlier timestamp appears in the next traversal.
 

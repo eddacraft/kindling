@@ -29,7 +29,7 @@ mod error;
 mod filter;
 mod input;
 mod mapping;
-mod project;
+pub(crate) mod project;
 
 pub use error::HookError;
 pub use input::{HookInput, HookType};
