@@ -47,6 +47,10 @@ impl Drop for PidGuard {
 }
 
 /// The lock file guarding `pid_path`: same directory, extension `lock`.
+///
+/// Give each daemon a `pid_path` whose extension isn't `lock`, and don't put
+/// two pid paths that differ only in extension in one directory. Otherwise
+/// the lock and PID files, or two daemons' locks, would be the same file.
 pub fn lock_path_for(pid_path: &Path) -> PathBuf {
     pid_path.with_extension("lock")
 }
