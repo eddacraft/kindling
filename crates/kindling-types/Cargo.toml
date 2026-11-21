@@ -26,4 +26,4 @@ ts-rs = ["dep:ts-rs"]
 base64 = "0.22"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
-ts-rs = { version = "11", optional = true, features = ["serde-json-impl"] }
+ts-rs = { version = "12", optional = true, features = ["serde-json-impl"] }
