@@ -18,7 +18,13 @@ jobs:
 
       - name: Reject AI-tooling tells in commit messages
         env:
-          BASE: ${{ github.event.pull_request.base.sha }}
+          # The base *branch*, not `pull_request.base.sha`: the event's base SHA
+          # can lag well behind the branch tip. Once the PR merges main,
+          # `base.sha..head` then also scans commits already on main (whose
+          # squash merges may carry trailers) and fails PRs that added none
+          # (seen on #278). Scanning from the branch tip checks only the PR's
+          # own commits.
+          BASE_REF: ${{ github.base_ref }}
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
           set -eu
@@ -34,7 +40,13 @@ jobs:
             '🤖 generated with'
           )
 
-          range="$BASE..$HEAD"
+          # `fetch-depth: 0` fetches every branch, so the base branch tip is
+          # available as origin/$BASE_REF. Fail closed if it is not.
+          if ! base="$(git rev-parse --verify --quiet "refs/remotes/origin/$BASE_REF^{commit}")"; then
+            echo "::error::base branch origin/$BASE_REF not found"
+            exit 1
+          fi
+          range="$base..$HEAD"
           fail=0
 
           # Enumerate the PR's commits up front. A failed `git log` (e.g. an
