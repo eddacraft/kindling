@@ -34,7 +34,7 @@ fn sampled_peak_includes_the_final_snapshot() {
     let sampler = ResourceSampler::start(Duration::from_millis(1));
     let allocation = vec![0_u8; 2 * 1024 * 1024];
     std::hint::black_box(&allocation);
-    let summary = sampler.finish();
+    let summary = sampler.finish().expect("resource sampler should finish");
 
     if summary.available {
         assert!(summary.peak_rss_mib >= summary.rss_start_mib);
