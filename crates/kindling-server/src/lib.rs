@@ -54,7 +54,7 @@ mod state;
 pub use config::{ServerConfig, Transport, DEFAULT_IDLE_TIMEOUT};
 pub use error::{ApiError, ServerError};
 pub use handlers::{PROJECT_HEADER, SESSION_HEADER};
-pub use pid::{acquire_pid_lock, PidGuard};
+pub use pid::{acquire_pid_lock, lock_path_for, PidGuard};
 pub use state::AppState;
 
 use std::sync::Arc;

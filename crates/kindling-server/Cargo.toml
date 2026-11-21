@@ -40,9 +40,6 @@ thiserror = "2"
 # deliberately avoid `chrono-tz` (a large bundled IANA database).
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 
-[target.'cfg(unix)'.dependencies]
-nix = { version = "0.32", features = ["signal", "process"] }
-
 [dev-dependencies]
 tempfile = "3"
 hyper = { version = "1", features = ["client", "http1"] }

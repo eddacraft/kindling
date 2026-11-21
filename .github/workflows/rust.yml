@@ -202,6 +202,8 @@ jobs:
   # TCP round-trip, exercising the cfg(windows) Transport::Tcp defaults end to
   # end. The full client suite is NOT run here: tests/client.rs is cfg(unix)
   # (it binds a Unix domain socket), so only the TCP test applies on Windows.
+  # The daemon ownership-lock tests run here too, because Windows locks files
+  # with LockFileEx rather than flock.
   windows-tcp:
     name: windows tcp transport
     runs-on: windows-latest
@@ -213,6 +215,8 @@ jobs:
       - run: cargo test -p kindling-client --test tcp
       - name: demo recipe quoting
         run: cargo test -p eddacraft-kindling --lib commands::demo
+      - name: daemon ownership lock (LockFileEx)
+        run: cargo test -p kindling-server --lib pid::tests
 
   # Exercises the thin TS client (@eddacraft/kindling) AND the live TS adapters
   # (opencode, pocketflow, vscode) against a REAL daemon. Their integration tests skip

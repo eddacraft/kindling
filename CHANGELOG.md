@@ -41,6 +41,13 @@ ended with v0.4.0.
 
 ### Fixed
 
+- Starting kindling from several tools at once can no longer leave two daemons
+  writing to the same store. Ownership is now an operating-system lock on
+  `~/.kindling/kindling.lock`, which is released automatically if the daemon
+  crashes, so a stale PID file never blocks startup. Leave the lock file in
+  place; deleting it while a daemon runs defeats the lock. For Rust users of
+  `kindling-server`, `ServerError::AlreadyRunning` now carries `Option<i32>`,
+  which is `None` when the running daemon's PID can't be read (#171).
 - SessionStart context renders each observation's timestamp in the
   daylight-saving offset that applied at that time, rather than an hour off
   for observations from the other side of a DST change.

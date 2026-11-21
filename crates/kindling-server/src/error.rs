@@ -13,9 +13,10 @@ use serde_json::json;
 /// [`ApiError`] instead so they can map to HTTP status codes.
 #[derive(Debug, thiserror::Error)]
 pub enum ServerError {
-    /// Another live daemon already holds the PID lock.
-    #[error("a kindling daemon is already running (pid {0})")]
-    AlreadyRunning(i32),
+    /// Another daemon holds the ownership lock. The PID is `None` when the
+    /// owner's PID file can't be read (for example while it is being written).
+    #[error("a kindling daemon is already running (pid {})", display_pid(.0))]
+    AlreadyRunning(Option<i32>),
 
     /// Failed to read/parse/write the PID file.
     #[error("pid file error: {0}")]
@@ -28,6 +29,10 @@ pub enum ServerError {
     /// A service/store failure surfaced during startup.
     #[error(transparent)]
     Service(#[from] ServiceError),
+}
+
+fn display_pid(pid: &Option<i32>) -> String {
+    pid.map_or_else(|| "unknown".to_owned(), |pid| pid.to_string())
 }
 
 /// Per-request error mapped to an HTTP status + JSON body `{ "error": "…" }`.
