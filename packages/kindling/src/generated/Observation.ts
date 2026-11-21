@@ -13,4 +13,4 @@ export type Observation = { id: string, kind: ObservationKind, content: string,
 /**
  * Source-specific metadata stored as a JSON object.
  */
-provenance: { [key in string]?: JsonValue }, ts: number, scopeIds: ScopeIds, redacted: boolean, };
+provenance: { [key in string]: JsonValue }, ts: number, scopeIds: ScopeIds, redacted: boolean, };
