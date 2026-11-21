@@ -101,6 +101,32 @@ at each release; older distribution approaches may now be superseded.
 
 ### Fixed
 
+- **Daemon ownership is an OS file lock (GH-171).** `acquire_pid_lock`
+  replaced a check-then-act protocol on PID-file contents (read, liveness
+  check, remove, write) that had no mutual exclusion: concurrent starters
+  could all win (3 owners in the first round of a 6-starter test), stale
+  cleanup could delete a successor's file, and on Windows the liveness check
+  always reported "dead". PR #281's `create_new` variant still let 4 starters
+  produce multiple owners in 2,084 of 3,000 rounds.
+  - Ownership is `std::fs::File::try_lock()` (stable since 1.89, the MSRV;
+    `flock` on Unix, `LockFileEx` on Windows) on `pid_path.with_extension("lock")`,
+    held by `PidGuard` for the daemon's lifetime. The OS releases it on
+    process death, so stale cleanup and `process_is_alive` are gone, and so is
+    the `nix` dependency of `kindling-server`.
+  - The lock file is opened with `create(true)` and no truncation, and is never
+    deleted: unlinking it would let one starter lock the old inode while
+    another creates a new one.
+  - The PID is written to `pid_path` only after the lock is held, as a separate
+    file because Windows blocks reads of a locked file. `PidGuard` removes it on
+    drop, before releasing the lock.
+  - `AlreadyRunning(Option<i32>)` comes only from `TryLockError::WouldBlock`,
+    with `None` when the PID file is missing, mid-write or malformed; every
+    other failure is `ServerError::Pid`.
+  - Tests: 6 barrier-synchronised starters × 200 rounds with exactly one
+    owner, live-owner blocking and release, leftover files from a crashed
+    owner, unknown PID, and non-contention lock errors. The `windows-tcp` CI
+    job runs them (`pid::tests`) against `LockFileEx`. Design agreed on #171; supersedes
+    PR #281.
 - **SessionStart context resolves the UTC offset per observation (GH-209, PR #274).**
   The handler resolved one local offset at request time and applied it to
   every historical timestamp, a regression from the PORT-009 port: the Node

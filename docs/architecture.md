@@ -49,7 +49,7 @@ The architecture is deliberately layered to separate concerns:
                                         ▼
      ┌──────────────────────────────────────────────────────────┐
      │  kindling serve  →  kindling-server (daemon runtime)       │
-     │  - PID lock, socket mode 0600, idle shutdown               │
+     │  - owner lock, socket mode 0600, idle shutdown             │
      │  - Per-project routing (one service cached per project)    │
      │  - v1 HTTP API (camelCase JSON)                            │
      │                                                            │
@@ -161,7 +161,7 @@ All published crates share the workspace version (see `Cargo.toml`, currently `0
 
 - HTTP/1 over UDS (TCP loopback fallback on Windows, with the ephemeral port published to a port file and a per-daemon bearer token required on every route except `/v1/health`).
 - Per-project routing via the `X-Kindling-Project` header; one service instance cached per project. The header is routing only, never authorization.
-- PID lock, socket mode `0600`, idle shutdown (default 30 minutes), cancellation-safe activity tracking.
+- Single-owner OS file lock (`kindling.lock`, released by the OS if the daemon dies) with the PID in `kindling.pid` for display, socket mode `0600`, idle shutdown (default 30 minutes), cancellation-safe activity tracking.
 - Formats injection-context markdown (`inject.rs`) byte-for-byte compatible with the original Node hooks.
 
 **Dependencies:** `kindling-types`, `kindling-store`, `kindling-service`.
