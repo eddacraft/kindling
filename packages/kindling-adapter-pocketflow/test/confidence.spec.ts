@@ -121,6 +121,46 @@ describe('calculateConfidence', () => {
       calculateConfidence(recentFailures),
     );
   });
+
+  describe('recencyWeight', () => {
+    // Overall rate 0.5 (5/10); the last five runs all succeeded (recent rate 1.0).
+    const state = {
+      successCount: 5,
+      failureCount: 5,
+      consecutiveFailures: 0,
+      history: Array.from({ length: 5 }, () => ({ success: true, timestamp: Date.now() })),
+    };
+    const config = {
+      historySize: 10,
+      baseConfidence: 0.5,
+      minConfidence: 0,
+      maxConfidence: 1,
+    };
+
+    it('uses only the overall rate when recencyWeight is 0', () => {
+      expect(calculateConfidence(state, { ...config, recencyWeight: 0 })).toBe(0.5);
+    });
+
+    it('uses only the recent rate when recencyWeight is 1', () => {
+      expect(calculateConfidence(state, { ...config, recencyWeight: 1 })).toBe(1);
+    });
+
+    it('blends the two rates linearly in between', () => {
+      expect(calculateConfidence(state, { ...config, recencyWeight: 0.7 })).toBe(0.85);
+      expect(calculateConfidence(state, { ...config, recencyWeight: 0.2 })).toBe(0.6);
+    });
+
+    it('is honoured when passed to ConfidenceTracker', () => {
+      const trackerFor = (recencyWeight: number) => {
+        const tracker = new ConfidenceTracker({ ...config, recencyWeight });
+        for (let i = 0; i < 5; i++) tracker.recordFailure('node');
+        for (let i = 0; i < 5; i++) tracker.recordSuccess('node');
+        return tracker.getConfidence('node');
+      };
+      expect(trackerFor(0)).toBe(0.5);
+      expect(trackerFor(1)).toBe(1);
+    });
+  });
 });
 
 describe('ConfidenceTracker', () => {

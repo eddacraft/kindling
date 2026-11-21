@@ -166,6 +166,11 @@ describe('ConfidenceTracker', () => {
     expect(after).toBeGreaterThan(initial);
   });
 
+  it('clamps a single success to maxConfidence, as the class JSDoc example states', () => {
+    tracker.recordSuccess('run-tests');
+    expect(tracker.getConfidence('run-tests')).toBe(0.95);
+  });
+
   it('should decrease confidence on failure', () => {
     tracker.recordSuccess('test-node');
     tracker.recordSuccess('test-node');

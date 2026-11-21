@@ -27,7 +27,7 @@ use crate::dto::{
     DEFAULT_MAX_RESULTS,
 };
 use crate::error::ApiError;
-use crate::inject::{format_pre_compact, format_session_start, local_offset_seconds};
+use crate::inject::{format_pre_compact, format_session_start_with, local_offset_seconds};
 use crate::state::AppState;
 
 /// Header carrying the project root string for per-project DB routing.
@@ -57,12 +57,12 @@ fn project_root(headers: &HeaderMap) -> Result<String, ApiError> {
 /// `GET /v1/health` — capability handshake plus touched project ids.
 /// Requires no project header.
 pub async fn health(State(state): State<AppState>) -> Json<Value> {
-    let schema = kindling_store::schema_version();
     let capability = build_capability(
         env!("CARGO_PKG_VERSION"),
-        schema.version as u32,
+        kindling_store::wire_version(),
         state.kindling_home().display().to_string(),
-    );
+    )
+    .with_schema_revision(kindling_store::schema_revision());
     let mut body = serde_json::to_value(capability).expect("capability serializes");
     if let Some(obj) = body.as_object_mut() {
         obj.insert("projects".to_string(), json!(state.known_project_ids()));
@@ -279,10 +279,9 @@ pub async fn session_start_context(
         let guard = svc.lock().expect("service mutex poisoned");
         guard.session_start_context_at(&req.scope_ids, max_results, now)?
     };
-    // Resolve the local offset once, at the request instant, so every timestamp
-    // in this batch renders in a single consistent zone.
-    let offset = local_offset_seconds(now);
-    let additional = format_session_start(&ctx, offset);
+    // Resolve the local offset at each observation's instant so every timestamp
+    // renders in the DST offset that was in effect then, not at request time.
+    let additional = format_session_start_with(&ctx, local_offset_seconds);
     Ok(Json(json!({ "additionalContext": additional })))
 }
 

@@ -37,7 +37,7 @@ Publishing readiness (done in-repo by PORT-014):
    `CARGO_REGISTRY_TOKEN`).
 2. Run [`scripts/publish.sh`](../scripts/publish.sh) — it publishes in
    dependency order: `kindling-types → kindling-store → kindling-provider →
-kindling-service → kindling-server → kindling-client → eddacraft-kindling`
+   kindling-service → kindling-server → kindling-client → eddacraft-kindling`
    (server publishes before client because client carries a versioned
    dev-dependency on server). crates.io needs a few seconds to index each crate
    before the next dependent one resolves; the script pauses between publishes.

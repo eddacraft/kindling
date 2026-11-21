@@ -6,4 +6,4 @@ import type { JsonValue } from "./serde_json/JsonValue.js";
 /**
  * Input for creating a new observation. Optional fields are auto-generated.
  */
-export type ObservationInput = { id?: string, kind: ObservationKind, content: string, provenance?: { [key in string]?: JsonValue }, ts?: number, scopeIds: ScopeIds, redacted?: boolean, };
+export type ObservationInput = { id?: string, kind: ObservationKind, content: string, provenance?: { [key in string]: JsonValue }, ts?: number, scopeIds: ScopeIds, redacted?: boolean, };

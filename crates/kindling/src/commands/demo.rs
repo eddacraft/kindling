@@ -22,6 +22,11 @@ struct DemoOutput {
     try_next: Vec<String>,
 }
 
+struct DemoRecipe {
+    label: &'static str,
+    command: String,
+}
+
 #[derive(Serialize)]
 struct ImportCounts {
     observations: usize,
@@ -46,36 +51,31 @@ pub fn run(args: DemoArgs) -> CliResult {
         None => demo_db_path()?,
     };
 
+    // Validate before `--reset` so an unusable path never deletes the file.
+    let database = database_string(&db_path)?;
+
     if args.reset && db_path.exists() {
         std::fs::remove_file(&db_path)?;
     }
 
-    let (service, _) = open_service(Some(db_path.to_string_lossy().as_ref()))?;
+    let (service, _) = open_service(Some(database))?;
 
     let bundle = ExportBundle::from_json(DEMO_FIXTURE)?;
     let result = service.import(&bundle, ImportOptions { dry_run: false })?;
 
-    let try_next = vec![
-        format!(
-            "kindling search \"JWT\" --all-repos --db {}",
-            shell_quote(&db_path)
-        ),
-        format!("kindling browse --db {}", shell_quote(&db_path)),
-        format!("kindling list observations --db {}", shell_quote(&db_path)),
-        format!("kindling status --db {}", shell_quote(&db_path)),
-    ];
+    let try_next = try_next_commands(database);
 
     if args.common.json {
         let out = DemoOutput {
             success: result.errors.is_empty(),
-            database: db_path.to_string_lossy().into_owned(),
+            database: database.to_owned(),
             imported: ImportCounts {
                 observations: result.observations,
                 capsules: result.capsules,
                 summaries: result.summaries,
                 pins: result.pins,
             },
-            try_next,
+            try_next: json_try_next(&try_next),
         };
         println!("{}", format_json(&out, true)?);
     } else {
@@ -93,8 +93,13 @@ pub fn run(args: DemoArgs) -> CliResult {
             }
         }
         println!("\nTry next:");
-        for line in &try_next {
-            println!("  {line}");
+        let mut label = None;
+        for recipe in &try_next {
+            if label != Some(recipe.label) {
+                println!("\n{}:", recipe.label);
+                label = Some(recipe.label);
+            }
+            println!("  {}", recipe.command);
         }
         println!();
     }
@@ -102,11 +107,238 @@ pub fn run(args: DemoArgs) -> CliResult {
     Ok(())
 }
 
-fn shell_quote(path: &Path) -> String {
-    let s = path.to_string_lossy();
-    if s.contains(' ') {
-        format!("'{s}'")
+/// Shell whose recipes populate `--json` `tryNext`, so the array holds exactly
+/// one command per action on every platform. PowerShell is the default shell
+/// in Windows Terminal.
+#[cfg(windows)]
+const JSON_RECIPE_SHELL: &str = "PowerShell";
+#[cfg(not(windows))]
+const JSON_RECIPE_SHELL: &str = "POSIX";
+
+/// Build the labelled "try next" recipes for `database`.
+///
+/// Unix emits POSIX recipes. Windows emits labelled `cmd.exe` and PowerShell
+/// recipes because those shells use different quoting rules. The label is for
+/// human-readable output only and never appears in the command text.
+fn try_next_commands(database: &str) -> Vec<DemoRecipe> {
+    let prefixes = [
+        "kindling search \"JWT\" --all-repos --db=",
+        "kindling browse --db=",
+        "kindling list observations --db=",
+        "kindling status --db=",
+    ];
+    #[cfg(windows)]
+    {
+        let mut recipes = Vec::with_capacity(prefixes.len() * 2);
+        for prefix in prefixes {
+            recipes.push(DemoRecipe {
+                label: "cmd.exe",
+                command: format!("{prefix}{}", cmd_quote(database)),
+            });
+        }
+        for prefix in prefixes {
+            recipes.push(DemoRecipe {
+                label: "PowerShell",
+                command: format!("{prefix}{}", powershell_quote(database)),
+            });
+        }
+        recipes
+    }
+    #[cfg(not(windows))]
+    {
+        prefixes
+            .into_iter()
+            .map(|prefix| DemoRecipe {
+                label: "POSIX",
+                command: format!("{prefix}{}", posix_quote(database)),
+            })
+            .collect()
+    }
+}
+
+/// The `--json` `tryNext` commands: one shell's recipes, without labels.
+fn json_try_next(recipes: &[DemoRecipe]) -> Vec<String> {
+    recipes
+        .iter()
+        .filter(|recipe| recipe.label == JSON_RECIPE_SHELL)
+        .map(|recipe| recipe.command.clone())
+        .collect()
+}
+
+fn database_string(path: &Path) -> Result<&str, CliError> {
+    path.to_str()
+        .ok_or_else(|| CliError::Invalid("demo database path is not valid UTF-8".to_string()))
+}
+
+/// Quote a database path for a POSIX shell (`sh`/`bash`/`zsh`).
+///
+/// The demo recipes are copied by hand, so the path must survive a shell
+/// word-splitting pass verbatim. Single quotes make every character literal
+/// except `'` itself, so embedded single quotes are rewritten as the shell
+/// sequence `'\''` (close quote, escaped quote, reopen quote). Always quoting
+/// keeps paths with spaces, apostrophes or metacharacters (`$`, `;`, `` ` ``,
+/// `*`, …) literal without having to enumerate them.
+#[cfg(not(windows))]
+fn posix_quote(path: &str) -> String {
+    format!("'{}'", path.replace('\'', "'\\''"))
+}
+
+/// Quote a database path for `cmd.exe`, only when it needs quoting.
+///
+/// Double quotes stop `cmd.exe` treating spaces and `& ( ) ^ |` as syntax.
+/// They do not stop `%VAR%` expansion, which `cmd.exe` cannot suppress inside
+/// quotes, so a path containing `%name%` may still be rewritten. Such paths
+/// are rare enough that we accept the limitation rather than escape for it.
+#[cfg(windows)]
+fn cmd_quote(path: &str) -> String {
+    if needs_windows_quote(path) {
+        format!("\"{path}\"")
     } else {
-        s.into_owned()
+        path.to_owned()
+    }
+}
+
+/// Quote a database path as a PowerShell literal string: single quotes, with
+/// embedded single quotes doubled (`''`).
+#[cfg(windows)]
+fn powershell_quote(path: &str) -> String {
+    format!("'{}'", path.replace('\'', "''"))
+}
+
+#[cfg(windows)]
+fn needs_windows_quote(path: &str) -> bool {
+    path.chars().any(|character| {
+        character.is_whitespace() || matches!(character, '&' | '(' | ')' | '%' | '!' | '^' | '|')
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    #[cfg(unix)]
+    use super::database_string;
+    #[cfg(not(windows))]
+    use super::posix_quote;
+    #[cfg(windows)]
+    use super::{cmd_quote, powershell_quote};
+    use super::{json_try_next, try_next_commands};
+    #[cfg(unix)]
+    use std::path::PathBuf;
+
+    #[test]
+    fn json_try_next_has_one_unlabelled_command_per_action() {
+        let json = json_try_next(&try_next_commands("demo.db"));
+        assert_eq!(json.len(), 4);
+        assert!(json
+            .iter()
+            .all(|command| command.starts_with("kindling ") && !command.contains(':')));
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn quotes_a_plain_path() {
+        assert_eq!(
+            posix_quote("/home/user/kindling.db"),
+            "'/home/user/kindling.db'"
+        );
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn quotes_paths_with_spaces() {
+        assert_eq!(
+            posix_quote("/tmp/kindling home/demo.db"),
+            "'/tmp/kindling home/demo.db'"
+        );
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn escapes_embedded_single_quotes() {
+        assert_eq!(
+            posix_quote("/tmp/o'brien/demo.db"),
+            "'/tmp/o'\\''brien/demo.db'"
+        );
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn quotes_shell_metacharacters_literally() {
+        assert_eq!(
+            posix_quote("/tmp/db $HOME;$(id)/demo.db"),
+            "'/tmp/db $HOME;$(id)/demo.db'"
+        );
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn posix_recipe_round_trips_through_shell() {
+        let path = "/tmp/db $HOME;$(id)/demo.db";
+        let recipe = try_next_commands(path).remove(0);
+        assert_eq!(recipe.label, "POSIX");
+        let quoted = recipe.command.split_once("--db=").unwrap().1;
+        let script = format!("printf '%s' {quoted}");
+        let output = std::process::Command::new("sh")
+            .args(["-c", &script])
+            .output()
+            .expect("POSIX shell should run");
+        assert_eq!(String::from_utf8(output.stdout).unwrap(), path);
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn recipes_bind_leading_dash_paths_to_db_option() {
+        let recipes = try_next_commands("-scratch.db");
+        assert!(recipes
+            .iter()
+            .all(|recipe| recipe.command.contains("--db='-scratch.db'")));
+        assert!(recipes
+            .iter()
+            .all(|recipe| !recipe.command.contains("POSIX:")));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rejects_non_utf8_database_paths() {
+        use std::ffi::OsString;
+        use std::os::unix::ffi::OsStringExt;
+
+        let path = PathBuf::from(OsString::from_vec(vec![b'd', b'b', 0xff]));
+        assert!(database_string(&path).is_err());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_recipes_quote_cmd_and_powershell_paths() {
+        assert_eq!(
+            cmd_quote(r"C:\Users\alice\.kindling\demo.db"),
+            r"C:\Users\alice\.kindling\demo.db"
+        );
+        assert_eq!(
+            powershell_quote(r"C:\tmp\o'brien\demo.db"),
+            r#"'C:\tmp\o''brien\demo.db'"#
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn cmd_quote_wraps_paths_that_need_it() {
+        assert_eq!(
+            cmd_quote(r"C:\Program Files\kindling\demo.db"),
+            r#""C:\Program Files\kindling\demo.db""#
+        );
+        assert_eq!(
+            cmd_quote(r"C:\R&D\kindling\demo.db"),
+            r#""C:\R&D\kindling\demo.db""#
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_json_try_next_uses_powershell_recipes() {
+        let json = json_try_next(&try_next_commands(r"C:\Program Files\demo.db"));
+        assert_eq!(json.len(), 4);
+        assert!(json
+            .iter()
+            .all(|command| command.ends_with(r"--db='C:\Program Files\demo.db'")));
     }
 }

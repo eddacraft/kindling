@@ -65,6 +65,47 @@ fn scope_ids_empty_serialises_as_empty_object() {
     );
 }
 
+/// `scopeIds` is a keyed object on the wire. The retired TS validator also
+/// accepted arrays; the Rust types must not (GH-216).
+const ARRAY_SCOPE_IDS: [&str; 2] = ["[]", r#"["x"]"#];
+
+fn assert_rejects_sequence<T: DeserializeOwned>(json: &str) {
+    let err = match serde_json::from_str::<T>(json) {
+        Ok(_) => panic!("array-shaped scopeIds must be rejected: {json}"),
+        Err(e) => e.to_string(),
+    };
+    assert!(
+        err.contains("invalid type: sequence"),
+        "rejected for the wrong reason ({err}): {json}"
+    );
+}
+
+#[test]
+fn scope_ids_rejects_json_arrays() {
+    serde_json::from_str::<ScopeIds>("{}").expect("object control");
+    for array in ARRAY_SCOPE_IDS {
+        assert_rejects_sequence::<ScopeIds>(array);
+    }
+}
+
+#[test]
+fn wire_types_embedding_scope_ids_reject_json_arrays() {
+    // Each template is valid with an object `scopeIds`; only the array form
+    // may make it fail.
+    fn check<T: DeserializeOwned>(template: &str) {
+        let control = template.replace("SCOPE", r#"{"sessionId":"s1"}"#);
+        serde_json::from_str::<T>(&control)
+            .unwrap_or_else(|e| panic!("object control must parse ({e}): {control}"));
+        for array in ARRAY_SCOPE_IDS {
+            assert_rejects_sequence::<T>(&template.replace("SCOPE", array));
+        }
+    }
+
+    check::<ObservationInput>(r#"{"kind":"message","content":"c","scopeIds":SCOPE}"#);
+    check::<RetrieveOptions>(r#"{"query":"q","scopeIds":SCOPE}"#);
+    check::<ListObservationsRequest>(r#"{"scopeIds":SCOPE}"#);
+}
+
 #[test]
 fn observation_full() {
     let o: Observation = round_trip("observation_full.json");

@@ -12,7 +12,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@eddacraft/kindling': resolve(__dirname, '../kindling/src/index.ts'),
+      '@eddacraft/kindling': resolve(import.meta.dirname, '../kindling/src/index.ts'),
     },
   },
 });

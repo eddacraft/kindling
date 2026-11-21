@@ -418,6 +418,31 @@ mod tests {
     }
 
     #[test]
+    fn import_repairs_links_for_existing_capsule() {
+        let mut bundle = seeded().export(export_opts()).unwrap();
+        bundle.dataset.capsules[0].observation_ids = vec!["o1".into()];
+        let dest = KindlingService::open_in_memory().unwrap();
+        dest.store()
+            .create_capsule(&bundle.dataset.capsules[0])
+            .unwrap();
+
+        let repaired = dest.import(&bundle, ImportOptions::default()).unwrap();
+        assert_eq!(repaired.observations, 1);
+        assert_eq!(repaired.capsules, 1);
+        assert!(repaired.errors.is_empty());
+
+        let restored = dest.export(export_opts()).unwrap();
+        assert_eq!(
+            restored.dataset.capsules[0].observation_ids,
+            bundle.dataset.capsules[0].observation_ids
+        );
+
+        let again = dest.import(&bundle, ImportOptions::default()).unwrap();
+        assert_eq!((again.observations, again.capsules), (0, 0));
+        assert!(again.errors.is_empty());
+    }
+
+    #[test]
     fn partial_import_rolls_back_failed_capsule_and_can_retry() {
         let mut bundle = seeded().export(export_opts()).unwrap();
         bundle.dataset.capsules[0].observation_ids = vec!["o1".into(), "missing".into()];

@@ -48,11 +48,14 @@ kindling/
 
 - Rust via `rustup` — the toolchain is pinned in [`rust-toolchain.toml`](rust-toolchain.toml) (MSRV 1.89); `rustup` installs it automatically.
 - A C compiler (`cc`/`clang`/`gcc`, Xcode Command Line Tools on macOS) — SQLite is compiled from source via `rusqlite`'s `bundled` feature.
-- Node.js 24 (see [`.nvmrc`](.nvmrc)) and pnpm 10 — needed for the thin client / adapters and to install the git hooks.
+- Node.js 24 (see [`.nvmrc`](.nvmrc)) and pnpm 12 — needed for the thin client / adapters and to install the git hooks.
 
 See the [README's Development section](README.md#development) for the full setup walkthrough.
 
 ### Development Setup
+
+If Corepack is not already enabled, run `corepack enable`. Corepack will use
+the repository's pinned pnpm version from `package.json`.
 
 ```bash
 git clone https://github.com/eddacraft/kindling.git

@@ -246,11 +246,16 @@ kindling forget <observation-id>
 kindling export | import
 kindling demo   [--reset]
 kindling browse [--output <path>] [--no-open]
+kindling tui    [--db <path>]
 kindling spool status --spool-path <path> [--json]
 kindling serve  [--socket ~/.kindling/kindling.sock]
                 [--idle-timeout 1800] [--daemonize] [--kindling-home <dir>]
 kindling hook   <type>
 ```
+
+The terminal browser uses `eddacraft-tui`, the canonical TUI library for eddacraft
+products, for themed containers, editable search, keyboard hints and terminal
+lifecycle management. Its ratatui and crossterm dependencies match the library.
 
 **Hook types:** `session-start`, `post-tool-use`, `post-tool-use-failure`, `user-prompt-submit`, `subagent-stop`, `stop`, `pre-compact`.
 

@@ -23,7 +23,7 @@ mod output;
 pub use cli::{
     BrowseArgs, CapsuleCloseArgs, CapsuleCommand, CapsuleOpenArgs, Cli, Command, CommonOpts,
     DemoArgs, ExportArgs, ForgetArgs, ImportArgs, InitArgs, ListArgs, LogArgs, PinArgs, SearchArgs,
-    ServeArgs, SpoolCommand, SpoolStatusArgs, StatsArgs, StatusArgs, UnpinArgs, WrapArgs,
+    ServeArgs, SpoolCommand, SpoolStatusArgs, StatsArgs, StatusArgs, TuiArgs, UnpinArgs, WrapArgs,
 };
 
 use std::path::PathBuf;
@@ -74,8 +74,9 @@ pub type CliResult = Result<(), CliError>;
 /// Resolution order (documented in the PORT-012 brief):
 /// 1. an explicit `--db <path>`;
 /// 2. the `KINDLING_DB_PATH` environment override;
-/// 3. the per-project default `project_db_path(default_kindling_home(), cwd)`
-///    via [`kindling_store::resolve_db_path`].
+/// 3. the per-project default `project_db_path(default_kindling_home(), root)`
+///    via [`kindling_store::resolve_db_path`], where `root` is
+///    [`current_project_root`] — the same root the hooks route by.
 ///
 /// This intentionally prefers the per-project store layout over the TS
 /// single-DB default (`~/.kindling/kindling.db`): the Rust daemon model is
@@ -85,8 +86,7 @@ pub fn resolve_db_path(explicit: Option<&str>) -> Result<PathBuf, CliError> {
     if let Some(path) = explicit {
         return Ok(PathBuf::from(path));
     }
-    let cwd = std::env::current_dir()?;
-    let project_root = cwd.to_string_lossy();
+    let project_root = current_project_root()?;
     kindling_store::resolve_db_path(&project_root).ok_or_else(|| {
         CliError::Invalid(
             "could not resolve a database path: no --db, no KINDLING_DB_PATH, \
@@ -94,6 +94,18 @@ pub fn resolve_db_path(explicit: Option<&str>) -> Result<PathBuf, CliError> {
                 .to_string(),
         )
     })
+}
+
+/// The project root for the current working directory, resolved exactly as the
+/// hooks resolve it: `KINDLING_REPO_ROOT` when cwd is inside it, else the Git
+/// toplevel, else cwd (see [`hook::project::project_root`]).
+///
+/// Both the embedded ([`resolve_db_path`]) and daemon ([`build_client`]) paths
+/// route through here, so a CLI run from a repository subdirectory opens the
+/// same per-project database the hooks write (GH-205).
+pub(crate) fn current_project_root() -> Result<String, CliError> {
+    let cwd = std::env::current_dir()?;
+    Ok(hook::project::project_root(&cwd.to_string_lossy()))
 }
 
 /// Open an in-process service at the resolved DB path.
@@ -150,6 +162,7 @@ fn json_flag(command: &Command) -> bool {
         Command::Serve(_) => false,
         Command::Demo(a) => a.common.json,
         Command::Browse(a) => a.common.json,
+        Command::Tui(a) => a.common.json,
         Command::Wrap(a) => a.common.json,
         Command::Spool(SpoolCommand::Status(a)) => a.json,
     }
@@ -179,6 +192,7 @@ fn dispatch(cli: Cli) -> Result<i32, CliError> {
         Command::Serve(args) => commands::serve::run(args).map(|()| 0),
         Command::Demo(args) => commands::demo::run(args).map(|()| 0),
         Command::Browse(args) => commands::browse::run(args).map(|()| 0),
+        Command::Tui(args) => commands::tui::run(args).map(|()| 0),
         Command::Spool(SpoolCommand::Status(args)) => commands::spool::run_status(args).map(|()| 0),
     }
 }
@@ -196,8 +210,8 @@ fn dispatch(cli: Cli) -> Result<i32, CliError> {
 /// we reject the combination: when `explicit_db` is `Some`, return a clear
 /// [`CliError::Invalid`] telling the user to drop `--db` (use the per-project
 /// default) or drop `--via-daemon` (embedded mode honours `--db`). When
-/// `explicit_db` is `None`, behave as before — [`kindling_client::Client::new`]
-/// routes by the current working directory (mirroring `ClientConfig::defaults`).
+/// `explicit_db` is `None`, route by [`current_project_root`] (the hooks'
+/// project root) on top of `ClientConfig::defaults`.
 ///
 /// All daemon-backed verbs (log, capsule open/close, search, pin, unpin, forget)
 /// build their client through here, so the rejection covers every daemon path.
@@ -212,7 +226,9 @@ pub(crate) fn build_client(explicit_db: Option<&str>) -> Result<kindling_client:
                 .to_string(),
         ));
     }
-    Ok(kindling_client::Client::new()?)
+    let mut config = kindling_client::ClientConfig::defaults()?;
+    config.project_root = current_project_root()?;
+    Ok(kindling_client::Client::with_config(config))
 }
 
 /// A small single-threaded Tokio runtime for the async client/serve paths.

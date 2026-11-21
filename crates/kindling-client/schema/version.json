@@ -1,5 +1,7 @@
 {
-  "version": 6,
+  "version": 7,
+  "minReader": 6,
+  "wireVersion": 6,
   "minCompatible": 1,
   "ftsTokenizer": "porter unicode61"
 }
