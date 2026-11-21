@@ -162,12 +162,15 @@ mod tests {
 
         let guard = acquire_pid_lock(&path).expect("leftovers must not block acquisition");
         assert_eq!(fs::read_to_string(&path).unwrap(), me().to_string());
+        // Read the lock file only after releasing it: LockFileEx is mandatory
+        // on Windows, so even this process can't read it through another
+        // handle while the lock is held.
+        drop(guard);
         assert_eq!(
             fs::read(&lock_path).unwrap(),
             b"leftover",
             "the lock file must be opened without truncation"
         );
-        drop(guard);
     }
 
     #[test]
