@@ -25,6 +25,7 @@ ended with v0.4.0.
 - `/v1/health` and `kindling status --json` report `schemaVersion` from `wireVersion` (6) alongside `schemaRevision` (7); Rust and TypeScript clients validate `schemaVersion` against the supported wire range.
 - **Documented which tool results the Claude Code hooks capture.** Bash output is the only tool result stored (known secret patterns masked, capped at about 10,000 characters); other tools keep inputs only. Behaviour is unchanged, and there is no setting: the retired adapter's `captureResults`, `captureUserMessages` and `captureSubagents` switches have no replacement. See the plugin's [Privacy](plugins/kindling-claude-code/README.md#privacy) section for detail (#217).
 - The PocketFlow adapter's `ConfidenceConfig` no longer advertises `successIncrement` and `failureDecrement`, which never affected the confidence score. Remove them from any `ConfidenceTracker` configuration.
+- The Rust client (`kindling-client`, the Claude Code hooks, and `kindling-runtime` with `external-spawn`) now honours `KINDLING_BIN` when it auto-spawns the daemon, matching the TypeScript client. An empty value is treated as unset; otherwise `kindling` on `PATH` is used as before.
 
 ### Deprecated
 

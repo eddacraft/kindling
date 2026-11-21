@@ -45,6 +45,18 @@ at each release; older distribution approaches may now be superseded.
 
 ### Changed
 
+- **Rust client honours `KINDLING_BIN` when auto-spawning the daemon (GH-184, PR #272).**
+  `Spawner::Command` execs `$KINDLING_BIN` when it is set and non-empty, and
+  `kindling` on `PATH` otherwise, matching the TypeScript client's
+  `resolveBinaryPath`. The value is read with `var_os`, so a non-UTF-8 path is
+  honoured rather than silently dropped, and a launcher that exits at once is
+  reported under the binary that actually ran. This reaches the Claude Code
+  hooks and `kindling-runtime` with `external-spawn`. The missing-binary test
+  that sets the variable runs alone in its own test binary
+  (`tests/default_spawner.rs`) so the environment is never changed under
+  concurrent tests. The `kindling-runtime` integration suite is gated on
+  `embedded-daemon`, and CI builds it with `--no-default-features` so the
+  gating stays checked.
 - **Tool-result capture contract for the Rust hook (#217).** The TS→Rust
   port dropped the retired Claude adapter's `captureResults` setting.
   `format_tool_content` in `crates/kindling/src/hook/mapping.rs` was left

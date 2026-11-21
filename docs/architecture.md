@@ -399,7 +399,7 @@ kindling reads its home directory and daemon settings from the environment and t
 | Per-project DB           | `~/.kindling/projects/<hash>/kindling.db` | `KINDLING_DB_PATH` / `--db`; else derived from project root |
 | Project root             | git toplevel of cwd                       | `KINDLING_REPO_ROOT` (only if cwd is inside it)             |
 | Socket                   | `~/.kindling/kindling.sock`               | `kindling serve --socket`; hooks honour `KINDLING_SOCK`     |
-| Binary (TS client)       | `kindling` on `PATH`                      | `KINDLING_BIN`                                              |
+| Daemon binary (clients)  | `kindling` on `PATH`                      | `KINDLING_BIN` (Rust and TS clients; empty = unset)         |
 | Session-start recent cap | `10` observations                         | `KINDLING_MAX_CONTEXT` (hooks)                              |
 | Idle timeout             | `1800` seconds (30 min)                   | `kindling serve --idle-timeout`                             |
 | Daemonize                | off                                       | `kindling serve --daemonize`                                |

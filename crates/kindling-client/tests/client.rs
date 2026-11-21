@@ -463,33 +463,6 @@ async fn spawn_failure_writes_spawn_log() {
     );
 }
 
-/// 4b. Default `Spawner::Command` execs the (absent in CI) `kindling` binary;
-/// the call must still fail cleanly with Unavailable, not panic or hang.
-#[tokio::test]
-async fn default_spawner_missing_binary_is_unavailable() {
-    let dir = tempfile::tempdir().unwrap();
-    let socket_path: PathBuf = dir.path().join("nonexistent.sock");
-
-    let client = Client::with_config(ClientConfig {
-        socket_path,
-        port_path: dir.path().join("nonexistent.port"),
-        project_root: PROJECT_A.to_string(),
-        expected_schema_version: schema_version_u32(),
-        connect_timeout: Duration::from_millis(200),
-        poll_interval: Duration::from_millis(10),
-        spawn: Spawner::Command, // execs `kindling`, not on PATH in CI
-        transport: Transport::Uds,
-        spawn_log_path: None,
-    });
-
-    let result = tokio::time::timeout(Duration::from_secs(3), client.health()).await;
-    let outcome = result.expect("call must not hang");
-    assert!(
-        matches!(outcome, Err(ClientError::Unavailable(_))),
-        "expected Unavailable, got {outcome:?}"
-    );
-}
-
 /// 5. API error mapping: closing a nonexistent capsule → Api { status: 404 }.
 #[tokio::test]
 async fn api_error_mapping_404() {
