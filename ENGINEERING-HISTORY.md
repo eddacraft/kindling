@@ -101,6 +101,36 @@ at each release; older distribution approaches may now be superseded.
 
 ### Fixed
 
+- **Exact composite ranking in the local FTS provider (#188).**
+  `LocalFtsProvider::search` applied `ORDER BY f.rank LIMIT max_results` to
+  each entity type before BM25 normalization and the recency blend. A match
+  outside a type's BM25 shortlist was never scored even when its composite
+  score was higher, and normalization ran over the shortlist only, so scores
+  changed with the limit. The orchestrator passes `max_candidates` (default 10)
+  as that limit, so any query with more than 10 matches of one type could be
+  affected. The provider now reads `(rowid, id, rank, recency)` for every
+  filtered match of both types, normalizes and scores in Rust (same formula and
+  rounding), takes the top `max_results` with `select_nth_unstable_by`, and
+  hydrates only those rows by rowid. Ties are ordered observations first, then
+  BM25 rank, then `id` (previously equal-rank order was unspecified). The scan
+  and hydration share one read transaction when the connection is in autocommit
+  mode; a hydration miss or id mismatch is an error. Non-finite scores map to
+  0.0. Row-decoding errors now surface only for returned rows.
+  - Two frozen TS-parity entries were hand-edited, both cases that limit below
+    the match count: search "scoped to repo with maxResults" keeps the same ids
+    with corrected scores (0.8176/0.8076 to 0.8551/0.8451), and retrieve
+    "session scope with maxCandidates" changes from `[obs-4 0.7, obs-5 0.28]`
+    to `[obs-5 0.8551, obs-6 0.8451]`, the prefix of the unlimited case.
+  - Cost: every match's base row is now read to get `ts` and the scope
+    columns. On the small-content `ranked-retrieve` bench (2k-200k matches) p50
+    is unchanged (200k: 169 ms before, 156 ms after). With 8 KB content, where
+    those columns sit behind the content overflow pages, an unscoped query over
+    20k matches went from 15 ms to 83 ms (100k: 73 ms to 397 ms). The old query
+    was fast there because `LIMIT` stopped the join early. Selective scopes got
+    faster, because without `ORDER BY` the planner can drive from the scope
+    index (200k matches, 1% scope: 225 ms to 44 ms). Moving `ts` and the scope
+    ids into the FTS table as `UNINDEXED` columns would remove the base-row
+    reads; that is a schema change and is left for a separate proposal.
 - **Daemon ownership is an OS file lock (GH-171).** `acquire_pid_lock`
   replaced a check-then-act protocol on PID-file contents (read, liveness
   check, remove, write) that had no mutual exclusion: concurrent starters

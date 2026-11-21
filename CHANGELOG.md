@@ -42,6 +42,7 @@ ended with v0.4.0.
 
 ### Fixed
 
+- **Search now returns the true best matches.** Retrieval scored only each type's top text matches before blending in recency, so a recent but weaker match could be left out, and a result's score changed with `maxCandidates`. Every matching observation and summary is now scored first, so results and scores no longer depend on the limit. For queries with more matches than `maxCandidates` (default 10), both the order and the scores themselves may change, so anyone filtering on a score threshold may see different results.
 - Starting kindling from several tools at once can no longer leave two daemons
   writing to the same store. Ownership is now an operating-system lock on
   `~/.kindling/kindling.lock`, which is released automatically if the daemon
