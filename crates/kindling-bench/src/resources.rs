@@ -214,6 +214,41 @@ fn panic_message(payload: Box<dyn Any + Send>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+
+    #[test]
+    fn drop_signals_the_worker_and_waits_for_it_to_exit() {
+        // The worker records whether it was told to stop, then lingers on its
+        // way out. `exited` can only be true when `drop` returns if drop both
+        // signalled the worker (otherwise it times out and records false) and
+        // joined it (otherwise drop returns while the worker is still asleep).
+        let exited = Arc::new(AtomicBool::new(false));
+        let (stop, worker_stop) = mpsc::channel::<()>();
+        let worker_exited = Arc::clone(&exited);
+        let handle = thread::spawn(move || {
+            let signalled = matches!(
+                worker_stop.recv_timeout(Duration::from_secs(10)),
+                Err(mpsc::RecvTimeoutError::Disconnected)
+            );
+            thread::sleep(Duration::from_millis(100));
+            worker_exited.store(signalled, Ordering::SeqCst);
+            Snapshot::default()
+        });
+        let sampler = ResourceSampler {
+            before: Snapshot::default(),
+            stop: Some(stop),
+            handle: Some(handle),
+            measurement_scope: "in-process",
+        };
+
+        drop(sampler);
+
+        assert!(
+            exited.load(Ordering::SeqCst),
+            "drop returned before the signalled worker exited"
+        );
+    }
 
     #[test]
     fn worker_panic_is_reported_instead_of_defaulting_snapshot() {
