@@ -34,6 +34,9 @@ ended with v0.4.0.
 
 ### Security
 
+- Updated the Vite test dependency to 8.3.8 to address five development-tooling
+  advisories. Vite is used by Vitest during development (#278).
+
 - Resolved Dependabot alerts in development tooling (`minimatch`, `@azure/msal-node`). None of these ship in kindling, its crates or the VSIX.
 
 ### Fixed

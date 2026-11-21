@@ -70,6 +70,12 @@ at each release; older distribution approaches may now be superseded.
 
 ### Security
 
+- **Vite test tooling upgraded (PR #278).** The workspace uses Vite 8.3.8
+  with Vitest 5.1.1, moving outside the five Vite advisory ranges affecting
+  7.3.5. Vite brings Rolldown 1.2.19 and the Rollup override is removed.
+  The PostCSS and Picomatch overrides follow Vite’s declared minimums.
+  VSIX packaging continues to use its direct esbuild dependency.
+
 - **Development-tooling dependency alerts resolved (PR #299).** Two alerts
   that Dependabot could not fix within the existing version ranges are now
   closed, both under `@vscode/vsce`. `@azure/identity` refreshes to 4.14.1,
