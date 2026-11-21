@@ -1,5 +1,6 @@
 //! Client configuration and the daemon-spawn abstraction.
 
+use std::ffi::OsString;
 use std::io;
 use std::path::PathBuf;
 use std::process::{Child, Command, ExitStatus, Stdio};
@@ -133,12 +134,14 @@ pub enum Transport {
 
 /// How the client starts the daemon when it is not already running.
 ///
-/// The default execs the real `kindling` binary; tests inject a closure that
+/// The default execs the real `kindling` binary (`$KINDLING_BIN`, else
+/// `kindling` on `PATH`); tests inject a closure that
 /// starts an in-process daemon so cold-spawn can be exercised without the
 /// (not-yet-built) binary on `PATH`.
 #[derive(Clone, Default)]
 pub enum Spawner {
-    /// Production path: `kindling serve --daemonize`. The launcher is reaped
+    /// Production path: `kindling serve --daemonize`, using `$KINDLING_BIN`
+    /// when set and non-empty, else `kindling` on `PATH`. The launcher is reaped
     /// in the background so an immediate exit cannot linger as a zombie in a
     /// long-lived Unix host; the daemon itself is not awaited on the connect
     /// path. A missing binary surfaces as a spawn error, which the connect
@@ -167,11 +170,29 @@ impl Spawner {
     }
 }
 
+/// The daemon binary [`Spawner::Command`] execs: `$KINDLING_BIN` when set and
+/// non-empty, otherwise `kindling` resolved on `PATH`. Same rule as the
+/// TypeScript client's `resolveBinaryPath`. Read with `var_os` so a non-UTF-8
+/// path is honoured rather than silently ignored.
+fn kindling_binary() -> OsString {
+    binary_from_override(std::env::var_os("KINDLING_BIN"))
+}
+
+/// Pure half of [`kindling_binary`], split out so the rule is unit-testable
+/// without mutating the process environment.
+fn binary_from_override(value: Option<OsString>) -> OsString {
+    match value {
+        Some(bin) if !bin.is_empty() => bin,
+        _ => OsString::from("kindling"),
+    }
+}
+
 /// `kindling serve --daemonize` with stdio detached and, on Unix, its own
 /// process group. The returned child is adopted so a failed launcher is
 /// reaped instead of being dropped.
 fn spawn_kindling_command() -> io::Result<()> {
-    let mut cmd = Command::new("kindling");
+    let program = kindling_binary();
+    let mut cmd = Command::new(&program);
     cmd.args(["serve", "--daemonize"])
         // Detach the daemon's stdio from ours. Without this the
         // long-lived daemon inherits the spawner's stdout — fatal
@@ -189,14 +210,15 @@ fn spawn_kindling_command() -> io::Result<()> {
         use std::os::unix::process::CommandExt;
         cmd.process_group(0);
     }
-    adopt_child(cmd.spawn()?)
+    adopt_child(cmd.spawn()?, &program)
 }
 
 /// Reap `child` if it has already exited; otherwise wait for it on a
-/// background thread so a later exit cannot linger as a zombie.
-fn adopt_child(mut child: Child) -> io::Result<()> {
+/// background thread so a later exit cannot linger as a zombie. `program` is
+/// the binary that was run, named in the error if it has already failed.
+fn adopt_child(mut child: Child, program: &std::ffi::OsStr) -> io::Result<()> {
     match child.try_wait()? {
-        Some(status) => child_status_result(status),
+        Some(status) => child_status_result(status, program),
         None => {
             std::thread::Builder::new()
                 .name("kindling-spawn-reaper".to_string())
@@ -208,12 +230,13 @@ fn adopt_child(mut child: Child) -> io::Result<()> {
     }
 }
 
-fn child_status_result(status: ExitStatus) -> io::Result<()> {
+fn child_status_result(status: ExitStatus, program: &std::ffi::OsStr) -> io::Result<()> {
     if status.success() {
         Ok(())
     } else {
         Err(io::Error::other(format!(
-            "kindling serve --daemonize exited immediately ({status})"
+            "{} serve --daemonize exited immediately ({status})",
+            std::path::Path::new(program).display()
         )))
     }
 }
@@ -252,8 +275,9 @@ pub struct ClientConfig {
     /// Interval between socket-connect attempts while polling for the daemon.
     /// Defaults to 10ms.
     pub poll_interval: Duration,
-    /// How to start the daemon when it is not running. Defaults to the real
-    /// `kindling serve --daemonize` binary.
+    /// How to start the daemon when it is not running. Defaults to
+    /// [`Spawner::Command`]: `kindling serve --daemonize`, using `$KINDLING_BIN`
+    /// when set and non-empty.
     pub spawn: Spawner,
     /// Transport to reach the daemon. Defaults to [`Transport::default`] (UDS
     /// on Unix, TCP on Windows).
@@ -368,6 +392,19 @@ mod tests {
     use super::*;
 
     #[test]
+    fn kindling_bin_override_falls_back_to_path_when_unset_or_empty() {
+        assert_eq!(binary_from_override(None), OsString::from("kindling"));
+        assert_eq!(
+            binary_from_override(Some(OsString::new())),
+            OsString::from("kindling")
+        );
+        assert_eq!(
+            binary_from_override(Some(OsString::from("/opt/kindling/bin/kindling"))),
+            OsString::from("/opt/kindling/bin/kindling")
+        );
+    }
+
+    #[test]
     fn expected_schema_version_parses_to_six_and_revision_to_seven() {
         assert_eq!(EXPECTED_SCHEMA_VERSION, 6);
         assert_eq!(MAX_WIRE_VERSION, 6);
@@ -400,9 +437,13 @@ mod tests {
         let mut child = Command::new("false").spawn().expect("spawn false");
         let status = child.wait().expect("wait for false");
         assert!(!status.success());
-        let err = adopt_child(child).expect_err("failed launcher must surface");
+        // The error names the binary that actually ran, which can be a
+        // `$KINDLING_BIN` override rather than `kindling` on `PATH`.
+        let err = adopt_child(child, std::ffi::OsStr::new("/opt/custom/kindling"))
+            .expect_err("failed launcher must surface");
         assert!(
-            err.to_string().contains("exited immediately"),
+            err.to_string()
+                .contains("/opt/custom/kindling serve --daemonize exited immediately"),
             "unexpected error: {err}"
         );
     }
@@ -413,7 +454,8 @@ mod tests {
         let mut child = Command::new("true").spawn().expect("spawn true");
         let status = child.wait().expect("wait for true");
         assert!(status.success());
-        adopt_child(child).expect("successful launcher is already reaped");
+        adopt_child(child, std::ffi::OsStr::new("true"))
+            .expect("successful launcher is already reaped");
     }
 
     #[cfg(unix)]
@@ -424,7 +466,7 @@ mod tests {
             .spawn()
             .expect("spawn exiting shell");
         let pid = child.id();
-        let _ = adopt_child(child);
+        let _ = adopt_child(child, std::ffi::OsStr::new("sh"));
         assert_reaped(pid);
     }
 
@@ -436,7 +478,7 @@ mod tests {
             .spawn()
             .expect("spawn sleep");
         let pid = child.id();
-        adopt_child(child).expect("live child is adopted");
+        adopt_child(child, std::ffi::OsStr::new("sh")).expect("live child is adopted");
 
         // The daemon path must not wait() in the foreground; the process stays up.
         std::thread::sleep(Duration::from_millis(50));

@@ -81,6 +81,10 @@ Each group reports:
 - **logical** `logicalReadBytes` / `logicalWriteBytes` (`rchar` / `wchar`) which
   still advance when physical counters stay flat.
 
+If the background resource sampler fails, the benchmark returns an error instead
+of emitting a successful report with fabricated default resource measurements.
+Successful reports retain the schema described above.
+
 Unsupported operating systems return `available: false` and `null` resource
 fields while still producing latency, throughput, and storage measurements.
 

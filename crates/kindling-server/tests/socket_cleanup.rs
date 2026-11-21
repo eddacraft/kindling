@@ -102,6 +102,14 @@ async fn shutdown_removes_the_bound_socket() {
         !cfg.socket_path.exists(),
         "daemon should unlink the socket it bound"
     );
+    assert!(
+        !cfg.pid_path.exists(),
+        "daemon should remove its pid file on clean shutdown"
+    );
+    assert!(
+        kindling_server::lock_path_for(&cfg.pid_path).exists(),
+        "the ownership lock file is never deleted"
+    );
 }
 
 #[tokio::test]

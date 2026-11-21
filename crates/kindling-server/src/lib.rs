@@ -38,10 +38,12 @@
 //!
 //! # Lifecycle
 //!
-//! [`serve`] acquires a PID lock (cleaning up a stale file — see [`pid`]), binds
-//! the UDS at mode `0600`, builds the router, and runs until idle. The daemon
-//! shuts down after [`ServerConfig::idle_timeout`] of no in-flight and no
-//! recent requests, then removes the socket and PID file.
+//! [`serve`] takes the exclusive ownership lock (an OS file lock the kernel
+//! releases if the daemon dies, so there is no stale-file cleanup — see
+//! [`pid`]), binds the UDS at mode `0600`, builds the router, and runs until
+//! idle. The daemon shuts down after [`ServerConfig::idle_timeout`] of no
+//! in-flight and no recent requests, then removes the socket and PID file and
+//! releases the lock. The lock file itself is never deleted.
 
 mod config;
 mod dto;
@@ -54,7 +56,7 @@ mod state;
 pub use config::{ServerConfig, Transport, DEFAULT_IDLE_TIMEOUT};
 pub use error::{ApiError, ServerError};
 pub use handlers::{PROJECT_HEADER, SESSION_HEADER};
-pub use pid::{acquire_pid_lock, PidGuard};
+pub use pid::{acquire_pid_lock, lock_path_for, PidGuard};
 pub use state::AppState;
 
 use std::sync::Arc;

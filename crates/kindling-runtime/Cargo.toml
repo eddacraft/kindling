@@ -28,7 +28,8 @@ client = ["dep:kindling-client"]
 spool = ["client", "kindling-client/spool"]
 # In-process `kindling-server` started on a tokio task — no `kindling` on PATH.
 embedded-daemon = ["client", "dep:kindling-server"]
-# Fall back to spawning the real `kindling` binary on PATH (Spawner::Command).
+# Fall back to spawning the real `kindling` binary (Spawner::Command):
+# `$KINDLING_BIN` when set and non-empty, else `kindling` on PATH.
 external-spawn = ["client"]
 
 # Build docs.rs with every feature so the spool + embedded surfaces appear in

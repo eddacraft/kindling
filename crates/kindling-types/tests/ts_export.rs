@@ -18,39 +18,39 @@ fn bindings_dir() -> PathBuf {
 
 #[test]
 fn export_all_types_to_bindings_dir() {
-    // `export_all_to` writes (or overwrites) one file per type. ts-rs handles
-    // creating the directory if needed.
-    let dir = bindings_dir();
+    // `export_all` writes (or overwrites) one file per type into `cfg.out_dir()`.
+    // ts-rs handles creating the directory if needed.
+    let cfg = ts_rs::Config::new().with_out_dir(bindings_dir());
     let exports: Vec<Result<(), ts_rs::ExportError>> = vec![
-        Capability::export_all_to(&dir),
-        CapabilityFeature::export_all_to(&dir),
-        KindRegistryEntry::export_all_to(&dir),
-        ScopeIds::export_all_to(&dir),
-        ValidationError::export_all_to(&dir),
-        Observation::export_all_to(&dir),
-        ObservationInput::export_all_to(&dir),
-        Capsule::export_all_to(&dir),
-        CapsuleInput::export_all_to(&dir),
-        Summary::export_all_to(&dir),
-        SummaryInput::export_all_to(&dir),
-        Pin::export_all_to(&dir),
-        PinInput::export_all_to(&dir),
-        RetrieveOptions::export_all_to(&dir),
-        RetrieveResult::export_all_to(&dir),
-        RetrieveProvenance::export_all_to(&dir),
-        PinResult::export_all_to(&dir),
-        CandidateResult::export_all_to(&dir),
-        ProviderSearchOptions::export_all_to(&dir),
-        ProviderSearchResult::export_all_to(&dir),
-        GenericEvent::export_all_to(&dir),
-        GenericEventScope::export_all_to(&dir),
-        GenericEventReceipt::export_all_to(&dir),
-        GenericEventLookup::export_all_to(&dir),
-        GenericEventForget::export_all_to(&dir),
-        GenericEventLimits::export_all_to(&dir),
-        RejectReason::export_all_to(&dir),
-        ConflictKind::export_all_to(&dir),
-        CommitFailure::export_all_to(&dir),
+        Capability::export_all(&cfg),
+        CapabilityFeature::export_all(&cfg),
+        KindRegistryEntry::export_all(&cfg),
+        ScopeIds::export_all(&cfg),
+        ValidationError::export_all(&cfg),
+        Observation::export_all(&cfg),
+        ObservationInput::export_all(&cfg),
+        Capsule::export_all(&cfg),
+        CapsuleInput::export_all(&cfg),
+        Summary::export_all(&cfg),
+        SummaryInput::export_all(&cfg),
+        Pin::export_all(&cfg),
+        PinInput::export_all(&cfg),
+        RetrieveOptions::export_all(&cfg),
+        RetrieveResult::export_all(&cfg),
+        RetrieveProvenance::export_all(&cfg),
+        PinResult::export_all(&cfg),
+        CandidateResult::export_all(&cfg),
+        ProviderSearchOptions::export_all(&cfg),
+        ProviderSearchResult::export_all(&cfg),
+        GenericEvent::export_all(&cfg),
+        GenericEventScope::export_all(&cfg),
+        GenericEventReceipt::export_all(&cfg),
+        GenericEventLookup::export_all(&cfg),
+        GenericEventForget::export_all(&cfg),
+        GenericEventLimits::export_all(&cfg),
+        RejectReason::export_all(&cfg),
+        ConflictKind::export_all(&cfg),
+        CommitFailure::export_all(&cfg),
     ];
 
     for (i, r) in exports.into_iter().enumerate() {

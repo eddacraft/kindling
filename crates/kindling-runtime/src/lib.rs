@@ -107,8 +107,9 @@ pub enum SpawnStrategy {
     /// binary, no `kindling` on `PATH`. This is the default.
     #[default]
     Embedded,
-    /// Exec the real `kindling` binary on `PATH` (requires the `external-spawn`
-    /// feature). For hosts that ship the CLI separately.
+    /// Exec the real `kindling` binary: `$KINDLING_BIN` when set and non-empty,
+    /// else `kindling` on `PATH` (requires the `external-spawn` feature). For
+    /// hosts that ship the CLI separately.
     External,
     /// Never spawn. Attach to an already-running daemon or fail with
     /// [`ClientError::Unavailable`](kindling_client::ClientError::Unavailable).

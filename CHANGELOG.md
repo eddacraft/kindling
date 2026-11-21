@@ -25,20 +25,43 @@ ended with v0.4.0.
 - `/v1/health` and `kindling status --json` report `schemaVersion` from `wireVersion` (6) alongside `schemaRevision` (7); Rust and TypeScript clients validate `schemaVersion` against the supported wire range.
 - **Documented which tool results the Claude Code hooks capture.** Bash output is the only tool result stored (known secret patterns masked, capped at about 10,000 characters); other tools keep inputs only. Behaviour is unchanged, and there is no setting: the retired adapter's `captureResults`, `captureUserMessages` and `captureSubagents` switches have no replacement. See the plugin's [Privacy](plugins/kindling-claude-code/README.md#privacy) section for detail (#217).
 - The PocketFlow adapter's `ConfidenceConfig` no longer advertises `successIncrement` and `failureDecrement`, which never affected the confidence score. Remove them from any `ConfidenceTracker` configuration.
+- The Rust client (`kindling-client`, the Claude Code hooks, and `kindling-runtime` with `external-spawn`) now honours `KINDLING_BIN` when it auto-spawns the daemon, matching the TypeScript client. An empty value is treated as unset; otherwise `kindling` on `PATH` is used as before.
+
+### Deprecated
+
+- `kindling_server::inject::format_session_start` is deprecated in favour of
+  `format_session_start_with`, which takes a per-timestamp offset resolver.
+  The old function still compiles and behaves as before.
 
 ### Security
+
+- Updated the Vite test dependency to 8.3.8 to address five development-tooling
+  advisories. Vite is used by Vitest during development (#278).
 
 - Resolved Dependabot alerts in development tooling (`minimatch`, `@azure/msal-node`). None of these ship in kindling, its crates or the VSIX.
 
 ### Fixed
 
 - **Search now returns the true best matches.** Retrieval scored only each type's top text matches before blending in recency, so a recent but weaker match could be left out, and a result's score changed with `maxCandidates`. Every matching observation and summary is now scored first, so results and scores no longer depend on the limit. For queries with more matches than `maxCandidates` (default 10), both the order and the scores themselves may change, so anyone filtering on a score threshold may see different results.
+- Starting kindling from several tools at once can no longer leave two daemons
+  writing to the same store. Ownership is now an operating-system lock on
+  `~/.kindling/kindling.lock`, which is released automatically if the daemon
+  crashes, so a stale PID file never blocks startup. Leave the lock file in
+  place; deleting it while a daemon runs defeats the lock. For Rust users of
+  `kindling-server`, `ServerError::AlreadyRunning` now carries `Option<i32>`,
+  which is `None` when the running daemon's PID can't be read (#171).
+- SessionStart context renders each observation's timestamp in the
+  daylight-saving offset that applied at that time, rather than an hour off
+  for observations from the other side of a DST change.
 - `kindling search --kind`, `--after` and `--before` now filter up to the top 10,000 matches. Before, they filtered only the first 10, so matches could be missing even with a large `--max`. When the cap is reached, the output says so.
 - **Contributor package-manager tooling now requires pnpm 12.** Enable Corepack
   with `corepack enable` so the repository's pinned pnpm version is used.
 - Project-root overrides now reject sibling directories with similar path prefixes, preventing incorrect repository selection.
 - Invalid project-root requests are rejected rather than queued for retry.
 - Installer fallback respects a pinned Kindling version and non-default Cargo installation locations.
+- Demo command recipes now use labelled, shell-appropriate quoting across POSIX shells, Windows cmd.exe and PowerShell, including paths with spaces, shell metacharacters and leading dashes. `kindling demo --json` lists one command per action in `tryNext` (PowerShell syntax on Windows).
+- The CLI now opens the same project database as the Claude Code hooks when run from a repository subdirectory, so hook-captured memory is visible and CLI writes no longer split across per-directory databases. This applies embedded and with `--via-daemon`; `--db`, `KINDLING_DB_PATH` and `KINDLING_REPO_ROOT` still take precedence.
+  - **Upgrade note:** data the CLI previously wrote while run from a subdirectory stays in that subdirectory's database and is not migrated. On Windows this also applies to data written from the repository root, because Git reports the root with forward slashes. To bring it across, run `kindling export` with `--db` set to the old database, then `kindling import` from the repository.
 - API requests that send `scopeIds` as a JSON array are now rejected with a 4xx. Previously `[]` was treated as an empty scope and `["x"]` was silently read as `{ "sessionId": "x" }`. Send `scopeIds` as an object.
 - The observation list documentation no longer promises that an observation written mid-traversal is always returned. A later page returns it only if its timestamp and id sort after the cursor; one written with an earlier timestamp appears in the next traversal.
 

@@ -1,7 +1,8 @@
 //! Low-overhead process resource sampling for repeatable workload profiles.
 
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::any::Any;
+use std::fmt;
+use std::sync::mpsc::{self, Sender};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
@@ -59,11 +60,28 @@ pub struct ResourceSummary {
     pub logical_write_bytes: Option<u64>,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum SamplerError {
+    WorkerPanicked(String),
+}
+
+impl fmt::Display for SamplerError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::WorkerPanicked(message) => {
+                write!(formatter, "resource sampler worker panicked: {message}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for SamplerError {}
+
 /// Background sampler. On Linux it samples `/proc/self`; elsewhere resource
 /// fields are reported as unavailable without failing the benchmark.
 pub struct ResourceSampler {
     before: Snapshot,
-    stop: Arc<AtomicBool>,
+    stop: Option<Sender<()>>,
     handle: Option<JoinHandle<Snapshot>>,
     measurement_scope: &'static str,
 }
@@ -83,12 +101,10 @@ impl ResourceSampler {
 
     fn start_self(interval: Duration, measurement_scope: &'static str) -> Self {
         let before = snapshot();
-        let stop = Arc::new(AtomicBool::new(false));
-        let thread_stop = Arc::clone(&stop);
+        let (stop, thread_stop) = mpsc::channel();
         let handle = thread::spawn(move || {
             let mut peak = snapshot();
-            while !thread_stop.load(Ordering::Relaxed) {
-                thread::sleep(interval);
+            while let Err(mpsc::RecvTimeoutError::Timeout) = thread_stop.recv_timeout(interval) {
                 let current = snapshot();
                 peak.rss_kib = option_max(peak.rss_kib, current.rss_kib);
                 peak.threads = option_max(peak.threads, current.threads);
@@ -98,20 +114,15 @@ impl ResourceSampler {
         });
         Self {
             before,
-            stop,
+            stop: Some(stop),
             handle: Some(handle),
             measurement_scope,
         }
     }
 
-    #[must_use]
-    pub fn finish(mut self) -> ResourceSummary {
-        self.stop.store(true, Ordering::Relaxed);
-        let peak = self
-            .handle
-            .take()
-            .and_then(|handle| handle.join().ok())
-            .unwrap_or_default();
+    #[must_use = "finish the sampler and handle measurement failure"]
+    pub fn finish(mut self) -> Result<ResourceSummary, SamplerError> {
+        let peak = self.stop_and_join()?;
         let after = snapshot();
         let ncpus = thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get);
         let cpu_cores = match (
@@ -136,7 +147,7 @@ impl ResourceSampler {
         let rss_end_mib = after.rss_kib.map(kib_to_mib);
         let peak_rss_mib = peak_rss_kib.map(kib_to_mib);
 
-        ResourceSummary {
+        Ok(ResourceSummary {
             platform: std::env::consts::OS.to_string(),
             available: self.before.rss_kib.is_some(),
             measurement_scope: self.measurement_scope.to_string(),
@@ -164,7 +175,98 @@ impl ResourceSampler {
             write_bytes: delta(self.before.write_bytes, after.write_bytes),
             logical_read_bytes: delta(self.before.rchar, after.rchar),
             logical_write_bytes: delta(self.before.wchar, after.wchar),
-        }
+        })
+    }
+
+    fn stop_and_join(&mut self) -> Result<Snapshot, SamplerError> {
+        self.stop.take();
+        self.handle
+            .take()
+            .map(|handle| {
+                handle
+                    .join()
+                    .map_err(|payload| SamplerError::WorkerPanicked(panic_message(payload)))
+            })
+            .unwrap_or_else(|| Ok(Snapshot::default()))
+    }
+}
+
+impl Drop for ResourceSampler {
+    fn drop(&mut self) {
+        // Cancellation-safe cleanup: error or early-return paths can drop a
+        // sampler without calling `finish`. Signal the polling thread to exit
+        // and join it so it does not keep running detached past the sampler's
+        // lifetime.
+        let _ = self.stop_and_join();
+    }
+}
+
+fn panic_message(payload: Box<dyn Any + Send>) -> String {
+    if let Some(message) = payload.downcast_ref::<&str>() {
+        (*message).to_owned()
+    } else if let Some(message) = payload.downcast_ref::<String>() {
+        message.clone()
+    } else {
+        "non-string panic payload".to_owned()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+
+    #[test]
+    fn drop_signals_the_worker_and_waits_for_it_to_exit() {
+        // The worker records whether it was told to stop, then lingers on its
+        // way out. `exited` can only be true when `drop` returns if drop both
+        // signalled the worker (otherwise it times out and records false) and
+        // joined it (otherwise drop returns while the worker is still asleep).
+        let exited = Arc::new(AtomicBool::new(false));
+        let (stop, worker_stop) = mpsc::channel::<()>();
+        let worker_exited = Arc::clone(&exited);
+        let handle = thread::spawn(move || {
+            let signalled = matches!(
+                worker_stop.recv_timeout(Duration::from_secs(10)),
+                Err(mpsc::RecvTimeoutError::Disconnected)
+            );
+            thread::sleep(Duration::from_millis(100));
+            worker_exited.store(signalled, Ordering::SeqCst);
+            Snapshot::default()
+        });
+        let sampler = ResourceSampler {
+            before: Snapshot::default(),
+            stop: Some(stop),
+            handle: Some(handle),
+            measurement_scope: "in-process",
+        };
+
+        drop(sampler);
+
+        assert!(
+            exited.load(Ordering::SeqCst),
+            "drop returned before the signalled worker exited"
+        );
+    }
+
+    #[test]
+    fn worker_panic_is_reported_instead_of_defaulting_snapshot() {
+        let handle = thread::spawn(|| -> Snapshot { panic!("sampler exploded") });
+        let mut sampler = ResourceSampler {
+            before: Snapshot::default(),
+            stop: None,
+            handle: Some(handle),
+            measurement_scope: "in-process",
+        };
+
+        let error = sampler
+            .stop_and_join()
+            .expect_err("panic should be reported");
+        assert_eq!(
+            error,
+            SamplerError::WorkerPanicked("sampler exploded".to_owned())
+        );
     }
 }
 

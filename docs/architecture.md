@@ -49,7 +49,7 @@ The architecture is deliberately layered to separate concerns:
                                         ▼
      ┌──────────────────────────────────────────────────────────┐
      │  kindling serve  →  kindling-server (daemon runtime)       │
-     │  - PID lock, socket mode 0600, idle shutdown               │
+     │  - owner lock, socket mode 0600, idle shutdown             │
      │  - Per-project routing (one service cached per project)    │
      │  - v1 HTTP API (camelCase JSON)                            │
      │                                                            │
@@ -161,7 +161,7 @@ All published crates share the workspace version (see `Cargo.toml`, currently `0
 
 - HTTP/1 over UDS (TCP loopback fallback on Windows, with the ephemeral port published to a port file and a per-daemon bearer token required on every route except `/v1/health`).
 - Per-project routing via the `X-Kindling-Project` header; one service instance cached per project. The header is routing only, never authorization.
-- PID lock, socket mode `0600`, idle shutdown (default 30 minutes), cancellation-safe activity tracking.
+- Single-owner OS file lock (`kindling.lock`, released by the OS if the daemon dies) with the PID in `kindling.pid` for display, socket mode `0600`, idle shutdown (default 30 minutes), cancellation-safe activity tracking.
 - Formats injection-context markdown (`inject.rs`) byte-for-byte compatible with the original Node hooks.
 
 **Dependencies:** `kindling-types`, `kindling-store`, `kindling-service`.
@@ -399,7 +399,7 @@ kindling reads its home directory and daemon settings from the environment and t
 | Per-project DB           | `~/.kindling/projects/<hash>/kindling.db` | `KINDLING_DB_PATH` / `--db`; else derived from project root |
 | Project root             | git toplevel of cwd                       | `KINDLING_REPO_ROOT` (only if cwd is inside it)             |
 | Socket                   | `~/.kindling/kindling.sock`               | `kindling serve --socket`; hooks honour `KINDLING_SOCK`     |
-| Binary (TS client)       | `kindling` on `PATH`                      | `KINDLING_BIN`                                              |
+| Daemon binary (clients)  | `kindling` on `PATH`                      | `KINDLING_BIN` (Rust and TS clients; empty = unset)         |
 | Session-start recent cap | `10` observations                         | `KINDLING_MAX_CONTEXT` (hooks)                              |
 | Idle timeout             | `1800` seconds (30 min)                   | `kindling serve --idle-timeout`                             |
 | Daemonize                | off                                       | `kindling serve --daemonize`                                |

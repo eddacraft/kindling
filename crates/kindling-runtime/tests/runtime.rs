@@ -1,8 +1,11 @@
 //! Integration tests for `kindling-runtime` against a real (in-process) daemon.
 //!
 //! UDS-specific (the runtime's embedded daemon binds a Unix domain socket), so
-//! the suite is Unix-only — mirroring `kindling-client`'s `tests/client.rs`.
-#![cfg(unix)]
+//! the suite is Unix-only. It is also gated on the `embedded-daemon` feature:
+//! every test starts or attaches to an in-process daemon via the optional
+//! `kindling-client`/`kindling-server` surfaces, which minimal feature builds
+//! do not compile in. Mirrors `kindling-client`'s `tests/client.rs`.
+#![cfg(all(unix, feature = "embedded-daemon"))]
 
 use std::path::PathBuf;
 use std::time::Duration;

@@ -45,6 +45,18 @@ at each release; older distribution approaches may now be superseded.
 
 ### Changed
 
+- **Rust client honours `KINDLING_BIN` when auto-spawning the daemon (GH-184, PR #272).**
+  `Spawner::Command` execs `$KINDLING_BIN` when it is set and non-empty, and
+  `kindling` on `PATH` otherwise, matching the TypeScript client's
+  `resolveBinaryPath`. The value is read with `var_os`, so a non-UTF-8 path is
+  honoured rather than silently dropped, and a launcher that exits at once is
+  reported under the binary that actually ran. This reaches the Claude Code
+  hooks and `kindling-runtime` with `external-spawn`. The missing-binary test
+  that sets the variable runs alone in its own test binary
+  (`tests/default_spawner.rs`) so the environment is never changed under
+  concurrent tests. The `kindling-runtime` integration suite is gated on
+  `embedded-daemon`, and CI builds it with `--no-default-features` so the
+  gating stays checked.
 - **Tool-result capture contract for the Rust hook (#217).** The TS→Rust
   port dropped the retired Claude adapter's `captureResults` setting.
   `format_tool_content` in `crates/kindling/src/hook/mapping.rs` was left
@@ -69,6 +81,12 @@ at each release; older distribution approaches may now be superseded.
   exists.
 
 ### Security
+
+- **Vite test tooling upgraded (PR #278).** The workspace uses Vite 8.3.8
+  with Vitest 5.1.1, moving outside the five Vite advisory ranges affecting
+  7.3.5. Vite brings Rolldown 1.2.19 and the Rollup override is removed.
+  The PostCSS and Picomatch overrides follow Vite’s declared minimums.
+  VSIX packaging continues to use its direct esbuild dependency.
 
 - **Development-tooling dependency alerts resolved (PR #299).** Two alerts
   that Dependabot could not fix within the existing version ranges are now
@@ -113,6 +131,44 @@ at each release; older distribution approaches may now be superseded.
     index (200k matches, 1% scope: 225 ms to 44 ms). Moving `ts` and the scope
     ids into the FTS table as `UNINDEXED` columns would remove the base-row
     reads; that is a schema change and is left for a separate proposal.
+- **Daemon ownership is an OS file lock (GH-171).** `acquire_pid_lock`
+  replaced a check-then-act protocol on PID-file contents (read, liveness
+  check, remove, write) that had no mutual exclusion: concurrent starters
+  could all win (3 owners in the first round of a 6-starter test), stale
+  cleanup could delete a successor's file, and on Windows the liveness check
+  always reported "dead". PR #281's `create_new` variant still let 4 starters
+  produce multiple owners in 2,084 of 3,000 rounds.
+  - Ownership is `std::fs::File::try_lock()` (stable since 1.89, the MSRV;
+    `flock` on Unix, `LockFileEx` on Windows) on `pid_path.with_extension("lock")`,
+    held by `PidGuard` for the daemon's lifetime. The OS releases it on
+    process death, so stale cleanup and `process_is_alive` are gone, and so is
+    the `nix` dependency of `kindling-server`.
+  - The lock file is opened with `create(true)` and no truncation, and is never
+    deleted: unlinking it would let one starter lock the old inode while
+    another creates a new one.
+  - The PID is written to `pid_path` only after the lock is held, as a separate
+    file because Windows blocks reads of a locked file. `PidGuard` removes it on
+    drop, before releasing the lock.
+  - `AlreadyRunning(Option<i32>)` comes only from `TryLockError::WouldBlock`,
+    with `None` when the PID file is missing, mid-write or malformed; every
+    other failure is `ServerError::Pid`.
+  - Tests: 6 barrier-synchronised starters × 200 rounds with exactly one
+    owner, live-owner blocking and release, leftover files from a crashed
+    owner, unknown PID, and non-contention lock errors. The `windows-tcp` CI
+    job runs them (`pid::tests`) against `LockFileEx`. Design agreed on #171; supersedes
+    PR #281.
+- **SessionStart context resolves the UTC offset per observation (GH-209, PR #274).**
+  The handler resolved one local offset at request time and applied it to
+  every historical timestamp, a regression from the PORT-009 port: the Node
+  hook's `new Date(ts).toLocaleString()` resolves each instant separately.
+  The new `inject::format_session_start_with(ctx, offset_of)` calls the
+  resolver once per observation, and the handler passes
+  `local_offset_seconds`. The published 0.4.1 signature,
+  `format_session_start(ctx, offset_seconds: i32)`, stays as a
+  `#[deprecated]` wrapper, so the fix ships as a patch release with no semver
+  break. Unit tests pin both sides of the 2023-11-05 06:00 UTC
+  America/New_York fall-back (1:59:59 AM EDT, then 1:00:00 AM EST) with a
+  fixed resolver; no process `TZ` mutation.
 - **`kindling search` filters see past the default candidate limit.**
   With `--kind`, `--after` or `--before`, the CLI passed
   `max_candidates: None` intending "the full ranked set", but `None` means the
@@ -161,6 +217,18 @@ at each release; older distribution approaches may now be superseded.
   valid HTTP header field, now surface as `ClientError::InvalidRequest` instead
   of `ClientError::Http`. The spool treats these as permanent local errors and
   does not buffer them ahead of later entries.
+- **CLI project routing matches the hooks (GH-205).** The embedded
+  `resolve_db_path` and the daemon `build_client` hashed
+  `std::env::current_dir()`, while hooks hash `hook::project::project_root`
+  (`KINDLING_REPO_ROOT` when cwd is inside it, else the Git toplevel, else
+  cwd). Both CLI paths now resolve the root through one
+  `current_project_root()` helper backed by that resolver; the daemon path sets
+  `ClientConfig.project_root` explicitly. `kindling-client`'s
+  `ClientConfig::defaults()` keeps its cwd fallback as the SDK default. No
+  migration: the hooks already wrote the Git-root hash, so the CLI is
+  re-pointed at the existing hook database. End-to-end tests in
+  `crates/kindling/tests/project_routing.rs` cover root and nested
+  invocations, embedded and over the daemon, and the override precedence.
 - **Installer cargo fallback honours a pinned version and the Cargo install path (GH-193).**
   A failed archive download no longer runs unversioned `cargo install
   eddacraft-kindling` and then a bare `kindling` from PATH. The fallback
