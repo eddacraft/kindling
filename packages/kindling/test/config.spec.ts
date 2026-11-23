@@ -25,10 +25,10 @@ import {
 } from '../src/config.js';
 
 describe('wireVersion range and parse trap', () => {
-  it('pins EXPECTED_SCHEMA_VERSION=6, MAX_WIRE_VERSION=6, KNOWN_SCHEMA_REVISION=7', () => {
+  it('pins EXPECTED_SCHEMA_VERSION=6, MAX_WIRE_VERSION=6, KNOWN_SCHEMA_REVISION=8', () => {
     expect(EXPECTED_SCHEMA_VERSION).toBe(6);
     expect(MAX_WIRE_VERSION).toBe(6);
-    expect(KNOWN_SCHEMA_REVISION).toBe(7);
+    expect(KNOWN_SCHEMA_REVISION).toBe(8);
   });
 
   it('reads wireVersion when the first version field is 7', () => {

@@ -35,6 +35,20 @@ cargo bench -p kindling-bench --bench workloads -- daemon/list-full-scan
 Criterion writes its normal comparison data and reports under
 `target/criterion/`. Do not commit those machine-specific results.
 
+## Retrieval on an existing corpus
+
+`retrieve_corpus` times `KindlingService::retrieve_at` against a database you
+already have, and prints each query's timings and ordered result ids as JSON,
+so two builds can be compared for speed and identical results:
+
+```bash
+cargo build --release -p kindling-bench --bin retrieve_corpus
+target/release/retrieve_corpus <db> <now_ms> <repo|-> <max_candidates> <reps> <query>...
+```
+
+It opens the database writable, which runs any pending migration, so point it
+at a copy. When comparing two builds, give each its own `CARGO_TARGET_DIR`.
+
 ## Workload and resource profile
 
 The profiler emits stable-schema JSON suitable for archiving or comparing in

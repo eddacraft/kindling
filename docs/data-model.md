@@ -248,7 +248,8 @@ The **canonical schema** is `schema/schema.sql` (the DDL reflecting the state af
 
 Key facts (authoritative source is `schema/schema.sql`):
 
-- **Tables:** `observations`, `capsules`, `capsule_observations`, `summaries`, `pins`, `observations_fts`, `summaries_fts`, `schema_migrations`.
+- **Tables:** `observations`, `observation_meta`, `capsules`, `capsule_observations`, `summaries`, `pins`, `observations_fts`, `summaries_fts`, `generic_events`, `generic_event_usage`, `schema_migrations`.
+- **`observation_meta`** (revision 8) is a narrow, trigger-maintained copy of each observation's `rowid`, `id`, `ts`, scope ids and `redacted`. Retrieval's candidate scan joins it instead of the wide `observations` row. It is derived data, not a source of truth.
 - **FTS tokenizer:** `porter unicode61` on both FTS tables. Changing it is a **breaking change** — it invalidates existing indexes and changes search results.
 - **Scope ids are denormalized into columns** (`session_id`, `repo_id`, `agent_id`, `user_id`) on `observations`, `capsules`, and `pins` — added by migration `004_denormalize_scopes`. Retrieval filters on these columns directly; it does **not** use `json_extract` against the legacy `scope_ids` JSON blob. There is no `task_id` column.
 

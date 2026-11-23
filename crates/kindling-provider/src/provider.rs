@@ -125,8 +125,10 @@ impl<'conn> LocalFtsProvider<'conn> {
         options: &ProviderSearchOptions,
         now: Timestamp,
     ) -> ProviderResult<Vec<Candidate>> {
-        let (sql, params) = candidate_query(entity_type, options, now);
         let result = (|| -> Result<Vec<Candidate>, rusqlite::Error> {
+            let narrow =
+                matches!(entity_type, EntityType::Observation) && self.has_observation_meta()?;
+            let (sql, params) = candidate_query(entity_type, options, now, narrow);
             let mut stmt = self.conn.prepare(&sql)?;
             let rows = stmt.query_map(params_from_iter(params), |row| {
                 Ok(Candidate {
@@ -146,6 +148,17 @@ impl<'conn> LocalFtsProvider<'conn> {
             Err(err) if is_fts_syntax_error(&err) => Ok(Vec::new()),
             Err(err) => Err(err.into()),
         }
+    }
+
+    /// Whether the database has `observation_meta` (schema revision 8). A
+    /// revision-7 database opened without migrating, for example read-only,
+    /// does not.
+    fn has_observation_meta(&self) -> Result<bool, rusqlite::Error> {
+        self.conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'observation_meta')",
+            [],
+            |row| row.get(0),
+        )
     }
 
     /// Read a ranked candidate's full row. Runs in the same snapshot as the
@@ -323,16 +336,23 @@ impl RetrievalProvider for LocalFtsProvider<'_> {
 /// pages: that read is the dominant cost of this query. Deferring them to
 /// [`LocalFtsProvider::hydrate`] would break exact ranking, since hydration
 /// sees only the rows already chosen.
+///
+/// Observation candidates join `observation_meta`, a narrow copy of the
+/// columns used here, when it exists. The wide `observations` row keeps them
+/// behind `content` and its overflow pages, and reading it was the largest
+/// cost of a broad search. Without the table (a revision-7 database opened
+/// without migrating) the same query runs against `observations`.
 fn candidate_query(
     entity_type: EntityType,
     options: &ProviderSearchOptions,
     now: Timestamp,
+    has_observation_meta: bool,
 ) -> (String, Vec<SqlValue>) {
     let exclude_ids = options.exclude_ids.as_deref().unwrap_or(&[]);
     let include_redacted = options.include_redacted.unwrap_or(false);
 
     let scope_prefix = match entity_type {
-        EntityType::Observation => "o",
+        EntityType::Observation => "m",
         EntityType::Summary => "c", // summaries are scoped through their capsule
     };
     let (scope_clauses, scope_params) = build_scope_filters(&options.scope_ids, scope_prefix);
@@ -343,23 +363,28 @@ fn candidate_query(
             let redacted_filter = if include_redacted {
                 ""
             } else {
-                "AND o.redacted = 0"
+                "AND m.redacted = 0"
             };
             format!(
                 "WITH fts_hits AS (
                    SELECT rowid, rank FROM observations_fts WHERE content MATCH ?
                  )
                  SELECT
-                   o.rowid, o.id,
+                   m.rowid, m.id,
                    f.rank AS fts_rank,
-                   MAX(0.0, 1.0 - CAST(? - o.ts AS REAL) / ?) AS recency
+                   MAX(0.0, 1.0 - CAST(? - m.ts AS REAL) / ?) AS recency
                  FROM fts_hits f
-                 JOIN observations o ON f.rowid = o.rowid
+                 JOIN {meta_table} m ON f.rowid = m.rowid
                  WHERE 1=1
                    {redacted_filter}
                    {scope_filter}
                    {exclude_filter}",
-                exclude_filter = exclude_id_filter("o", exclude_ids),
+                meta_table = if has_observation_meta {
+                    "observation_meta"
+                } else {
+                    "observations"
+                },
+                exclude_filter = exclude_id_filter("m", exclude_ids),
             )
         }
         EntityType::Summary => {
@@ -473,7 +498,7 @@ fn exclude_id_filter(prefix: &str, exclude_ids: &[Id]) -> String {
 ///
 /// FTS5 column filters such as `missing:term` surface as SQLite
 /// `no such column: missing` with a bare identifier. Provider SQL always
-/// qualifies columns (`o.redacted`, `f.rank`, …), so those schema errors
+/// qualifies columns (`m.redacted`, `o.redacted`, `f.rank`, …), so those schema errors
 /// still propagate. The FTS `content` column is also treated as schema: it
 /// is the only indexed column, so `no such column: content` means the index
 /// itself is broken, not that the user typed a bad filter.
@@ -508,7 +533,7 @@ fn is_schema_column(column: &str) -> bool {
     column == "content"
         || matches!(
             column.split_once('.').map(|(alias, _)| alias),
-            Some("o" | "s" | "c" | "f")
+            Some("o" | "m" | "s" | "c" | "f")
         )
 }
 
@@ -562,6 +587,7 @@ mod tests {
     fn schema_and_backend_errors_are_not_syntax_errors() {
         for msg in [
             "no such column: o.redacted",
+            "no such column: m.redacted",
             "no such column: f.rank",
             "no such column: s.content",
             "no such column: c.session_id",

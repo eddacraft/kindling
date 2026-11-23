@@ -1,6 +1,6 @@
 -- kindling SQLite Schema Contract
 -- =================================
--- Canonical DDL reflecting the state after all migrations (through 007).
+-- Canonical DDL reflecting the state after all migrations (through 008).
 -- Both the TypeScript store (better-sqlite3) and the Rust crate MUST produce
 -- an identical structure when creating a fresh database.
 --
@@ -34,7 +34,8 @@ INSERT OR IGNORE INTO schema_migrations (version, name, applied_at) VALUES
   (4, '004_denormalize_scopes',    0),
   (5, '005_pragma_user_version',   0),
   (6, '006_scoped_keyset_indexes', 0),
-  (7, '007_generic_events',        0);
+  (7, '007_generic_events',        0),
+  (8, '008_observation_meta',      0);
 
 -- Atomic units of captured context.
 CREATE TABLE IF NOT EXISTS observations (
@@ -277,4 +278,46 @@ BEGIN
      SET payload_bytes = payload_bytes - COALESCE(length(CAST(OLD.payload AS BLOB)), 0),
          event_count   = event_count - 1
    WHERE id = 1;
+END;
+
+-- ============================================================================
+-- Observation metadata (revision 8, additive)
+-- ============================================================================
+
+-- A narrow copy of the observation columns that retrieval filters and ranks
+-- on. The candidate scan joins this table instead of `observations`, whose
+-- wide rows keep these columns behind `content` and its overflow pages. Kept
+-- in sync with `observations` by the triggers below, so writers that predate
+-- revision 8 keep it current too. Not a source of truth: hydration still
+-- reads `observations`.
+CREATE TABLE IF NOT EXISTS observation_meta (
+  rowid       INTEGER PRIMARY KEY,
+  id          TEXT,
+  ts          INTEGER NOT NULL,
+  session_id  TEXT,
+  repo_id     TEXT,
+  agent_id    TEXT,
+  user_id     TEXT,
+  redacted    INTEGER NOT NULL
+);
+
+CREATE TRIGGER IF NOT EXISTS observation_meta_insert
+AFTER INSERT ON observations
+BEGIN
+  INSERT OR REPLACE INTO observation_meta (rowid, id, ts, session_id, repo_id, agent_id, user_id, redacted)
+  VALUES (NEW.rowid, NEW.id, NEW.ts, NEW.session_id, NEW.repo_id, NEW.agent_id, NEW.user_id, NEW.redacted);
+END;
+
+CREATE TRIGGER IF NOT EXISTS observation_meta_update
+AFTER UPDATE ON observations
+BEGIN
+  DELETE FROM observation_meta WHERE rowid = OLD.rowid;
+  INSERT OR REPLACE INTO observation_meta (rowid, id, ts, session_id, repo_id, agent_id, user_id, redacted)
+  VALUES (NEW.rowid, NEW.id, NEW.ts, NEW.session_id, NEW.repo_id, NEW.agent_id, NEW.user_id, NEW.redacted);
+END;
+
+CREATE TRIGGER IF NOT EXISTS observation_meta_delete
+AFTER DELETE ON observations
+BEGIN
+  DELETE FROM observation_meta WHERE rowid = OLD.rowid;
 END;
