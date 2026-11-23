@@ -246,8 +246,8 @@ The provider takes an explicit `retrieve_at` (the `now` clock) so recency scorin
 Scoring every match is what makes a broad query over a large store expensive.
 So when a query has many matches, the provider ranks only the recent ones:
 
-- **When it applies.** Only when the observations with `ts` in the last 30 days
-  (before `retrieve_at`) hold at least `max(1000, max_candidates)` matches that
+- **When it applies.** Only when the observations with `ts` at or after
+  `retrieve_at` minus 30 days (future-dated rows included) hold at least `max(1000, max_candidates)` matches that
   survive scope, redaction and exclude filtering.
 - **What it ranks.** Observation candidates are then only those observations.
   BM25 min-max normalisation runs over them plus every matching summary.

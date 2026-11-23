@@ -1278,6 +1278,127 @@ mod tests {
         );
     }
 
+    /// A window larger than the anchor's 256 rows, whose best match has the
+    /// lowest rowid in the store: the scan's lower bound must be the window's
+    /// lowest rowid, not the anchor.
+    #[test]
+    fn a_low_rowid_recent_row_is_kept_in_a_large_window() {
+        let store = SqliteKindlingStore::open_in_memory().unwrap();
+        insert(
+            &store,
+            "early-recent",
+            "needle needle needle",
+            session(None, None),
+            NOW,
+        );
+        for i in 0..50 {
+            insert(
+                &store,
+                &format!("old-{i}"),
+                &format!("needle old {i}"),
+                session(None, None),
+                NOW - 60 * DAY,
+            );
+        }
+        for i in 0..300 {
+            let ts = NOW - 29 * DAY + i as i64 * DAY / 12;
+            insert(
+                &store,
+                &format!("new-{i}"),
+                &format!("needle new {i}"),
+                session(None, None),
+                ts,
+            );
+        }
+        let windowed = ranked(
+            &window_provider(&store, 20),
+            &needle(10, ScopeIds::default()),
+        );
+        assert_eq!(windowed[0].0, "early-recent", "{windowed:?}");
+        assert!(windowed.iter().all(|(id, _)| !id.starts_with("old-")));
+    }
+
+    /// The window is used at exactly `max(threshold, max_results)` in-scope
+    /// window matches and not one below, even when the store-wide counts pass.
+    #[test]
+    fn the_window_needs_max_results_matches_in_scope() {
+        let store = SqliteKindlingStore::open_in_memory().unwrap();
+        insert(
+            &store,
+            "old-best",
+            "needle needle needle",
+            session(None, Some("/r")),
+            NOW - 90 * DAY,
+        );
+        for i in 0..40 {
+            let ts = NOW - 29 * DAY + i as i64 * DAY / 2;
+            insert(
+                &store,
+                &format!("r-{i}"),
+                &format!("needle r {i}"),
+                session(None, Some("/r")),
+                ts,
+            );
+            insert(
+                &store,
+                &format!("q-{i}"),
+                &format!("needle q {i}"),
+                session(None, Some("/q")),
+                ts,
+            );
+        }
+        let in_r = |max_results: u32| needle(max_results, session(None, Some("/r")));
+        let windowed = ranked(&window_provider(&store, 20), &in_r(40));
+        assert!(
+            windowed.iter().all(|(id, _)| id.starts_with("r-")),
+            "{windowed:?}"
+        );
+        assert_eq!(
+            ranked(&window_provider(&store, 20), &in_r(41)),
+            ranked(&window_provider(&store, i64::MAX), &in_r(41))
+        );
+    }
+
+    /// The cutoff is inclusive: a row exactly 30 days old is in the window,
+    /// one a millisecond older is not. Future-dated rows are in it.
+    #[test]
+    fn the_window_cutoff_is_inclusive() {
+        let store = window_store(40, 40);
+        let cutoff = NOW - super::RECENT_WINDOW_MS;
+        insert(
+            &store,
+            "at-cutoff",
+            "needle needle needle needle",
+            session(None, Some("/r")),
+            cutoff,
+        );
+        insert(
+            &store,
+            "before-cutoff",
+            "needle needle needle needle needle",
+            session(None, Some("/r")),
+            cutoff - 1,
+        );
+        insert(
+            &store,
+            "future",
+            "needle needle needle needle",
+            session(None, Some("/r")),
+            NOW + DAY,
+        );
+        let windowed = ranked(
+            &window_provider(&store, 20),
+            &needle(10, ScopeIds::default()),
+        );
+        let ids: Vec<&str> = windowed.iter().map(|(id, _)| id.as_str()).collect();
+        assert!(ids.contains(&"at-cutoff"), "{ids:?}");
+        assert!(ids.contains(&"future"), "{ids:?}");
+        assert!(
+            !ids.contains(&"before-cutoff") && !ids.contains(&"old-best"),
+            "{ids:?}"
+        );
+    }
+
     #[test]
     fn the_window_combines_with_a_session_span() {
         let store = SqliteKindlingStore::open_in_memory().unwrap();
