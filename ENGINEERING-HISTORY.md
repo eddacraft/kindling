@@ -129,6 +129,36 @@ at each release; older distribution approaches may now be superseded.
   back to back, and a hook-style append plus a small search every 20 ms. Under
   that load, append p95 fell from 130.6 ms to 8.4 ms, and small-search p95 fell
   from 130.7 ms to 3.5 ms.
+- **Session-scoped searches read only the session's part of the index
+  (PERF-003, #316).** The provider first reads the session's rowid span from
+  `idx_obs_session_ts` (at most 10,000 index entries), then passes it to the
+  observation FTS scan as `rowid BETWEEN first AND last`. FTS5 applies the
+  range natively, so matches outside the span are never read or scored. Every
+  row carrying the session id lies inside its span, and BM25 uses corpus-wide
+  statistics, so candidates, scores and order are unchanged. A session with
+  more than 10,000 rows searches unbounded, as before. The span lookup runs
+  inside `search`'s read transaction, so a concurrent append can't land
+  outside a stale span.
+  - **Measured first.** On top of PERF-001, with the 220k-row synthetic
+    corpus, a SQL-level comparison returned identical rows for every order.
+    For one 200-row session, the rowid bound was 8–10× faster than FTS-first.
+    Driving from the scope index and probing FTS per row was slower in every
+    case, because FTS5 re-runs the MATCH for each rowid. For repo scope,
+    FTS-first stays: repos interleave across the whole store, so a span
+    doesn't narrow them, and an uncapped span lookup costs more than it
+    saves. Real stores' sessions fill 89–100% of their rowid span.
+  - **End to end.** `retrieve_corpus` (now with `session=` and `repo=`
+    scopes), `max_candidates` 10, best of 3 rounds of 5:
+
+    | Query | Scope | Before | After |
+    | --- | --- | --- | --- |
+    | Word in 50% of rows | One session | 27.5 ms | 4.5 ms |
+    | Word in 10% of rows | One session | 7.6 ms | 1.1 ms |
+    | Word in 1% of rows | One session | 1.1 ms | 0.4 ms |
+
+    Repo and unscoped queries are unchanged. Result ids matched in all 40
+    comparisons: two sessions, a missing session, one repo and no scope, with
+    `max_candidates` 10 and 1,000.
 
 ### Security
 
