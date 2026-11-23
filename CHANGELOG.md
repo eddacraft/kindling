@@ -22,7 +22,9 @@ ended with v0.4.0.
 ### Changed
 
 - **Search treats your query as plain text (#311).** File names, paths, hyphenated words and `prefix:` text now match as typed. Before, `kindling search cache.rs`, `src/provider.rs`, `kindling-server` or `fix: cache` returned nothing, with no error, and `NOT` or `OR` in a sentence were applied as operators. Every word must still match.
-  - **Upgrade action:** if you relied on SQLite FTS5 syntax (`auth*`, `OR`, `NOT`, `"exact phrase"`), add `--advanced` to `kindling search`, or set `"queryMode": "advanced"` on `/v1/retrieve` and `RetrieveOptions`. The CLI, the daemon, the VS Code extension and the Claude Code `/memory search` command all use plain text by default.
+  - **Upgrade action:** if you relied on SQLite FTS5 syntax (`auth*`, `OR`, `NOT`, `"exact phrase"`), add `--advanced` to `kindling search`, or set `"queryMode": "advanced"` on `/v1/retrieve` and `RetrieveOptions`. The VS Code extension and the Claude Code `/memory search` command always use plain text; they have no advanced option yet.
+  - **Upgrade action (Rust crates):** `RetrieveOptions` and `ProviderSearchOptions` gain an optional `query_mode` field. Code that builds either with a struct literal must add `query_mode: None` (or a `QueryMode`).
+  - **Restart a running daemon after upgrading.** An older daemon ignores `queryMode` and keeps the old behaviour until it is restarted on the new binary.
   - A malformed advanced query is now an error (exit code 1, or HTTP 400) instead of an empty result.
 - SQLite schema advances additively to revision 8 (`generic_events` and `generic_event_usage` tables in 7; `observation_meta` in 8) while keeping `PRAGMA user_version` at 6 (`minReader`) so 0.4.x binaries remain compatible. Tools checking the exact schema revision should read `MAX(schema_migrations.version)` rather than `PRAGMA user_version`.
 - `/v1/health` and `kindling status --json` report `schemaVersion` from `wireVersion` (6) alongside `schemaRevision` (8); Rust and TypeScript clients validate `schemaVersion` against the supported wire range.

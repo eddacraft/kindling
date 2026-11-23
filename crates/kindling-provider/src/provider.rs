@@ -514,7 +514,8 @@ fn fts_query(options: &ProviderSearchOptions) -> Option<String> {
 
 /// Compile plain text into an FTS5 query that is valid for every input.
 ///
-/// The text is split on whitespace. Each term becomes an FTS5 string: any `"`
+/// The text is split on whitespace and on NUL (FTS5 reads the query as a C
+/// string, so a NUL inside a term would cut its closing quote off). Each term becomes an FTS5 string: any `"`
 /// inside it is doubled and the term is wrapped in `"…"`. FTS5 tokenizes a
 /// string into a phrase, so `src/cache.rs` matches as the token sequence
 /// `src cache rs` and its punctuation is never read as syntax. Terms are
@@ -525,7 +526,8 @@ fn fts_query(options: &ProviderSearchOptions) -> Option<String> {
 /// which matches nothing on its own and does not constrain other terms.
 fn compile_literal_query(query: &str) -> Option<String> {
     let terms: Vec<String> = query
-        .split_whitespace()
+        .split(|c: char| c.is_whitespace() || c == '\0')
+        .filter(|term| !term.is_empty())
         .map(|term| format!("\"{}\"", term.replace('"', "\"\"")))
         .collect();
     (!terms.is_empty()).then(|| terms.join(" "))
@@ -627,6 +629,8 @@ fn is_fts_syntax_error_message(message: &str) -> bool {
         || msg.contains("fts syntax")
         || msg.contains("unterminated string")
         || msg.contains("unknown special query")
+        // `NEAR(a b, x)`: a NEAR distance that is not an integer.
+        || msg.contains("expected integer, got")
         || is_fts_unknown_column_error(&msg)
 }
 
@@ -932,6 +936,8 @@ mod tests {
             (r#"""#, Some(r#""""""#)),
             ("", None),
             (" \t\n ", None),
+            ("a\0b", Some(r#""a" "b""#)),
+            ("\0", None),
         ] {
             assert_eq!(
                 compile_literal_query(input).as_deref(),
@@ -981,6 +987,7 @@ mod tests {
             "fts5: syntax error near \"AND\"",
             "unterminated string",
             "unknown special query: ",
+            "expected integer, got \"x\"",
         ] {
             assert!(
                 is_fts_syntax_error_message(msg),

@@ -54,11 +54,13 @@ at each release; older distribution approaches may now be superseded.
   - **The compiler.** `LocalFtsProvider` builds the FTS5 `MATCH` expression in
     one place (`compile_literal_query`). Literal mode splits on whitespace,
     doubles embedded `"` and quotes each term, joined by FTS5's implicit AND.
+    NUL also separates terms, because FTS5 reads the query as a C string.
     Every input compiles to valid FTS5, so file names, paths and operator-like
     words are searched for as text. Advanced mode passes the query through.
     Empty and whitespace-only queries return nothing without running `MATCH`.
   - **Errors.** FTS5 syntax errors were swallowed into an empty result. They
-    are now `ProviderError::InvalidQuery`. `kindling-service` re-exports
+    are now `ProviderError::InvalidQuery`. The classifier also recognises
+    `expected integer, got` (a non-integer `NEAR` distance). `kindling-service` re-exports
     `ProviderError` so the daemon maps it to HTTP 400 without depending on the
     provider crate. The CLI gains `kindling search --advanced`.
   - **TS parity fixtures.** These replay in advanced mode, which is what the
@@ -367,7 +369,7 @@ at each release; older distribution approaches may now be superseded.
   invocations, embedded and over the daemon, and the override precedence.
 - **Installer cargo fallback honours a pinned version and the Cargo install path (GH-193).**
   A failed archive download no longer runs unversioned `cargo install
-eddacraft-kindling` and then a bare `kindling` from PATH. The fallback
+  eddacraft-kindling` and then a bare `kindling` from PATH. The fallback
   passes `--version` when `KINDLING_VERSION` is set, refuses a non-default
   `KINDLING_REPO`, and invokes the binary cargo installed (including a
   nonstandard `CARGO_HOME` or `CARGO_INSTALL_ROOT`).

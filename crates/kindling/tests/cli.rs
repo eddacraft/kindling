@@ -320,6 +320,42 @@ fn search_matches_identifiers_literally_by_default() {
     }
 }
 
+/// The rest of the #311 examples at CLI level: punctuation-only words, embedded
+/// quotes, and literal versus advanced `NOT`.
+#[test]
+fn search_literal_punctuation_quotes_and_not() {
+    let env = CliEnv::new();
+    assert_success(&env.run_db(&["log", "built the C++ bindings for user@host"]));
+    assert_success(&env.run_db(&["log", "the tool said \"hello\" twice"]));
+    assert_success(&env.run_db(&["log", "what is not cached"]));
+    assert_success(&env.run_db(&["log", "what is cached"]));
+
+    let count = |args: &[&str]| {
+        let out = env.run_db(args);
+        assert_success(&out);
+        candidate_contents(&json_stdout(&out))
+    };
+
+    for (query, expected) in [
+        ("C++", "built the C++ bindings for user@host"),
+        ("user@host", "built the C++ bindings for user@host"),
+        ("said \"hello", "the tool said \"hello\" twice"),
+        ("what NOT cached", "what is not cached"),
+    ] {
+        assert_eq!(
+            count(&["search", query, "--json"]),
+            [expected],
+            "literal {query:?}"
+        );
+    }
+
+    assert_eq!(
+        count(&["search", "what NOT not", "--advanced", "--json"]),
+        ["what is cached"],
+        "advanced NOT is an operator"
+    );
+}
+
 /// `--advanced` keeps FTS5 syntax; a malformed advanced query fails loudly
 /// instead of looking like "no results".
 #[test]

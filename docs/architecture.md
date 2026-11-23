@@ -169,6 +169,8 @@ All published crates share the workspace version (see `Cargo.toml`, currently `0
 
 **v1 endpoints** (camelCase JSON; `X-Kindling-Project` required on all data endpoints, not on health):
 
+`/v1/retrieve` takes `RetrieveOptions`. Its optional `queryMode` is `"literal"` (the default) or `"advanced"` (FTS5 syntax); see [Query interpretation](retrieval-contract.md#query-interpretation).
+
 | Method | Path                          | Purpose                                             |
 | ------ | ----------------------------- | --------------------------------------------------- |
 | GET    | `/v1/health`                  | liveness + capability handshake (no project header) |

@@ -667,6 +667,14 @@ fn literal_queries_escape_embedded_double_quotes() {
 }
 
 #[test]
+fn literal_queries_treat_nul_as_a_separator() {
+    let store = text_fixture(&["cache invalidation fixed", "cache warmed"]);
+
+    let results = search(&store, &options("cache\0invalidation", ScopeIds::default()));
+    assert_eq!(sorted_ids(&results), ["obs-0"]);
+}
+
+#[test]
 fn literal_queries_require_every_term() {
     let store = text_fixture(&["cache invalidation fixed", "cache warmed"]);
 
@@ -691,6 +699,10 @@ fn literal_zero_hit_queries_return_empty_not_an_error() {
         "missing:term",
         "hello missing:term",
         "++",
+        // FTS5 reads the query as a C string; NUL must not truncate a term.
+        "\0",
+        "a\0b",
+        "cache\0",
     ] {
         let results = LocalFtsProvider::from_store(&store)
             .search(&options(query, ScopeIds::default()), NOW)
@@ -768,6 +780,7 @@ fn malformed_advanced_queries_are_invalid_query_errors() {
         "missing:term",
         "col1:foo",
         "hello missing:term",
+        "NEAR(a b, x)",
     ] {
         let err = LocalFtsProvider::from_store(&store)
             .search(&advanced(query), NOW)
@@ -812,6 +825,10 @@ fn genuine_schema_errors_are_not_swallowed() {
     let err = LocalFtsProvider::from_store(&store)
         .search(&options("authentication", ScopeIds::default()), NOW)
         .expect_err("a missing observations column must surface as a provider error");
+    assert!(
+        !matches!(err, ProviderError::InvalidQuery(_)),
+        "a schema error is not a query error: {err:?}"
+    );
     let msg = err.to_string().to_lowercase();
     assert!(
         msg.contains("no such column"),
@@ -839,6 +856,10 @@ fn genuine_backend_errors_are_not_swallowed() {
     let err = LocalFtsProvider::from_store(&store)
         .search(&options("authentication", ScopeIds::default()), NOW)
         .expect_err("a missing FTS table must surface as a provider error");
+    assert!(
+        !matches!(err, ProviderError::InvalidQuery(_)),
+        "a backend error is not a query error: {err:?}"
+    );
     let msg = err.to_string().to_lowercase();
     assert!(
         msg.contains("no such table"),
