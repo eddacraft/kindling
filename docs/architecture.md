@@ -178,7 +178,7 @@ All published crates share the workspace version (see `Cargo.toml`, currently `0
 | POST   | `/v1/observations`            | append an observation                               |
 | POST   | `/v1/observations/list`       | exhaustive keyset-paginated list                    |
 | POST   | `/v1/observations/:id/forget` | forget an observation                               |
-| POST   | `/v1/retrieve`                | orchestrated retrieval                              |
+| POST   | `/v1/retrieve`                | orchestrated retrieval (400: bad advanced query)    |
 | POST   | `/v1/pins`                    | create a pin                                        |
 | DELETE | `/v1/pins/:id`                | remove a pin                                        |
 | POST   | `/v1/context/session-start`   | session-start context                               |
@@ -237,7 +237,7 @@ unrelated project); the installed command and library are still `kindling`.
 ```
 kindling init
 kindling log
-kindling search <query>
+kindling search <query> [--advanced]
 kindling capsule open | close
 kindling status
 kindling stats [--json]

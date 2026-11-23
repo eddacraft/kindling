@@ -5,12 +5,14 @@
 //! (already camelCase via its `Serialize`); its `provenance.scopeIds` records
 //! the repo scope that was actually applied.
 //!
+//! The query is literal text unless `--advanced` asks for FTS5 syntax (GH-311).
+//!
 //! Without `--repo`, the repo scope defaults to the enclosing git repository
 //! root (see [`crate::commands::resolve_repo`]); `--all-repos` searches every
 //! repository.
 
 use kindling_types::{
-    ObservationKind, RetrieveOptions, RetrieveResult, RetrievedEntity, Timestamp,
+    ObservationKind, QueryMode, RetrieveOptions, RetrieveResult, RetrievedEntity, Timestamp,
 };
 
 use crate::cli::SearchArgs;
@@ -63,6 +65,7 @@ pub fn run(args: SearchArgs, via_daemon: bool) -> CliResult {
         token_budget: None,
         max_candidates: Some(fetch_limit),
         include_redacted: None,
+        query_mode: args.advanced.then_some(QueryMode::Advanced),
     };
 
     let mut result = if via_daemon {

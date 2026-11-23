@@ -1167,3 +1167,74 @@ async fn array_scope_ids_are_rejected_on_every_route() {
         }
     }
 }
+
+/// GH-311: retrieval queries are literal text by default, so identifiers with
+/// punctuation match. `queryMode: "advanced"` keeps FTS5 syntax, and a
+/// malformed advanced query is a 400 with the parse error, not an empty 200.
+#[tokio::test]
+async fn retrieve_query_modes() {
+    let daemon = TestDaemon::start().await;
+    let mut c = daemon.connect().await;
+
+    let resp = c
+        .send(
+            "POST",
+            "/v1/observations",
+            Some(PROJECT_A),
+            Some(json!({
+                "kind": "message",
+                "content": "edited src/cache.rs in kindling-server",
+                "scopeIds": {}
+            })),
+        )
+        .await;
+    assert_eq!(resp.status, StatusCode::CREATED);
+
+    for query in ["src/cache.rs", "kindling-server"] {
+        let resp = retrieve(&mut c, json!({ "query": query, "scopeIds": {} })).await;
+        assert_eq!(resp.status, StatusCode::OK, "literal {query:?}");
+        assert_eq!(
+            resp.json()["candidates"].as_array().unwrap().len(),
+            1,
+            "literal {query:?} is the default and should match"
+        );
+    }
+
+    let resp = retrieve(
+        &mut c,
+        json!({ "query": "kindl*", "scopeIds": {}, "queryMode": "advanced" }),
+    )
+    .await;
+    assert_eq!(resp.status, StatusCode::OK);
+    assert_eq!(resp.json()["candidates"].as_array().unwrap().len(), 1);
+
+    let resp = retrieve(
+        &mut c,
+        json!({ "query": "AND OR", "scopeIds": {}, "queryMode": "advanced" }),
+    )
+    .await;
+    assert_eq!(resp.status, StatusCode::BAD_REQUEST);
+    let error = resp.json()["error"].as_str().unwrap().to_string();
+    assert!(
+        error.contains("invalid search query"),
+        "400 body should carry the parse error: {error}"
+    );
+
+    let resp = retrieve(
+        &mut c,
+        json!({ "query": "q", "scopeIds": {}, "queryMode": "raw" }),
+    )
+    .await;
+    // An unknown mode fails body deserialization, which axum's JSON extractor
+    // reports as 422, like any other malformed request body.
+    assert_eq!(
+        resp.status,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "unknown query mode"
+    );
+}
+
+async fn retrieve(c: &mut support::Client, body: serde_json::Value) -> support::TestResponse {
+    c.send("POST", "/v1/retrieve", Some(PROJECT_A), Some(body))
+        .await
+}

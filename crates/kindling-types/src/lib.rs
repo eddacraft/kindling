@@ -39,7 +39,7 @@ pub use observation::{Observation, ObservationInput, ObservationKind};
 pub use pin::{is_pin_active, Pin, PinInput, PinTargetType};
 pub use redaction::RedactionEvidence;
 pub use retrieval::{
-    CandidateResult, PinResult, ProviderSearchOptions, ProviderSearchResult, RetrieveOptions,
-    RetrieveProvenance, RetrieveResult, RetrievedEntity,
+    CandidateResult, PinResult, ProviderSearchOptions, ProviderSearchResult, QueryMode,
+    RetrieveOptions, RetrieveProvenance, RetrieveResult, RetrievedEntity,
 };
 pub use summary::{is_valid_confidence, Summary, SummaryInput};

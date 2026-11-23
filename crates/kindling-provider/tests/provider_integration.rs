@@ -3,11 +3,11 @@
 //! Mirrors `packages/kindling-provider-local/test/local-fts.spec.ts` so the
 //! Rust provider demonstrably reproduces the TS provider's behaviour.
 
-use kindling_provider::{LocalFtsProvider, RetrievalProvider};
+use kindling_provider::{LocalFtsProvider, ProviderError, RetrievalProvider};
 use kindling_store::SqliteKindlingStore;
 use kindling_types::{
-    Observation, ObservationKind, ProviderSearchOptions, ProviderSearchResult, RetrievedEntity,
-    ScopeIds, Summary, Timestamp,
+    Observation, ObservationKind, ProviderSearchOptions, ProviderSearchResult, QueryMode,
+    RetrievedEntity, ScopeIds, Summary, Timestamp,
 };
 
 const NOW: Timestamp = 1_700_000_000_000;
@@ -65,6 +65,14 @@ fn options(query: &str, scope_ids: ScopeIds) -> ProviderSearchOptions {
         max_results: None,
         exclude_ids: None,
         include_redacted: None,
+        query_mode: None,
+    }
+}
+
+fn advanced(query: &str) -> ProviderSearchOptions {
+    ProviderSearchOptions {
+        query_mode: Some(QueryMode::Advanced),
+        ..options(query, ScopeIds::default())
     }
 }
 
@@ -602,24 +610,156 @@ fn has_correct_provider_name() {
     assert_eq!(provider.name(), "local-fts");
 }
 
-// ===== Malformed query handling =====
+// ===== Query interpretation (GH-311) =====
+//
+// Literal mode (the default) treats the query as plain text: whitespace-split
+// terms, each quoted for FTS5, all required. Advanced mode passes FTS5 syntax
+// through and reports malformed input as `ProviderError::InvalidQuery`.
+
+/// Store with one observation per entry, ids `obs-0`, `obs-1`, … in order.
+fn text_fixture(contents: &[&str]) -> SqliteKindlingStore {
+    let store = SqliteKindlingStore::open_in_memory().unwrap();
+    for (i, content) in contents.iter().enumerate() {
+        store
+            .insert_observation(&observation(
+                &format!("obs-{i}"),
+                content,
+                scope(Some("s1"), Some("/repo")),
+                NOW,
+            ))
+            .unwrap();
+    }
+    store
+}
 
 #[test]
-fn malformed_queries_return_empty_results() {
-    let store = SqliteKindlingStore::open_in_memory().unwrap();
-    store
-        .insert_observation(&observation(
-            "obs-1",
-            "authentication test",
-            scope(Some("s1"), None),
-            NOW,
-        ))
-        .unwrap();
+fn literal_queries_find_developer_identifiers() {
+    let store = text_fixture(&[
+        "edited src/provider.rs and cache.rs in kindling-server to fix: cache invalidation",
+        "built the C++ bindings and ssh'd to user@host",
+        "unrelated note about the weather",
+    ]);
+
+    for query in [
+        "cache.rs",
+        "src/provider.rs",
+        "kindling-server",
+        "fix: cache",
+        "src/provider.rs cache.rs",
+    ] {
+        let results = search(&store, &options(query, ScopeIds::default()));
+        assert_eq!(sorted_ids(&results), ["obs-0"], "literal query {query:?}");
+    }
+    for query in ["C++", "user@host"] {
+        let results = search(&store, &options(query, ScopeIds::default()));
+        assert_eq!(sorted_ids(&results), ["obs-1"], "literal query {query:?}");
+    }
+}
+
+#[test]
+fn literal_queries_escape_embedded_double_quotes() {
+    let store = text_fixture(&["the tool said \"hello\" twice", "goodbye"]);
+
+    for query in ["said \"hello\"", "\"hello", "hello\"", "\"\"hello\"\""] {
+        let results = search(&store, &options(query, ScopeIds::default()));
+        assert_eq!(sorted_ids(&results), ["obs-0"], "literal query {query:?}");
+    }
+}
+
+#[test]
+fn literal_queries_require_every_term() {
+    let store = text_fixture(&["cache invalidation fixed", "cache warmed"]);
+
+    let results = search(&store, &options("cache invalidation", ScopeIds::default()));
+    assert_eq!(sorted_ids(&results), ["obs-0"]);
+}
+
+#[test]
+fn literal_zero_hit_queries_return_empty_not_an_error() {
+    let store = text_fixture(&["authentication test"]);
+
+    for query in [
+        "nonexistentterm",
+        "AND OR",
+        "*",
+        "",
+        "   ",
+        "foo(bar",
+        "\"unclosed quote",
+        "content:",
+        "NOT NOT NOT",
+        "missing:term",
+        "hello missing:term",
+        "++",
+    ] {
+        let results = LocalFtsProvider::from_store(&store)
+            .search(&options(query, ScopeIds::default()), NOW)
+            .unwrap_or_else(|err| panic!("literal query {query:?} must not error: {err}"));
+        assert!(
+            results.is_empty(),
+            "literal query {query:?} should find nothing"
+        );
+    }
+}
+
+#[test]
+fn literal_not_is_a_word_but_advanced_not_is_an_operator() {
+    let store = text_fixture(&["what is not cached", "what is cached"]);
+
+    let literal = search(&store, &options("what NOT cached", ScopeIds::default()));
+    assert_eq!(
+        sorted_ids(&literal),
+        ["obs-0"],
+        "literal NOT is a search word"
+    );
+
+    let excluded = search(&store, &advanced("what NOT cached"));
+    assert!(
+        excluded.is_empty(),
+        "advanced NOT excludes every row containing `cached`, got {:?}",
+        sorted_ids(&excluded)
+    );
+
+    let excluded = search(&store, &advanced("what NOT not"));
+    assert_eq!(
+        sorted_ids(&excluded),
+        ["obs-1"],
+        "advanced NOT excludes `not`"
+    );
+}
+
+#[test]
+fn advanced_queries_keep_fts5_syntax() {
+    let store = text_fixture(&[
+        "authentication flow",
+        "authorize the deploy",
+        "database migration ran",
+        "migration of the database",
+    ]);
+
+    let cases: [(&str, &[&str]); 4] = [
+        ("auth*", &["obs-0", "obs-1"]),
+        ("deploy OR flow", &["obs-0", "obs-1"]),
+        ("\"database migration\"", &["obs-2"]),
+        ("database AND migration", &["obs-2", "obs-3"]),
+    ];
+    for (query, expected) in cases {
+        let results = search(&store, &advanced(query));
+        assert_eq!(sorted_ids(&results), expected, "advanced query {query:?}");
+    }
+
+    // The same strings are plain text in literal mode.
+    assert!(search(&store, &options("auth*", ScopeIds::default())).is_empty());
+    assert!(search(&store, &options("deploy OR flow", ScopeIds::default())).is_empty());
+}
+
+#[test]
+fn malformed_advanced_queries_are_invalid_query_errors() {
+    let store = text_fixture(&["authentication test"]);
 
     for query in [
         "AND OR",
         "*",
-        "",
         "foo(bar",
         "\"unclosed quote",
         "content:",
@@ -629,11 +769,23 @@ fn malformed_queries_return_empty_results() {
         "col1:foo",
         "hello missing:term",
     ] {
-        let results = search(&store, &options(query, ScopeIds::default()));
+        let err = LocalFtsProvider::from_store(&store)
+            .search(&advanced(query), NOW)
+            .expect_err(&format!("advanced query {query:?} must be rejected"));
         assert!(
-            results.is_empty(),
-            "query {query:?} should yield no results"
+            matches!(err, ProviderError::InvalidQuery(_)),
+            "advanced query {query:?} should be InvalidQuery, got {err:?}"
         );
+    }
+}
+
+#[test]
+fn empty_advanced_query_returns_nothing() {
+    let store = text_fixture(&["authentication test"]);
+
+    for query in ["", "   "] {
+        let results = search(&store, &advanced(query));
+        assert!(results.is_empty(), "advanced query {query:?}");
     }
 }
 
@@ -906,6 +1058,7 @@ fn retrieve_returns_top_composite_candidates_within_max_candidates() {
         token_budget: None,
         max_candidates: Some(2),
         include_redacted: None,
+        query_mode: None,
     };
 
     let result = kindling_provider::retrieve_at(&store, &provider, &options, NOW).unwrap();

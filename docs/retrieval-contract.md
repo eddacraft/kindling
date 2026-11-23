@@ -23,6 +23,7 @@ pub struct RetrieveOptions {
     pub token_budget: Option<usize>,    // DEPRECATED — see "Token Budget and Truncation"
     pub max_candidates: Option<usize>,  // Max candidates from provider (the bounded-result knob)
     pub include_redacted: Option<bool>, // Include redacted observations (default: false)
+    pub query_mode: Option<QueryMode>,  // Literal (default) or Advanced; see "Query interpretation"
 }
 
 pub struct RetrieveResult {
@@ -154,7 +155,7 @@ Retrieval results are organized in a **three-tier structure**:
 
 **Filtering:**
 
-- FTS query match (over `observations_fts` and `summaries_fts`)
+- FTS query match (over `observations_fts` and `summaries_fts`), with the query interpreted per [`queryMode`](#query-interpretation)
 - Scoped by `scopeIds`
 - Excludes redacted observations (unless `include_redacted = true`)
 - Excludes entities already in pins or current summary (deduplication)
@@ -191,6 +192,7 @@ pub struct ProviderSearchOptions {
     pub max_results: Option<usize>,
     pub exclude_ids: Vec<String>,   // for deduplication
     pub include_redacted: bool,
+    pub query_mode: QueryMode,      // Literal (default) or Advanced
     pub retrieve_at: i64,           // explicit "now" (epoch ms) — recency + determinism
 }
 
@@ -237,6 +239,41 @@ where:
   read in full.
 
 The provider takes an explicit `retrieve_at` (the `now` clock) so recency scoring is testable and reproducible; nothing reads the wall clock implicitly.
+
+### Query interpretation
+
+`queryMode` decides how the query string is turned into an FTS5 `MATCH`
+expression. The provider does this in one place, so the CLI, the daemon and the
+editor integrations all behave the same.
+
+| Mode              | Wire value            | Behaviour                                                                                                                                |
+| ----------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Literal (default) | `"literal"` or absent | Plain text. The query is split on whitespace, and each word is quoted, so every word must match and punctuation is never read as syntax. |
+| Advanced          | `"advanced"`          | The query is passed to FTS5 unchanged: prefix (`auth*`), `OR`, `NOT`, `NEAR`, "quoted phrases" and column filters.                       |
+
+**Literal mode:**
+
+- Each word is matched as typed. `src/cache.rs` matches the token sequence
+  `src cache rs`, and `kindling-server` matches `kindling server`. Neither is a
+  syntax error.
+- A double quote inside a word is escaped, so `say "hi"` is valid.
+- `NOT`, `OR`, `AND` and `*` are searched for as words. `what NOT cached` needs
+  all three words.
+- A query with no words (empty or whitespace only) returns no candidates.
+- A query that matches nothing returns no candidates, not an error.
+
+**Advanced mode:**
+
+- An empty or whitespace-only query returns no candidates.
+- A malformed query (for example `AND OR`, an unterminated quote, or an unknown
+  column filter) is an error: `ProviderError::InvalidQuery`, which the daemon
+  returns as HTTP 400. It is never silently turned into an empty result.
+
+**Limits of literal matching.** Matching runs on the `porter unicode61` tokens,
+which drop punctuation. So `C++` also matches text containing just `C`, and
+`cache.rs` matches both `src/cache.rs` and `tests/cache.rs`. Quoting removes
+the parse errors but does not make punctuation significant. Exact identifier
+lookup is tracked separately.
 
 ## Scoping
 

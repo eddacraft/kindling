@@ -405,3 +405,31 @@ fn redaction_evidence_round_trip() {
         ]
     );
 }
+
+#[test]
+fn retrieve_query_mode_wire_format() {
+    let absent: RetrieveOptions = serde_json::from_value(json!({"query": "q", "scopeIds": {}}))
+        .expect("query mode is optional");
+    assert_eq!(absent.query_mode, None);
+    assert_eq!(absent.query_mode.unwrap_or_default(), QueryMode::Literal);
+    assert!(serde_json::to_value(&absent)
+        .unwrap()
+        .get("queryMode")
+        .is_none());
+
+    for (wire, mode) in [
+        ("literal", QueryMode::Literal),
+        ("advanced", QueryMode::Advanced),
+    ] {
+        let opts: RetrieveOptions =
+            serde_json::from_value(json!({"query": "q", "scopeIds": {}, "queryMode": wire}))
+                .expect("known query mode parses");
+        assert_eq!(opts.query_mode, Some(mode));
+        assert_eq!(serde_json::to_value(&opts).unwrap()["queryMode"], wire);
+    }
+
+    assert!(serde_json::from_value::<RetrieveOptions>(
+        json!({"query": "q", "scopeIds": {}, "queryMode": "raw"})
+    )
+    .is_err());
+}

@@ -18,6 +18,24 @@ pub enum RetrievedEntity {
     Summary(Summary),
 }
 
+/// How a retrieval query string is interpreted.
+///
+/// `Literal` (the default when the field is absent) treats the input as plain
+/// text: it is split on whitespace and every term must match, so file names,
+/// paths and hyphenated words such as `src/cache.rs` or `kindling-server` work
+/// as typed, and words such as `NOT` or `OR` are searched for, not applied.
+/// `Advanced` passes the query to SQLite FTS5 unchanged, for prefix (`auth*`),
+/// `OR`, `NOT`, phrase and column syntax; a malformed advanced query is an
+/// error rather than an empty result.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-rs", derive(TS), ts(export, export_to = "../bindings/"))]
+#[serde(rename_all = "lowercase")]
+pub enum QueryMode {
+    #[default]
+    Literal,
+    Advanced,
+}
+
 /// Options for a retrieval request.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-rs", derive(TS), ts(export, export_to = "../bindings/"))]
@@ -36,6 +54,10 @@ pub struct RetrieveOptions {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts-rs", ts(optional))]
     pub include_redacted: Option<bool>,
+    /// How `query` is interpreted. Absent means [`QueryMode::Literal`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts-rs", ts(optional))]
+    pub query_mode: Option<QueryMode>,
 }
 
 /// Pin together with the observation or summary it points at.
@@ -101,6 +123,10 @@ pub struct ProviderSearchOptions {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts-rs", ts(optional))]
     pub include_redacted: Option<bool>,
+    /// How `query` is interpreted. Absent means [`QueryMode::Literal`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts-rs", ts(optional))]
+    pub query_mode: Option<QueryMode>,
 }
 
 /// A single result from a retrieval provider.

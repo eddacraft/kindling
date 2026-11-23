@@ -116,6 +116,8 @@ kindling tui                               # browse memory in the terminal
 kindling log "root cause: cache eviction"
 kindling search "authentication error"     # scoped to the current git repo
 kindling search "authentication error" --all-repos
+kindling search "src/cache.rs"             # words match as typed, all must match
+kindling search "auth* OR login" --advanced  # FTS5 syntax: prefix, OR, NOT, "phrases"
 kindling list capsules                     # capsules | pins | observations
 kindling status                            # database path and health
 kindling stats                             # counts by kind, capsules, pins, activity

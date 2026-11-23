@@ -107,6 +107,7 @@ pub fn retrieve_at(
             max_results: Some(max_candidates),
             exclude_ids: Some(pinned_ids),
             include_redacted: Some(include_redacted),
+            query_mode: options.query_mode,
         },
         now,
     )?;

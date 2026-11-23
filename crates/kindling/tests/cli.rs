@@ -288,6 +288,69 @@ fn search_finds_logged_observation() {
     assert_eq!(v["provenance"]["query"], json!("brown fox"));
 }
 
+/// GH-311: queries are literal text by default, so file names, paths,
+/// hyphenated words and `prefix:` text match as typed.
+#[test]
+fn search_matches_identifiers_literally_by_default() {
+    let env = CliEnv::new();
+    assert_success(&env.run_db(&[
+        "log",
+        "edited src/provider.rs and cache.rs in kindling-server to fix: cache invalidation",
+    ]));
+    assert_success(&env.run_db(&["log", "unrelated weather note"]));
+
+    for query in [
+        "cache.rs",
+        "src/provider.rs",
+        "kindling-server",
+        "fix: cache",
+        "what NOT kindling-server",
+    ] {
+        let search = env.run_db(&["search", query, "--json"]);
+        assert_success(&search);
+        let v = json_stdout(&search);
+        let contents = candidate_contents(&v);
+        let expected = usize::from(!query.starts_with("what"));
+        assert_eq!(
+            contents.len(),
+            expected,
+            "literal query {query:?} returned {contents:?}"
+        );
+        assert_eq!(v["provenance"]["query"], json!(query));
+    }
+}
+
+/// `--advanced` keeps FTS5 syntax; a malformed advanced query fails loudly
+/// instead of looking like "no results".
+#[test]
+fn search_advanced_keeps_fts5_syntax_and_rejects_malformed_queries() {
+    let env = CliEnv::new();
+    assert_success(&env.run_db(&["log", "database migration completed"]));
+
+    let prefix = env.run_db(&["search", "datab*", "--advanced", "--json"]);
+    assert_success(&prefix);
+    assert_eq!(candidate_contents(&json_stdout(&prefix)).len(), 1);
+
+    let literal = env.run_db(&["search", "datab*", "--json"]);
+    assert_success(&literal);
+    assert!(candidate_contents(&json_stdout(&literal)).is_empty());
+
+    let bad = env.run_db(&["search", "AND OR", "--advanced", "--json"]);
+    assert!(!bad.status.success(), "malformed advanced query must fail");
+    let err: serde_json::Value = serde_json::from_str(support::stderr(&bad).trim()).unwrap();
+    assert!(
+        err["error"]
+            .as_str()
+            .unwrap()
+            .contains("invalid search query"),
+        "error should name the problem: {err}"
+    );
+
+    let bad = env.run_db(&["search", "\"unclosed", "--advanced"]);
+    assert!(!bad.status.success(), "malformed advanced query must fail");
+    assert!(support::stderr(&bad).contains("invalid search query"));
+}
+
 #[test]
 fn export_then_import_dry_run_then_import_roundtrip() {
     let src = CliEnv::new();

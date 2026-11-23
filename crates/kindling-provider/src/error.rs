@@ -12,6 +12,11 @@ pub enum ProviderError {
     #[error(transparent)]
     Store(#[from] StoreError),
 
+    /// The query is not valid FTS5 syntax. Only an advanced-mode query can
+    /// produce this: literal queries are always compiled to valid syntax.
+    #[error("invalid search query: {0}")]
+    InvalidQuery(String),
+
     #[error("unexpected value {value:?} in column {column}")]
     UnexpectedRowValue { column: &'static str, value: String },
 }

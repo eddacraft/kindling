@@ -112,6 +112,7 @@ async fn warm_call_round_trip_all_methods() {
             token_budget: None,
             max_candidates: None,
             include_redacted: None,
+            query_mode: None,
         })
         .await
         .expect("retrieve");
@@ -162,6 +163,7 @@ async fn forget_redacts_observation() {
             token_budget: None,
             max_candidates: None,
             include_redacted: None,
+            query_mode: None,
         })
         .await
         .expect("retrieve before forget");
@@ -184,6 +186,7 @@ async fn forget_redacts_observation() {
             token_budget: None,
             max_candidates: None,
             include_redacted: None,
+            query_mode: None,
         })
         .await
         .expect("retrieve after forget");
@@ -568,6 +571,7 @@ async fn per_project_isolation_via_client() {
             token_budget: None,
             max_candidates: None,
             include_redacted: None,
+            query_mode: None,
         })
         .await
         .expect("retrieve under B");
@@ -585,6 +589,7 @@ async fn per_project_isolation_via_client() {
             token_budget: None,
             max_candidates: None,
             include_redacted: None,
+            query_mode: None,
         })
         .await
         .expect("retrieve under A");
