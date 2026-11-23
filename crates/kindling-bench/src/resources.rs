@@ -15,6 +15,8 @@ struct Snapshot {
     fds: Option<u64>,
     process_jiffies: Option<u64>,
     total_jiffies: Option<u64>,
+    /// CPUs covered by `total_jiffies` (`cpuN` lines in the same `/proc/stat`).
+    online_cpus: Option<usize>,
     /// Physical disk I/O from `/proc/.../io` (`read_bytes` / `write_bytes`).
     /// Often stays 0 when the page cache absorbs writes and no writeback
     /// has flushed yet (common on tmpfs and heavily cached local disks).
@@ -124,20 +126,27 @@ impl ResourceSampler {
     pub fn finish(mut self) -> Result<ResourceSummary, SamplerError> {
         let peak = self.stop_and_join()?;
         let after = snapshot();
-        let ncpus = thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get);
+        // Normalise by the CPU count from the same /proc/stat as the totals
+        // (GH-178), not `available_parallelism`, which follows the affinity
+        // mask or quota while the totals cover every online CPU.
         let cpu_cores = match (
             self.before.process_jiffies,
             after.process_jiffies,
             self.before.total_jiffies,
             after.total_jiffies,
+            after.online_cpus.or(self.before.online_cpus),
         ) {
-            (Some(proc_before), Some(proc_after), Some(total_before), Some(total_after)) => {
-                Some(cpu_cores_for_window(
-                    proc_after.saturating_sub(proc_before),
-                    total_after.saturating_sub(total_before),
-                    ncpus,
-                ))
-            }
+            (
+                Some(proc_before),
+                Some(proc_after),
+                Some(total_before),
+                Some(total_after),
+                Some(ncpus),
+            ) => Some(cpu_cores_for_window(
+                proc_after.saturating_sub(proc_before),
+                total_after.saturating_sub(total_before),
+                ncpus,
+            )),
             _ => None,
         };
         let peak_rss_kib = option_max(option_max(peak.rss_kib, self.before.rss_kib), after.rss_kib);
@@ -365,9 +374,9 @@ fn snapshot() -> Snapshot {
     let process_jiffies = std::fs::read_to_string("/proc/self/stat")
         .ok()
         .and_then(|value| parse_proc_stat(&value));
-    let total_jiffies = std::fs::read_to_string("/proc/stat")
+    let cpu = std::fs::read_to_string("/proc/stat")
         .ok()
-        .and_then(|value| parse_total_cpu_jiffies(&value));
+        .and_then(|value| parse_cpu_stat(&value));
     let io = std::fs::read_to_string("/proc/self/io")
         .ok()
         .and_then(|value| parse_proc_io(&value));
@@ -379,7 +388,8 @@ fn snapshot() -> Snapshot {
         threads,
         fds,
         process_jiffies,
-        total_jiffies,
+        total_jiffies: cpu.map(|c| c.total_jiffies),
+        online_cpus: cpu.map(|c| c.online_cpus),
         read_bytes: io.map(|c| c.read_bytes),
         write_bytes: io.map(|c| c.write_bytes),
         rchar: io.map(|c| c.rchar),
@@ -392,11 +402,41 @@ fn snapshot() -> Snapshot {
     Snapshot::default()
 }
 
-fn parse_total_cpu_jiffies(stat: &str) -> Option<u64> {
-    let mut fields = stat.lines().next()?.split_whitespace();
+/// Host CPU accounting parsed from one read of `/proc/stat`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CpuStat {
+    /// Sum of the first eight fields of the aggregate `cpu` line (user, nice,
+    /// system, idle, iowait, irq, softirq, steal) across every online CPU.
+    pub total_jiffies: u64,
+    /// Number of `cpuN` lines: the CPUs `total_jiffies` covers.
+    pub online_cpus: usize,
+}
+
+/// Parse the aggregate jiffies and the online CPU count from `/proc/stat`.
+///
+/// The CPU count comes from the same document as the totals, so dividing a
+/// process's jiffies by `total_jiffies` and scaling by `online_cpus` gives
+/// saturated cores even when the process is restricted to fewer CPUs by an
+/// affinity mask or quota (where `available_parallelism` would disagree with
+/// the host-wide totals).
+#[must_use]
+pub fn parse_cpu_stat(stat: &str) -> Option<CpuStat> {
+    let mut lines = stat.lines();
+    let mut fields = lines.next()?.split_whitespace();
     (fields.next()? == "cpu").then_some(())?;
-    fields
+    let total_jiffies = fields
         .take(8)
         .map(str::parse::<u64>)
-        .try_fold(0u64, |total, value| Some(total.saturating_add(value.ok()?)))
+        .try_fold(0u64, |total, value| Some(total.saturating_add(value.ok()?)))?;
+    let online_cpus = lines
+        .filter(|line| {
+            line.strip_prefix("cpu")
+                .and_then(|rest| rest.split_whitespace().next())
+                .is_some_and(|id| !id.is_empty() && id.bytes().all(|b| b.is_ascii_digit()))
+        })
+        .count();
+    (online_cpus > 0).then_some(CpuStat {
+        total_jiffies,
+        online_cpus,
+    })
 }

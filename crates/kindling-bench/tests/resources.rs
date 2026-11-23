@@ -1,6 +1,6 @@
 use kindling_bench::resources::{
-    cpu_cores_for_window, parse_proc_io, parse_proc_stat, parse_proc_status, ProcIo,
-    ResourceSampler,
+    cpu_cores_for_window, parse_cpu_stat, parse_proc_io, parse_proc_stat, parse_proc_status,
+    CpuStat, ProcIo, ResourceSampler,
 };
 use std::time::Duration;
 
@@ -27,6 +27,60 @@ fn linux_resource_documents_are_parsed() {
 fn cpu_window_is_reported_in_saturated_cores() {
     assert_eq!(cpu_cores_for_window(25, 1_000, 8), 0.2);
     assert_eq!(cpu_cores_for_window(25, 0, 8), 0.0);
+}
+
+/// `/proc/stat` for an 8-CPU host where CPUs 0 and 1 are fully busy. Each
+/// `cpuN` line sums to `per_cpu` jiffies (user + idle), and the aggregate `cpu`
+/// line sums to `8 * per_cpu`.
+fn eight_cpu_proc_stat(per_cpu: u64) -> String {
+    let mut stat = format!("cpu  {} 0 0 {} 0 0 0 0 0 0\n", per_cpu * 2, per_cpu * 6);
+    for cpu in 0..8 {
+        let busy = if cpu < 2 { per_cpu } else { 0 };
+        stat.push_str(&format!(
+            "cpu{cpu} {busy} 0 0 {} 0 0 0 0 0 0\n",
+            per_cpu - busy
+        ));
+    }
+    stat.push_str("intr 0\nctxt 0\nbtime 0\nprocesses 1\n");
+    stat
+}
+
+#[test]
+fn proc_stat_reports_the_cpu_count_its_totals_cover() {
+    let parsed = parse_cpu_stat(&eight_cpu_proc_stat(100)).expect("fixture should parse");
+
+    assert_eq!(
+        parsed,
+        CpuStat {
+            total_jiffies: 800,
+            online_cpus: 8
+        }
+    );
+}
+
+#[test]
+fn saturating_two_of_eight_cpus_reports_two_cores() {
+    // A process pinned to 2 of 8 CPUs saturates both for the whole window. The
+    // host-wide totals advance by 8 * 1000 jiffies and the process by 2 * 1000.
+    // The core count must come from the same /proc/stat as the totals, not from
+    // `available_parallelism`, which is 2 under that affinity mask and would
+    // report 0.5 cores.
+    let before = parse_cpu_stat(&eight_cpu_proc_stat(1_000)).expect("before parses");
+    let after = parse_cpu_stat(&eight_cpu_proc_stat(2_000)).expect("after parses");
+
+    let cores = cpu_cores_for_window(
+        2_000,
+        after.total_jiffies - before.total_jiffies,
+        after.online_cpus,
+    );
+
+    assert_eq!(cores, 2.0);
+}
+
+#[test]
+fn proc_stat_without_per_cpu_lines_is_rejected() {
+    assert_eq!(parse_cpu_stat("cpu  1 2 3 4 5 6 7 8 0 0\nintr 0\n"), None);
+    assert_eq!(parse_cpu_stat("intr 0\n"), None);
 }
 
 #[test]
