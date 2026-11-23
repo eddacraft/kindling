@@ -10,6 +10,14 @@ use std::time::Duration;
 /// hold this lock to keep another test's sampler out of their window.
 static SAMPLER_WINDOW: Mutex<()> = Mutex::new(());
 
+/// Whether this host exposes `/proc/self/io`. Some sandboxes hide it while
+/// still exposing RSS. Only then may a logical-read test skip: where it is
+/// readable, the sampler must report `Some`, so a regression that drops the
+/// counter to `None` fails instead of silently skipping.
+fn io_accounting_available() -> bool {
+    std::fs::read("/proc/self/io").is_ok()
+}
+
 #[test]
 fn idle_window_reports_no_logical_reads_despite_polling() {
     let _window = SAMPLER_WINDOW.lock().unwrap_or_else(|e| e.into_inner());
@@ -20,9 +28,7 @@ fn idle_window_reports_no_logical_reads_despite_polling() {
     std::thread::sleep(Duration::from_millis(200));
     let summary = sampler.finish().expect("resource sampler should finish");
 
-    // RSS can be readable while /proc/self/io is not (some sandboxes), so
-    // guard on the counter this test measures.
-    if summary.logical_read_bytes.is_some() {
+    if io_accounting_available() {
         assert_eq!(summary.logical_read_bytes, Some(0));
     }
 }
@@ -31,24 +37,20 @@ fn idle_window_reports_no_logical_reads_despite_polling() {
 fn polled_window_reports_exactly_the_workload_reads() {
     const WORKLOAD_BYTES: usize = 64 * 1024 + 123;
     let _window = SAMPLER_WINDOW.lock().unwrap_or_else(|e| e.into_inner());
-    let path = std::env::temp_dir().join(format!(
-        "kindling-bench-known-reads-{}.bin",
-        std::process::id()
-    ));
-    std::fs::write(&path, vec![7_u8; WORKLOAD_BYTES]).expect("write the workload file");
+    let workload = tempfile::NamedTempFile::new().expect("create the workload file");
+    std::fs::write(workload.path(), vec![7_u8; WORKLOAD_BYTES]).expect("write the workload file");
 
     // Polls run on both sides of the workload read, so this checks the
     // subtraction removes the sampler's reads and nothing else: an
     // over-subtraction would report fewer bytes than the workload read.
     let sampler = ResourceSampler::start(Duration::from_millis(1));
     std::thread::sleep(Duration::from_millis(50));
-    let read = std::fs::read(&path).expect("read the workload file");
+    let read = std::fs::read(workload.path()).expect("read the workload file");
     std::thread::sleep(Duration::from_millis(50));
     let summary = sampler.finish().expect("resource sampler should finish");
-    std::fs::remove_file(&path).ok();
 
     assert_eq!(read.len(), WORKLOAD_BYTES);
-    if summary.logical_read_bytes.is_some() {
+    if io_accounting_available() {
         assert_eq!(summary.logical_read_bytes, Some(WORKLOAD_BYTES as u64));
     }
 }

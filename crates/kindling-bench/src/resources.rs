@@ -274,7 +274,7 @@ mod tests {
     }
 
     #[test]
-    fn finish_normalises_cpu_by_the_snapshot_cpu_count() {
+    fn cpu_cores_are_normalised_by_the_snapshot_cpu_count() {
         // Seven online CPUs, a count no real host running this test is likely
         // to match, so normalising by the host's `available_parallelism`
         // instead would give a different answer. The totals advance by
@@ -293,6 +293,15 @@ mod tests {
         };
 
         assert_eq!(cpu_cores_between(&before, &after), Some(3.0));
+        let after_without_count = Snapshot {
+            online_cpus: None,
+            ..after
+        };
+        assert_eq!(
+            cpu_cores_between(&before, &after_without_count),
+            Some(3.0),
+            "falls back to the start snapshot's CPU count"
+        );
         assert_eq!(
             cpu_cores_between(&before, &Snapshot::default()),
             None,
