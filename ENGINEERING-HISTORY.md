@@ -79,6 +79,39 @@ at each release; older distribution approaches may now be superseded.
   output (`map_subagent_stop`, capped at 5,000) is a separate path. The old
   `captureResults` gated all PostToolUse capture, and no replacement switch
   exists.
+- **Narrow metadata table for the candidate join (PERF-001, #316).** Schema
+  revision 8 adds `observation_meta(rowid, id, ts, session_id, repo_id,
+  agent_id, user_id, redacted)`, kept in sync with `observations` by AFTER
+  INSERT, UPDATE and DELETE triggers. Migration 008 creates and backfills it
+  inside `BEGIN IMMEDIATE`, only while `schema_migrations` row 8 is absent, so
+  racing opens copy once. It doesn't write `user_version`, and older binaries'
+  writes fire the triggers.
+  - **Why.** The provider's observation candidate query now joins
+    `observation_meta` instead of `observations`. Those columns sit after
+    `content` in the wide row, so for large content every FTS match paid for
+    overflow pages. That read was the largest single cost of a broad search
+    (experiment 7 on #316). Ranking, normalisation and hydration are
+    unchanged, and hydration still reads `observations`.
+  - **Fallback.** A revision-7 database opened without migrating has no
+    `observation_meta`, so the same query runs against `observations`.
+    Results are identical either way; a test compares the two.
+  - **Error classifier.** The `m` alias is a schema alias, so
+    `no such column: m.<col>` propagates as a backend error.
+  - **Measured.** On the 220k-row synthetic corpus, with `max_candidates`
+    10, best of 6 rounds, in-process `retrieve_at`:
+
+    | Query | Scope | Before | After |
+    | --- | --- | --- | --- |
+    | Word in 50% of rows | All rows | 219 ms | 104 ms |
+    | Word in 50% of rows | One repo | 158 ms | 46 ms |
+    | Word in 10% of rows | All rows | 67 ms | 23 ms |
+    | Word in 10% of rows | One repo | 51 ms | 12 ms |
+
+    Rare words and two-word ANDs are unchanged or slightly faster. The
+    top-10 results are identical for every query. The first open migrates
+    in 1.1 s and grows the file by 3.6%.
+  - **Benchmark harness.** `kindling-bench` gains the `retrieve_corpus`
+    binary used for these numbers.
 
 ### Security
 

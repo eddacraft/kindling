@@ -69,11 +69,11 @@ mod tests {
         let v = schema_version();
         assert!(v.version >= v.min_reader);
         assert!(v.min_reader >= v.min_compatible);
-        assert_eq!(v.version, 7);
+        assert_eq!(v.version, 8);
         assert_eq!(v.min_reader, 6);
         assert_eq!(v.wire_version, 6);
         assert_eq!(wire_version(), 6);
-        assert_eq!(schema_revision(), 7);
+        assert_eq!(schema_revision(), 8);
         assert_eq!(v.fts_tokenizer, "porter unicode61");
     }
 
@@ -85,7 +85,7 @@ mod tests {
             SCHEMA_SQL.contains(&pragma),
             "schema.sql must set PRAGMA user_version to match version.json minReader"
         );
-        let migration_seed = format!("({}, '007_generic_events',", v.version);
+        let migration_seed = format!("({}, '008_observation_meta',", v.version);
         assert!(
             SCHEMA_SQL.contains(&migration_seed),
             "schema.sql must seed schema_migrations row for version.json revision"

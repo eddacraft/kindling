@@ -3,7 +3,7 @@
 //! - No-coupling golden test (no FK, trigger, CHECK, or FTS coupling to existing tables)
 //! - `generic_event_usage` trigger accounting
 //! - Frozen 0.4.1 open gate compatibility (accepts revision-7 DB; INSERT/UPDATE/DELETE observations)
-//! - Every open-rule row for `user_version` 0, 1–4, 5, 6, 7, and 8+ (writable & read-only)
+//! - Every open-rule row for `user_version` 0, 1–4, 5, 6, 7, and above the current revision (writable & read-only)
 
 use std::path::Path;
 use std::sync::{Arc, Barrier};
@@ -168,23 +168,23 @@ fn open_rule_user_version_6_and_7_missing_and_present_row_7() {
 }
 
 #[test]
-fn open_rule_user_version_above_7_refused() {
+fn open_rule_user_version_above_current_revision_refused() {
     let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("v8.db");
-    create_legacy_db(&path, 8, 7);
+    let path = dir.path().join("v9.db");
+    create_legacy_db(&path, 9, 7);
 
     assert!(matches!(
         open_database(&path, &StoreOptions { readonly: false }),
         Err(StoreError::SchemaTooNew {
-            found: 8,
-            supported: 7,
+            found: 9,
+            supported: 8,
         })
     ));
     assert!(matches!(
         open_database(&path, &StoreOptions { readonly: true }),
         Err(StoreError::SchemaTooNew {
-            found: 8,
-            supported: 7,
+            found: 9,
+            supported: 8,
         })
     ));
 }

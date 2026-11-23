@@ -649,17 +649,12 @@ fn genuine_schema_errors_are_not_swallowed() {
         ))
         .unwrap();
 
-    // Drop the denormalised column the observations query selects so SQLite
-    // reports `no such column: o.redacted` — the same error class as an
+    // Drop the column the candidate scan reads from `observation_meta` so
+    // SQLite reports `no such column: m.redacted`: the same error class as an
     // unknown FTS column filter, but a real schema failure.
     store
         .connection()
-        .execute_batch(
-            "DROP TRIGGER IF EXISTS observations_fts_insert;
-             DROP TRIGGER IF EXISTS observations_fts_update;
-             DROP TRIGGER IF EXISTS observations_fts_delete;
-             ALTER TABLE observations DROP COLUMN redacted;",
-        )
+        .execute_batch("ALTER TABLE observation_meta DROP COLUMN redacted;")
         .unwrap();
 
     let err = LocalFtsProvider::from_store(&store)
@@ -1000,4 +995,67 @@ fn ts_era_array_scope_ids_row_is_searchable_as_unscoped() {
         RetrievedEntity::Observation(obs) => assert_eq!(obs.scope_ids, ScopeIds::default()),
         other => panic!("expected an observation, got {other:?}"),
     }
+}
+
+// ===== Narrow metadata join (schema revision 8) =====
+
+fn ids_and_scores(results: &[ProviderSearchResult]) -> Vec<(String, f64)> {
+    results
+        .iter()
+        .map(|r| (entity_id(r).to_string(), r.score))
+        .collect()
+}
+
+/// The candidate scan filters on `observation_meta`, not the wide row: a
+/// change made only to the narrow copy is what the search sees.
+#[test]
+fn candidate_scan_filters_on_observation_meta() {
+    let store = scope_fixture();
+    store
+        .connection()
+        .execute(
+            "UPDATE observation_meta SET repo_id = '/elsewhere' WHERE id = 'obs-1'",
+            [],
+        )
+        .unwrap();
+
+    let results = search(
+        &store,
+        &options("authentication", scope(None, Some("/repo1"))),
+    );
+    assert_eq!(sorted_ids(&results), ["obs-2"]);
+}
+
+/// A revision-7 database opened without migrating (for example read-only)
+/// has no `observation_meta`. Search falls back to the wide row and returns
+/// exactly what the narrow join returns.
+#[test]
+fn search_without_observation_meta_matches_the_narrow_join() {
+    let store = shortlist_fixture();
+    let mut all = options("needle", ScopeIds::default());
+    all.max_results = Some(2);
+    let mut scoped = options("authentication", scope(Some("s1"), None));
+    scoped.include_redacted = Some(true);
+    let queries = [all, scoped, options("needle", scope(Some("s1"), None))];
+
+    let narrow: Vec<_> = queries
+        .iter()
+        .map(|q| ids_and_scores(&search(&store, q)))
+        .collect();
+    assert!(narrow.iter().any(|r| !r.is_empty()), "fixture must match");
+
+    store
+        .connection()
+        .execute_batch(
+            "DROP TRIGGER observation_meta_insert;
+             DROP TRIGGER observation_meta_update;
+             DROP TRIGGER observation_meta_delete;
+             DROP TABLE observation_meta;",
+        )
+        .unwrap();
+    let wide: Vec<_> = queries
+        .iter()
+        .map(|q| ids_and_scores(&search(&store, q)))
+        .collect();
+    assert_eq!(wide, narrow);
 }

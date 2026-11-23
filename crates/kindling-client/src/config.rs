@@ -27,7 +27,7 @@ pub const MAX_WIRE_VERSION: u32 = EXPECTED_SCHEMA_VERSION;
 pub const KNOWN_SCHEMA_REVISION: u32 = parse_schema_revision(SCHEMA_VERSION_JSON);
 
 const _: () = assert!(EXPECTED_SCHEMA_VERSION == 6);
-const _: () = assert!(KNOWN_SCHEMA_REVISION == 7);
+const _: () = assert!(KNOWN_SCHEMA_REVISION == 8);
 
 const SCHEMA_VERSION_JSON: &str = include_str!("../schema/version.json");
 
@@ -408,7 +408,7 @@ mod tests {
     fn expected_schema_version_parses_to_six_and_revision_to_seven() {
         assert_eq!(EXPECTED_SCHEMA_VERSION, 6);
         assert_eq!(MAX_WIRE_VERSION, 6);
-        assert_eq!(KNOWN_SCHEMA_REVISION, 7);
+        assert_eq!(KNOWN_SCHEMA_REVISION, 8);
     }
 
     #[test]

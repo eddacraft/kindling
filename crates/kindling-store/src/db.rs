@@ -101,6 +101,52 @@ INSERT OR IGNORE INTO schema_migrations (version, name, applied_at)
 COMMIT;
 "#;
 
+/// Additive revision 8: `observation_meta`, a narrow copy of the observation
+/// columns retrieval filters and ranks on, plus the triggers that keep it in
+/// sync with `observations`.
+///
+/// Like 007 it runs inside `BEGIN IMMEDIATE`, is idempotent and never writes
+/// `PRAGMA user_version`, so older binaries still open the database (their
+/// writes fire the triggers). The backfill runs only while row 8 is absent, so
+/// a racing opener that loses the lock does not copy the table again.
+const MIGRATION_008_OBSERVATION_META: &str = r#"
+BEGIN IMMEDIATE;
+CREATE TABLE IF NOT EXISTS observation_meta (
+  rowid       INTEGER PRIMARY KEY,
+  id          TEXT    NOT NULL,
+  ts          INTEGER NOT NULL,
+  session_id  TEXT,
+  repo_id     TEXT,
+  agent_id    TEXT,
+  user_id     TEXT,
+  redacted    INTEGER NOT NULL
+);
+INSERT OR REPLACE INTO observation_meta (rowid, id, ts, session_id, repo_id, agent_id, user_id, redacted)
+  SELECT rowid, id, ts, session_id, repo_id, agent_id, user_id, redacted FROM observations
+   WHERE NOT EXISTS (SELECT 1 FROM schema_migrations WHERE version = 8);
+CREATE TRIGGER IF NOT EXISTS observation_meta_insert
+AFTER INSERT ON observations
+BEGIN
+  INSERT OR REPLACE INTO observation_meta (rowid, id, ts, session_id, repo_id, agent_id, user_id, redacted)
+  VALUES (NEW.rowid, NEW.id, NEW.ts, NEW.session_id, NEW.repo_id, NEW.agent_id, NEW.user_id, NEW.redacted);
+END;
+CREATE TRIGGER IF NOT EXISTS observation_meta_update
+AFTER UPDATE ON observations
+BEGIN
+  DELETE FROM observation_meta WHERE rowid = OLD.rowid;
+  INSERT OR REPLACE INTO observation_meta (rowid, id, ts, session_id, repo_id, agent_id, user_id, redacted)
+  VALUES (NEW.rowid, NEW.id, NEW.ts, NEW.session_id, NEW.repo_id, NEW.agent_id, NEW.user_id, NEW.redacted);
+END;
+CREATE TRIGGER IF NOT EXISTS observation_meta_delete
+AFTER DELETE ON observations
+BEGIN
+  DELETE FROM observation_meta WHERE rowid = OLD.rowid;
+END;
+INSERT OR IGNORE INTO schema_migrations (version, name, applied_at)
+  VALUES (8, '008_observation_meta', unixepoch('subsec') * 1000);
+COMMIT;
+"#;
+
 /// Database open options.
 #[derive(Debug, Clone, Default)]
 pub struct StoreOptions {
@@ -343,6 +389,14 @@ fn ensure_schema(conn: &Connection, readonly: bool) -> StoreResult<()> {
         };
         if !has_rev_7 {
             conn.execute_batch(MIGRATION_007_GENERIC_EVENTS)?;
+        }
+        let has_rev_8: bool = conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version = 8)",
+            [],
+            |row| row.get(0),
+        )?;
+        if !has_rev_8 {
+            conn.execute_batch(MIGRATION_008_OBSERVATION_META)?;
         }
     }
     Ok(())
