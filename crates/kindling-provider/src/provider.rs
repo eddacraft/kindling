@@ -59,6 +59,18 @@ const MATCH_CONTEXT_UNITS: usize = 100;
 /// index reads. A larger session searches without a bound, exactly as before.
 const SESSION_SPAN_SCAN_LIMIT: i64 = 10_000;
 
+/// Matching observations (before scope filters) at which a search may use the
+/// recent window. Below it, retrieval is exact.
+const RECENT_WINDOW_THRESHOLD: i64 = 1_000;
+
+/// Age of the recent window: the same 30 days over which recency decays.
+const RECENT_WINDOW_MS: i64 = MAX_AGE_MS;
+
+/// Earliest window rows (by `ts`) whose lowest rowid anchors the cheap check
+/// before the window's exact lower bound is computed. Tolerates clock skew and
+/// interleaved writers.
+const RECENT_WINDOW_ANCHOR_ROWS: i64 = 256;
+
 /// Where a session's observations sit in rowid order.
 #[derive(Debug, PartialEq, Eq)]
 enum SessionSpan {
@@ -123,6 +135,7 @@ fn result_order(a: &Candidate, b: &Candidate) -> Ordering {
 pub struct LocalFtsProvider<'conn> {
     conn: &'conn Connection,
     session_span_scan_limit: i64,
+    recent_window_threshold: i64,
 }
 
 impl<'conn> LocalFtsProvider<'conn> {
@@ -133,6 +146,7 @@ impl<'conn> LocalFtsProvider<'conn> {
         Self {
             conn,
             session_span_scan_limit: SESSION_SPAN_SCAN_LIMIT,
+            recent_window_threshold: RECENT_WINDOW_THRESHOLD,
         }
     }
 
@@ -169,20 +183,22 @@ impl<'conn> LocalFtsProvider<'conn> {
                 _ => None,
             };
             let narrow = observations && self.has_observation_meta()?;
-            let (sql, params) =
-                candidate_query(entity_type, fts_query, options, now, narrow, rowid_span);
-            let mut stmt = self.conn.prepare(&sql)?;
-            let rows = stmt.query_map(params_from_iter(params), |row| {
-                Ok(Candidate {
-                    entity_type,
-                    rowid: row.get(0)?,
-                    id: row.get(1)?,
-                    fts_rank: row.get(2)?,
-                    recency: row.get(3)?,
-                    score: 0.0,
-                })
-            })?;
-            rows.collect()
+            if observations {
+                if let Some(recent) =
+                    self.recent_candidates(fts_query, options, now, narrow, rowid_span)?
+                {
+                    return Ok(recent);
+                }
+            }
+            self.run_candidates(
+                entity_type,
+                fts_query,
+                options,
+                now,
+                narrow,
+                rowid_span,
+                None,
+            )
         })();
 
         match result {
@@ -192,6 +208,136 @@ impl<'conn> LocalFtsProvider<'conn> {
             }
             Err(err) => Err(err.into()),
         }
+    }
+
+    /// Run one candidate scan. `min_ts` keeps only observations with
+    /// `ts >= min_ts`.
+    fn run_candidates(
+        &self,
+        entity_type: EntityType,
+        fts_query: &str,
+        options: &ProviderSearchOptions,
+        now: Timestamp,
+        narrow: bool,
+        rowid_span: Option<(i64, i64)>,
+        min_ts: Option<Timestamp>,
+    ) -> Result<Vec<Candidate>, rusqlite::Error> {
+        let (sql, params) = candidate_query(
+            entity_type,
+            fts_query,
+            options,
+            now,
+            narrow,
+            rowid_span,
+            min_ts,
+        );
+        let mut stmt = self.conn.prepare(&sql)?;
+        let rows = stmt.query_map(params_from_iter(params), |row| {
+            Ok(Candidate {
+                entity_type,
+                rowid: row.get(0)?,
+                id: row.get(1)?,
+                fts_rank: row.get(2)?,
+                recency: row.get(3)?,
+                score: 0.0,
+            })
+        })?;
+        rows.collect()
+    }
+
+    /// Observation candidates from the recent window, or `None` when the
+    /// search must be exact.
+    ///
+    /// The window holds the observations with `ts` in the last
+    /// [`RECENT_WINDOW_MS`]. It is used only when it alone holds at least
+    /// `max(recent_window_threshold, max_results)` in-scope matches, so a
+    /// search with fewer matches than the threshold is always exact, and so
+    /// is one whose window is thin. Inside the window, the choice does not
+    /// depend on `max_results` up to the threshold, so a smaller bound still
+    /// returns a prefix of a larger one.
+    ///
+    /// The window is exact about time. The FTS scan starts at the lowest rowid
+    /// of any observation in the window, and rows are then filtered on `ts`,
+    /// so rows whose `ts` does not rise with rowid (imports, backfills, clock
+    /// skew) are neither dropped nor wrongly included.
+    ///
+    /// Finding that lowest rowid reads every index entry in the window, so
+    /// cheap checks run first and send the search down the exact path when the
+    /// window can't or is unlikely to qualify. They only ever choose the exact
+    /// path:
+    /// - The query must match at least the threshold of observations (inside
+    ///   the session span, if any), counted from the FTS index alone and
+    ///   capped at the threshold.
+    /// - `anchor` is the lowest rowid among the window's
+    ///   [`RECENT_WINDOW_ANCHOR_ROWS`] earliest rows by `ts`, a short index
+    ///   read. Rows are normally appended in about `ts` order, so the window
+    ///   lies at and after it.
+    /// - The FTS index must hold at least the threshold of matches from
+    ///   `anchor` on, counted without reading any row and capped at the
+    ///   threshold.
+    fn recent_candidates(
+        &self,
+        fts_query: &str,
+        options: &ProviderSearchOptions,
+        now: Timestamp,
+        narrow: bool,
+        rowid_span: Option<(i64, i64)>,
+    ) -> Result<Option<Vec<Candidate>>, rusqlite::Error> {
+        let threshold = self.recent_window_threshold;
+        let cutoff = now.saturating_sub(RECENT_WINDOW_MS);
+        let (span_first, span_last) = rowid_span.unwrap_or((i64::MIN, i64::MAX));
+        let fts_matches_from = |first: i64| -> Result<i64, rusqlite::Error> {
+            self.conn.query_row(
+                "SELECT COUNT(*) FROM (
+                   SELECT 1 FROM observations_fts
+                   WHERE content MATCH ? AND rowid BETWEEN ? AND ?
+                   LIMIT ?
+                 )",
+                rusqlite::params![fts_query, first, span_last, threshold],
+                |row| row.get(0),
+            )
+        };
+        if fts_matches_from(span_first)? < threshold {
+            return Ok(None);
+        }
+
+        let anchor: Option<i64> = self.conn.query_row(
+            "SELECT MIN(rowid) FROM (
+               SELECT rowid FROM observations WHERE ts >= ? ORDER BY ts ASC LIMIT ?
+             )",
+            rusqlite::params![cutoff, RECENT_WINDOW_ANCHOR_ROWS],
+            |row| row.get(0),
+        )?;
+        let Some(anchor) = anchor else {
+            return Ok(None); // nothing in the window
+        };
+        if fts_matches_from(span_first.max(anchor))? < threshold {
+            return Ok(None);
+        }
+
+        // A covering scan of the window's index entries. Without INDEXED BY
+        // the planner walks the table in rowid order instead, which reads
+        // every older row.
+        let first_recent: i64 = self.conn.query_row(
+            "SELECT MIN(rowid) FROM observations INDEXED BY idx_observations_ts WHERE ts >= ?",
+            [cutoff],
+            |row| row.get(0),
+        )?;
+        let window_span = (span_first.max(first_recent), span_last);
+        let recent = self.run_candidates(
+            EntityType::Observation,
+            fts_query,
+            options,
+            now,
+            narrow,
+            Some(window_span),
+            Some(cutoff),
+        )?;
+        let max_results = i64::from(options.max_results.unwrap_or(DEFAULT_MAX_RESULTS));
+        if (recent.len() as i64) < threshold.max(max_results) {
+            return Ok(None);
+        }
+        Ok(Some(recent))
     }
 
     /// The rowid span of `session_id`'s observations, reading at most
@@ -344,7 +490,8 @@ impl RetrievalProvider for LocalFtsProvider<'_> {
         candidates.extend(self.candidates(EntityType::Summary, &fts_query, options, now)?);
 
         // Normalize BM25 ranks across the full filtered match set of BOTH
-        // entity types, so scores are comparable and independent of
+        // entity types (observations limited to the recent window when it
+        // applies), so scores are comparable and independent of
         // `max_results`. FTS5 rank is negative; more negative = more relevant.
         let mut min_rank = f64::INFINITY;
         let mut max_rank = f64::NEG_INFINITY;
@@ -417,7 +564,8 @@ impl RetrievalProvider for LocalFtsProvider<'_> {
 ///
 /// `rowid_span`, when set, bounds the observation FTS scan to
 /// `first..=last` (see [`LocalFtsProvider::session_rowid_span`]). It must
-/// contain every rowid the scope filter can accept.
+/// contain every rowid the other filters can accept. `min_ts` keeps only
+/// observations with `ts >= min_ts` (the recent window).
 fn candidate_query(
     entity_type: EntityType,
     fts_query: &str,
@@ -425,6 +573,7 @@ fn candidate_query(
     now: Timestamp,
     has_observation_meta: bool,
     rowid_span: Option<(i64, i64)>,
+    min_ts: Option<Timestamp>,
 ) -> (String, Vec<SqlValue>) {
     let exclude_ids = options.exclude_ids.as_deref().unwrap_or(&[]);
     let include_redacted = options.include_redacted.unwrap_or(false);
@@ -456,8 +605,14 @@ fn candidate_query(
                  JOIN {meta_table} m ON f.rowid = m.rowid
                  WHERE 1=1
                    {redacted_filter}
+                   {time_filter}
                    {scope_filter}
                    {exclude_filter}",
+                time_filter = if min_ts.is_some() {
+                    "AND m.ts >= ?"
+                } else {
+                    ""
+                },
                 meta_table = if has_observation_meta {
                     "observation_meta"
                 } else {
@@ -498,6 +653,9 @@ fn candidate_query(
     }
     params.push(SqlValue::Integer(now));
     params.push(SqlValue::Integer(MAX_AGE_MS));
+    if let (EntityType::Observation, Some(min_ts)) = (entity_type, min_ts) {
+        params.push(SqlValue::Integer(min_ts));
+    }
     params.extend(scope_params);
     params.extend(exclude_ids.iter().map(|id| SqlValue::Text(id.clone())));
     (sql, params)
@@ -888,6 +1046,275 @@ mod tests {
         assert!(run(10_000, &queries[0]).iter().any(|(id, _)| id == "sum-a"));
     }
 
+    const DAY: i64 = 86_400_000;
+
+    fn window_provider(store: &SqliteKindlingStore, threshold: i64) -> LocalFtsProvider<'_> {
+        let mut provider = LocalFtsProvider::from_store(store);
+        provider.recent_window_threshold = threshold;
+        provider
+    }
+
+    fn needle(max_results: u32, scope_ids: ScopeIds) -> ProviderSearchOptions {
+        ProviderSearchOptions {
+            query: "needle".to_string(),
+            scope_ids,
+            max_results: Some(max_results),
+            exclude_ids: None,
+            include_redacted: None,
+            query_mode: None,
+        }
+    }
+
+    fn ranked(provider: &LocalFtsProvider<'_>, opts: &ProviderSearchOptions) -> Vec<(String, f64)> {
+        provider
+            .search(opts, NOW)
+            .unwrap()
+            .into_iter()
+            .map(|r| {
+                let id = match r.entity {
+                    RetrievedEntity::Observation(o) => o.id,
+                    RetrievedEntity::Summary(s) => s.id,
+                };
+                (id, r.score)
+            })
+            .collect()
+    }
+
+    /// `recent` matches inside the window and `old` outside it, each "needle"
+    /// once, plus an old row ("old-best") that BM25 ranks far above the rest.
+    fn window_store(recent: usize, old: usize) -> SqliteKindlingStore {
+        let store = SqliteKindlingStore::open_in_memory().unwrap();
+        insert(
+            &store,
+            "old-best",
+            "needle needle needle",
+            session(None, Some("/r")),
+            NOW - 90 * DAY,
+        );
+        for i in 0..old {
+            let filler = format!("needle old filler words here {i}");
+            insert(
+                &store,
+                &format!("old-{i}"),
+                &filler,
+                session(None, Some("/r")),
+                NOW - (31 + i as i64 % 50) * DAY,
+            );
+        }
+        for i in 0..recent {
+            // Appended in time order across the last 29 days.
+            let filler = format!("needle recent filler words here {i}");
+            let ts = NOW - 29 * DAY + i as i64 * 29 * DAY / recent as i64;
+            insert(
+                &store,
+                &format!("new-{i}"),
+                &filler,
+                session(None, Some("/r")),
+                ts,
+            );
+        }
+        store
+    }
+
+    #[test]
+    fn large_match_sets_search_the_recent_window() {
+        let store = window_store(40, 40);
+        let opts = needle(10, ScopeIds::default());
+        let exact = ranked(&window_provider(&store, i64::MAX), &opts);
+        let windowed = ranked(&window_provider(&store, 20), &opts);
+
+        assert_eq!(
+            exact[0].0, "old-best",
+            "exact ranking keeps the old best match"
+        );
+        assert_eq!(windowed.len(), 10);
+        assert!(
+            windowed.iter().all(|(id, _)| id.starts_with("new-")),
+            "the window holds only rows from the last 30 days: {windowed:?}"
+        );
+
+        // Inside the window, a smaller bound is still a prefix of a larger one.
+        let wider = ranked(
+            &window_provider(&store, 20),
+            &needle(20, ScopeIds::default()),
+        );
+        assert_eq!(windowed[..], wider[..10]);
+    }
+
+    #[test]
+    fn below_the_threshold_search_is_exact() {
+        let store = window_store(90, 40);
+        let opts = needle(10, ScopeIds::default());
+        let exact = ranked(&window_provider(&store, i64::MAX), &opts);
+        // 131 rows match, 90 of them in the window. A threshold above the
+        // window's matches is exact; one equal to them uses the window.
+        assert_eq!(ranked(&window_provider(&store, 132), &opts), exact);
+        assert_eq!(ranked(&window_provider(&store, 91), &opts), exact);
+        let windowed = ranked(&window_provider(&store, 90), &opts);
+        assert_ne!(windowed, exact);
+        assert!(windowed.iter().all(|(id, _)| id.starts_with("new-")));
+    }
+
+    #[test]
+    fn a_thin_window_falls_back_to_the_exact_search() {
+        // The window has fewer matches than the threshold.
+        let store = window_store(15, 40);
+        let opts = needle(10, ScopeIds::default());
+        assert_eq!(
+            ranked(&window_provider(&store, 20), &opts),
+            ranked(&window_provider(&store, i64::MAX), &opts)
+        );
+
+        // The window has fewer matches than max_results.
+        let store = window_store(30, 40);
+        let opts = needle(35, ScopeIds::default());
+        assert_eq!(
+            ranked(&window_provider(&store, 20), &opts),
+            ranked(&window_provider(&store, i64::MAX), &opts)
+        );
+
+        // The window is large, but not in this scope.
+        let store = window_store(40, 40);
+        insert(
+            &store,
+            "scoped-new",
+            "needle",
+            session(None, Some("/other")),
+            NOW,
+        );
+        let opts = needle(10, session(None, Some("/other")));
+        assert_eq!(
+            ranked(&window_provider(&store, 20), &opts),
+            ranked(&window_provider(&store, i64::MAX), &opts)
+        );
+    }
+
+    /// Imports and backfills break "ts rises with rowid". The window is
+    /// defined by `ts`, not by rowid order.
+    #[test]
+    fn rows_out_of_time_order_are_windowed_by_ts() {
+        let store = SqliteKindlingStore::open_in_memory().unwrap();
+        // Lowest rowid, but recent: must be in the window.
+        insert(
+            &store,
+            "early-rowid-recent",
+            "needle needle needle",
+            session(None, None),
+            NOW,
+        );
+        for i in 0..40 {
+            insert(
+                &store,
+                &format!("old-{i}"),
+                &format!("needle old {i}"),
+                session(None, None),
+                NOW - 60 * DAY,
+            );
+        }
+        for i in 0..30 {
+            insert(
+                &store,
+                &format!("new-{i}"),
+                &format!("needle new {i}"),
+                session(None, None),
+                NOW - DAY,
+            );
+        }
+        // Highest rowid, but old: must not be in the window.
+        insert(
+            &store,
+            "late-rowid-old",
+            "needle needle needle needle",
+            session(None, None),
+            NOW - 365 * DAY,
+        );
+
+        let windowed = ranked(
+            &window_provider(&store, 20),
+            &needle(10, ScopeIds::default()),
+        );
+        assert_eq!(windowed[0].0, "early-rowid-recent");
+        assert!(windowed
+            .iter()
+            .all(|(id, _)| id != "late-rowid-old" && !id.starts_with("old-")));
+    }
+
+    /// When the window's earliest rows sit after most of its matches, the
+    /// cheap check can't see enough matches and the search stays exact. That
+    /// costs speed, never results.
+    #[test]
+    fn a_window_out_of_rowid_order_falls_back_to_exact() {
+        let store = SqliteKindlingStore::open_in_memory().unwrap();
+        for i in 0..300 {
+            insert(
+                &store,
+                &format!("new-{i}"),
+                &format!("needle {i}"),
+                session(None, None),
+                NOW - DAY,
+            );
+        }
+        // Appended last, but the window's earliest rows by ts.
+        for i in 0..300 {
+            insert(
+                &store,
+                &format!("imported-{i}"),
+                "unrelated",
+                session(None, None),
+                NOW - 29 * DAY,
+            );
+        }
+        insert(
+            &store,
+            "old-best",
+            "needle needle needle",
+            session(None, None),
+            NOW - 90 * DAY,
+        );
+        let opts = needle(10, ScopeIds::default());
+        assert_eq!(
+            ranked(&window_provider(&store, 20), &opts),
+            ranked(&window_provider(&store, i64::MAX), &opts)
+        );
+    }
+
+    #[test]
+    fn the_window_combines_with_a_session_span() {
+        let store = SqliteKindlingStore::open_in_memory().unwrap();
+        for i in 0..30 {
+            insert(
+                &store,
+                &format!("a-old-{i}"),
+                &format!("needle {i}"),
+                session(Some("a"), None),
+                NOW - 45 * DAY,
+            );
+            insert(
+                &store,
+                &format!("b-new-{i}"),
+                &format!("needle {i}"),
+                session(Some("b"), None),
+                NOW - DAY,
+            );
+        }
+        for i in 0..25 {
+            insert(
+                &store,
+                &format!("a-new-{i}"),
+                &format!("needle {i}"),
+                session(Some("a"), None),
+                NOW - 2 * DAY,
+            );
+        }
+        let opts = needle(10, session(Some("a"), None));
+        let windowed = ranked(&window_provider(&store, 20), &opts);
+        assert_eq!(windowed.len(), 10);
+        assert!(
+            windowed.iter().all(|(id, _)| id.starts_with("a-new-")),
+            "{windowed:?}"
+        );
+    }
+
     /// The span reaches FTS5 as a rowid constraint, so matches outside it are
     /// never read. (A filter applied after the scan would be correct but no
     /// faster.)
@@ -910,6 +1337,7 @@ mod tests {
                 NOW,
                 true,
                 span,
+                None,
             );
             let mut stmt = store
                 .connection()

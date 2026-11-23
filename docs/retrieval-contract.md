@@ -227,10 +227,11 @@ where:
 
 - **FTS-based:** Uses `observations_fts` and `summaries_fts`
 - **Recency-weighted:** Recent entities score higher (30-day window)
-- **Exact:** Every filtered match is scored before the result bound is applied,
-  so the provider returns the true top `max_candidates` by score. A result's
-  score does not depend on the bound, and a smaller bound always returns a
-  prefix of a larger one.
+- **Exact below 1,000 recent matches:** Every filtered match is scored before
+  the result bound is applied, so the provider returns the true top
+  `max_candidates` by score. A result's score does not depend on the bound, and
+  a smaller bound always returns a prefix of a larger one. Above the threshold,
+  see [Recent window](#recent-window).
 - **Totally ordered:** Equal scores are ordered observations before summaries,
   then by BM25 rank (most relevant first), then by entity `id`.
 - **Deterministic:** Same query + scope + data + `retrieve_at` → same results
@@ -239,6 +240,32 @@ where:
   read in full.
 
 The provider takes an explicit `retrieve_at` (the `now` clock) so recency scoring is testable and reproducible; nothing reads the wall clock implicitly.
+
+#### Recent window
+
+Scoring every match is what makes a broad query over a large store expensive.
+So when a query has many matches, the provider ranks only the recent ones:
+
+- **When it applies.** Only when the observations with `ts` in the last 30 days
+  (before `retrieve_at`) hold at least `max(1000, max_candidates)` matches that
+  survive scope, redaction and exclude filtering.
+- **What it ranks.** Observation candidates are then only those observations.
+  BM25 min-max normalisation runs over them plus every matching summary.
+  Summaries are never windowed.
+- **What it changes.** An older observation can drop out even when its BM25
+  relevance would have ranked it in the top `max_candidates`. Its recency
+  weight is already 0 at that age.
+- **What it doesn't change.** A query with fewer matches, or a thin window, is
+  ranked exactly as above. Inside the window, results stay deterministic,
+  totally ordered, and prefix-stable for any `max_candidates` up to 1,000.
+- **Defined by `ts`, not insertion order.** Imported, backfilled or clock-skewed
+  rows are in the window exactly when their `ts` is.
+- **Speed-only fallback.** When a window's rows sit far out of insertion order,
+  the provider may rank exactly instead. That costs speed, never results.
+
+On a 220k-observation store, the broadest query (a word in half the rows) goes
+from 102 ms to 41 ms, and its top 10 and top 50 match the exact ranking. See
+PERF-004 in [Engineering History](../ENGINEERING-HISTORY.md).
 
 ### Query interpretation
 
