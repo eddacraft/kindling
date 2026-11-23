@@ -405,7 +405,7 @@ mod tests {
     }
 
     #[test]
-    fn expected_schema_version_parses_to_six_and_revision_to_seven() {
+    fn expected_schema_version_parses_to_six_and_revision_to_eight() {
         assert_eq!(EXPECTED_SCHEMA_VERSION, 6);
         assert_eq!(MAX_WIRE_VERSION, 6);
         assert_eq!(KNOWN_SCHEMA_REVISION, 8);

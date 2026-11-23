@@ -113,7 +113,7 @@ const MIGRATION_008_OBSERVATION_META: &str = r#"
 BEGIN IMMEDIATE;
 CREATE TABLE IF NOT EXISTS observation_meta (
   rowid       INTEGER PRIMARY KEY,
-  id          TEXT    NOT NULL,
+  id          TEXT,
   ts          INTEGER NOT NULL,
   session_id  TEXT,
   repo_id     TEXT,

@@ -150,9 +150,6 @@ impl<'conn> LocalFtsProvider<'conn> {
         }
     }
 
-    /// Read a ranked candidate's full row. Runs in the same snapshot as the
-    /// candidate scan, so the row must exist and carry the same `id`; anything
-    /// else means the database changed underneath us and is an error.
     /// Whether the database has `observation_meta` (schema revision 8). A
     /// revision-7 database opened without migrating, for example read-only,
     /// does not.
@@ -164,6 +161,9 @@ impl<'conn> LocalFtsProvider<'conn> {
         )
     }
 
+    /// Read a ranked candidate's full row. Runs in the same snapshot as the
+    /// candidate scan, so the row must exist and carry the same `id`; anything
+    /// else means the database changed underneath us and is an error.
     fn hydrate(&self, candidate: Candidate) -> ProviderResult<ProviderSearchResult> {
         let entity = match candidate.entity_type {
             EntityType::Observation => {
@@ -498,7 +498,7 @@ fn exclude_id_filter(prefix: &str, exclude_ids: &[Id]) -> String {
 ///
 /// FTS5 column filters such as `missing:term` surface as SQLite
 /// `no such column: missing` with a bare identifier. Provider SQL always
-/// qualifies columns (`o.redacted`, `f.rank`, …), so those schema errors
+/// qualifies columns (`m.redacted`, `o.redacted`, `f.rank`, …), so those schema errors
 /// still propagate. The FTS `content` column is also treated as schema: it
 /// is the only indexed column, so `no such column: content` means the index
 /// itself is broken, not that the user typed a bad filter.

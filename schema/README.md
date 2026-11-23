@@ -25,7 +25,9 @@ This directory contains the **SQLite schema contract** for kindling: the canonic
 
 A schema revision is **additive** (and may keep `PRAGMA user_version` at `minReader`) **only if** every older writer's `INSERT`, `UPDATE`, and `DELETE` stays valid on every table, including new ones — for example, a new standalone table with no foreign-key, trigger, or `CHECK` coupling to existing tables. Any change that violates this rule MUST raise `minReader` (and `PRAGMA user_version`).
 
-A trigger on an existing table is additive only when it cannot make an older writer's statement fail. Revision 8's `observation_meta` triggers qualify: they copy columns that are `NOT NULL` on `observations` into a table keyed by `rowid`, with `INSERT OR REPLACE`, so every valid write to `observations` still succeeds and keeps the copy current. `crates/kindling-store/tests/schema_revision_8.rs` pins this with 0.4.1-style writes.
+A trigger on an existing table is additive only when it cannot make an older writer's statement fail. Revision 8's `observation_meta` triggers qualify: each column carries the same nullability as on `observations`, and rows are keyed by `rowid` and written with `INSERT OR REPLACE`, so every valid write to `observations` still succeeds and keeps the copy current. `crates/kindling-store/tests/schema_revision_8.rs` pins this with 0.4.1-style writes.
+
+**Writers must not use `REPLACE` conflict resolution on `observations`** (`INSERT OR REPLACE`, `REPLACE INTO`). With SQLite's default `recursive_triggers = OFF`, the implicit delete fires no triggers, so it already leaves a stale `observations_fts` entry, and from revision 8 a stale `observation_meta` row that makes search fail with a row-mismatch error. kindling's own writers use plain `INSERT` or `INSERT OR IGNORE`.
 
 ## How to add a migration
 

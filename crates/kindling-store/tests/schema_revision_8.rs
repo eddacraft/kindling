@@ -17,7 +17,7 @@ const META_COLUMNS: &str = "rowid, id, ts, session_id, repo_id, agent_id, user_i
 
 type MetaRow = (
     i64,
-    String,
+    Option<String>,
     i64,
     Option<String>,
     Option<String>,
@@ -267,4 +267,29 @@ fn frozen_041_writes_keep_observation_meta_in_sync() {
     conn.execute("DELETE FROM observations WHERE id = 'obs-041-b'", [])
         .unwrap();
     assert_meta_matches(&conn);
+}
+
+/// `observations.id` has no `NOT NULL`, so neither does the copy: a write the
+/// base schema accepts must not start failing, and a revision-7 database that
+/// already holds such a row must still migrate.
+#[test]
+fn null_ids_neither_fail_writes_nor_block_migration() {
+    let null_id_insert =
+        "INSERT INTO observations (id, kind, content, provenance, ts, scope_ids, redacted)
+         VALUES (NULL, 'message', 'no id', '{}', 1000, '{}', 0)";
+
+    let store = SqliteKindlingStore::open_in_memory().unwrap();
+    store.connection().execute(null_id_insert, []).unwrap();
+    assert_meta_matches(store.connection());
+
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("rev7-null-id.db");
+    revision_7_db(&path, 3);
+    Connection::open(&path)
+        .unwrap()
+        .execute(null_id_insert, [])
+        .unwrap();
+    let rw = open_database(&path, &StoreOptions { readonly: false }).unwrap();
+    assert!(has_migration(&rw, 8));
+    assert_meta_matches(&rw);
 }

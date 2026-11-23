@@ -291,8 +291,8 @@ END;
 -- revision 8 keep it current too. Not a source of truth: hydration still
 -- reads `observations`.
 CREATE TABLE IF NOT EXISTS observation_meta (
-  rowid       INTEGER PRIMARY KEY,         -- observations.rowid
-  id          TEXT    NOT NULL,
+  rowid       INTEGER PRIMARY KEY,
+  id          TEXT,
   ts          INTEGER NOT NULL,
   session_id  TEXT,
   repo_id     TEXT,
