@@ -50,6 +50,21 @@ const DEFAULT_MAX_RESULTS: u32 = 50;
 /// Match-context preview length in UTF-16 code units (JS `string.length`).
 const MATCH_CONTEXT_UNITS: usize = 100;
 
+/// Most session rows read to find a session's rowid span: about 1 ms of
+/// index reads. A larger session searches without a bound, exactly as before.
+const SESSION_SPAN_SCAN_LIMIT: i64 = 10_000;
+
+/// Where a session's observations sit in rowid order.
+#[derive(Debug, PartialEq, Eq)]
+enum SessionSpan {
+    /// The session has no observations.
+    Empty,
+    /// Every observation in the session has a rowid in `first..=last`.
+    Bounded(i64, i64),
+    /// The session has more rows than the scan limit: search without a bound.
+    Unbounded,
+}
+
 /// A retrieval provider: named source of ranked search results.
 ///
 /// Mirrors the `RetrievalProvider` interface in
@@ -102,6 +117,7 @@ fn result_order(a: &Candidate, b: &Candidate) -> Ordering {
 /// FTS5 + recency retrieval over a kindling SQLite database.
 pub struct LocalFtsProvider<'conn> {
     conn: &'conn Connection,
+    session_span_scan_limit: i64,
 }
 
 impl<'conn> LocalFtsProvider<'conn> {
@@ -109,7 +125,10 @@ impl<'conn> LocalFtsProvider<'conn> {
     pub const NAME: &'static str = "local-fts";
 
     pub fn new(conn: &'conn Connection) -> Self {
-        Self { conn }
+        Self {
+            conn,
+            session_span_scan_limit: SESSION_SPAN_SCAN_LIMIT,
+        }
     }
 
     /// Borrow the connection of an open store.
@@ -126,9 +145,24 @@ impl<'conn> LocalFtsProvider<'conn> {
         now: Timestamp,
     ) -> ProviderResult<Vec<Candidate>> {
         let result = (|| -> Result<Vec<Candidate>, rusqlite::Error> {
-            let narrow =
-                matches!(entity_type, EntityType::Observation) && self.has_observation_meta()?;
-            let (sql, params) = candidate_query(entity_type, options, now, narrow);
+            let observations = matches!(entity_type, EntityType::Observation);
+            // A session-scoped observation search reads only the session's
+            // rowid span of the FTS index. Every row carrying the session id
+            // lies inside [first, last] by definition, and BM25 uses
+            // corpus-wide statistics, so candidates and ranks are unchanged.
+            // FTS5 applies a rowid range natively, so matches outside the span
+            // are never read or scored. Repo, agent and user scopes interleave
+            // across the whole store, so a span would not narrow them.
+            let rowid_span = match options.scope_ids.session_id.as_deref() {
+                Some(session_id) if observations => match self.session_rowid_span(session_id)? {
+                    SessionSpan::Empty => return Ok(Vec::new()),
+                    SessionSpan::Bounded(first, last) => Some((first, last)),
+                    SessionSpan::Unbounded => None,
+                },
+                _ => None,
+            };
+            let narrow = observations && self.has_observation_meta()?;
+            let (sql, params) = candidate_query(entity_type, options, now, narrow, rowid_span);
             let mut stmt = self.conn.prepare(&sql)?;
             let rows = stmt.query_map(params_from_iter(params), |row| {
                 Ok(Candidate {
@@ -148,6 +182,31 @@ impl<'conn> LocalFtsProvider<'conn> {
             Err(err) if is_fts_syntax_error(&err) => Ok(Vec::new()),
             Err(err) => Err(err.into()),
         }
+    }
+
+    /// The rowid span of `session_id`'s observations, reading at most
+    /// `session_span_scan_limit` of them from `idx_obs_session_ts`. That index
+    /// does not order a session's rows by rowid, so the lookup reads one index
+    /// entry per row; past the limit the session is
+    /// [`SessionSpan::Unbounded`]. It reads `observations`, not
+    /// `observation_meta`, because only `observations` has a session index;
+    /// the triggers keep the two identical. [`RetrievalProvider::search`] runs
+    /// it in the same read transaction as the candidate scan, so a concurrent
+    /// write cannot land outside a stale span.
+    fn session_rowid_span(&self, session_id: &str) -> Result<SessionSpan, rusqlite::Error> {
+        let limit = self.session_span_scan_limit;
+        let (first, last, count): (Option<i64>, Option<i64>, i64) = self.conn.query_row(
+            "SELECT MIN(rowid), MAX(rowid), COUNT(*) FROM (
+               SELECT rowid FROM observations WHERE session_id = ? LIMIT ?
+             )",
+            rusqlite::params![session_id, limit.saturating_add(1)],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )?;
+        Ok(match (first, last) {
+            _ if count > limit => SessionSpan::Unbounded,
+            (Some(first), Some(last)) => SessionSpan::Bounded(first, last),
+            _ => SessionSpan::Empty,
+        })
     }
 
     /// Whether the database has `observation_meta` (schema revision 8). A
@@ -342,11 +401,16 @@ impl RetrievalProvider for LocalFtsProvider<'_> {
 /// behind `content` and its overflow pages, and reading it was the largest
 /// cost of a broad search. Without the table (a revision-7 database opened
 /// without migrating) the same query runs against `observations`.
+///
+/// `rowid_span`, when set, bounds the observation FTS scan to
+/// `first..=last` (see [`LocalFtsProvider::session_rowid_span`]). It must
+/// contain every rowid the scope filter can accept.
 fn candidate_query(
     entity_type: EntityType,
     options: &ProviderSearchOptions,
     now: Timestamp,
     has_observation_meta: bool,
+    rowid_span: Option<(i64, i64)>,
 ) -> (String, Vec<SqlValue>) {
     let exclude_ids = options.exclude_ids.as_deref().unwrap_or(&[]);
     let include_redacted = options.include_redacted.unwrap_or(false);
@@ -368,6 +432,7 @@ fn candidate_query(
             format!(
                 "WITH fts_hits AS (
                    SELECT rowid, rank FROM observations_fts WHERE content MATCH ?
+                     {span_filter}
                  )
                  SELECT
                    m.rowid, m.id,
@@ -385,6 +450,11 @@ fn candidate_query(
                     "observations"
                 },
                 exclude_filter = exclude_id_filter("m", exclude_ids),
+                span_filter = if rowid_span.is_some() {
+                    "AND rowid BETWEEN ? AND ?"
+                } else {
+                    ""
+                },
             )
         }
         EntityType::Summary => {
@@ -407,11 +477,13 @@ fn candidate_query(
         }
     };
 
-    let mut params: Vec<SqlValue> = vec![
-        SqlValue::Text(options.query.clone()),
-        SqlValue::Integer(now),
-        SqlValue::Integer(MAX_AGE_MS),
-    ];
+    let mut params: Vec<SqlValue> = vec![SqlValue::Text(options.query.clone())];
+    if let (EntityType::Observation, Some((first, last))) = (entity_type, rowid_span) {
+        params.push(SqlValue::Integer(first));
+        params.push(SqlValue::Integer(last));
+    }
+    params.push(SqlValue::Integer(now));
+    params.push(SqlValue::Integer(MAX_AGE_MS));
     params.extend(scope_params);
     params.extend(exclude_ids.iter().map(|id| SqlValue::Text(id.clone())));
     (sql, params)
@@ -566,7 +638,242 @@ fn decode_stored_scope_ids(raw: &str) -> serde_json::Result<ScopeIds> {
 
 #[cfg(test)]
 mod tests {
-    use super::is_fts_syntax_error_message;
+    use super::{is_fts_syntax_error_message, LocalFtsProvider, RetrievalProvider, SessionSpan};
+    use kindling_store::SqliteKindlingStore;
+    use kindling_types::{
+        Capsule, CapsuleStatus, CapsuleType, Observation, ObservationKind, ProviderSearchOptions,
+        RetrievedEntity, ScopeIds, Summary,
+    };
+
+    const NOW: i64 = 1_700_000_000_000;
+
+    fn session(session_id: Option<&str>, repo_id: Option<&str>) -> ScopeIds {
+        ScopeIds {
+            session_id: session_id.map(String::from),
+            repo_id: repo_id.map(String::from),
+            ..ScopeIds::default()
+        }
+    }
+
+    fn insert(store: &SqliteKindlingStore, id: &str, content: &str, scope_ids: ScopeIds, ts: i64) {
+        store
+            .insert_observation(&Observation {
+                id: id.to_string(),
+                kind: ObservationKind::Message,
+                content: content.to_string(),
+                provenance: serde_json::Map::new(),
+                ts,
+                scope_ids,
+                redacted: false,
+            })
+            .unwrap();
+    }
+
+    fn rowid(store: &SqliteKindlingStore, id: &str) -> i64 {
+        store
+            .connection()
+            .query_row("SELECT rowid FROM observations WHERE id = ?", [id], |r| {
+                r.get(0)
+            })
+            .unwrap()
+    }
+
+    fn provider(store: &SqliteKindlingStore, limit: i64) -> LocalFtsProvider<'_> {
+        let mut provider = LocalFtsProvider::from_store(store);
+        provider.session_span_scan_limit = limit;
+        provider
+    }
+
+    #[test]
+    fn session_span_is_bounded_empty_or_unbounded_past_the_scan_limit() {
+        let store = SqliteKindlingStore::open_in_memory().unwrap();
+        insert(&store, "a1", "cache", session(Some("a"), None), NOW);
+        insert(&store, "b1", "cache", session(Some("b"), None), NOW);
+        insert(&store, "a2", "cache", session(Some("a"), None), NOW);
+        insert(&store, "a3", "cache", session(Some("a"), None), NOW);
+
+        assert_eq!(
+            provider(&store, 3).session_rowid_span("a").unwrap(),
+            SessionSpan::Bounded(rowid(&store, "a1"), rowid(&store, "a3"))
+        );
+        assert_eq!(
+            provider(&store, 3).session_rowid_span("missing").unwrap(),
+            SessionSpan::Empty
+        );
+        // More rows than the limit: never under-bound, give up instead.
+        assert_eq!(
+            provider(&store, 2).session_rowid_span("a").unwrap(),
+            SessionSpan::Unbounded
+        );
+    }
+
+    /// Interleaved sessions, rows without a session, a matching row at the
+    /// start of the span, a redacted row at its end (redacted rows leave the
+    /// FTS index, but still set the span), and a summary in the session's
+    /// capsule. Every query
+    /// returns exactly what the unbounded scan (limit 0) returns.
+    #[test]
+    fn bounded_session_search_matches_the_unbounded_scan() {
+        let store = SqliteKindlingStore::open_in_memory().unwrap();
+        insert(
+            &store,
+            "before",
+            "auth cache token",
+            session(None, Some("/r")),
+            NOW,
+        );
+        insert(
+            &store,
+            "a-first",
+            "auth cache",
+            session(Some("a"), Some("/r")),
+            NOW - 5,
+        );
+        for i in 0..40 {
+            let (sid, repo) = match i % 3 {
+                0 => (Some("a"), Some("/r")),
+                1 => (Some("b"), Some("/r")),
+                _ => (None, Some("/q")),
+            };
+            let content = format!("auth {} cache {}", "token ".repeat(i % 4), i);
+            insert(
+                &store,
+                &format!("o{i}"),
+                &content,
+                session(sid, repo),
+                NOW - i as i64 * 3_600_000,
+            );
+        }
+        insert(
+            &store,
+            "a-last",
+            "auth token",
+            session(Some("a"), Some("/q")),
+            NOW,
+        );
+        insert(
+            &store,
+            "after",
+            "auth cache token",
+            session(Some("b"), None),
+            NOW,
+        );
+        store.redact_observation("a-last").unwrap();
+        store
+            .create_capsule(&Capsule {
+                id: "cap-a".to_string(),
+                kind: CapsuleType::Session,
+                intent: "test".to_string(),
+                status: CapsuleStatus::Open,
+                opened_at: NOW,
+                closed_at: None,
+                scope_ids: session(Some("a"), None),
+                observation_ids: Vec::new(),
+                summary_id: None,
+            })
+            .unwrap();
+        store
+            .insert_summary(&Summary {
+                id: "sum-a".to_string(),
+                capsule_id: "cap-a".to_string(),
+                content: "auth cache summary".to_string(),
+                confidence: 0.9,
+                created_at: NOW,
+                evidence_refs: Vec::new(),
+            })
+            .unwrap();
+
+        let span = provider(&store, 10_000).session_rowid_span("a").unwrap();
+        assert_eq!(
+            span,
+            SessionSpan::Bounded(rowid(&store, "a-first"), rowid(&store, "a-last"))
+        );
+
+        let opts = |query: &str, scope_ids: ScopeIds| ProviderSearchOptions {
+            query: query.to_string(),
+            scope_ids,
+            max_results: None,
+            exclude_ids: None,
+            include_redacted: None,
+        };
+        let mut queries = vec![
+            opts("auth", session(Some("a"), None)),
+            opts("token", session(Some("a"), None)),
+            opts("auth cache", session(Some("a"), Some("/r"))),
+            opts("auth", session(Some("b"), None)),
+            opts("auth", session(Some("missing"), None)),
+        ];
+        let mut redacted = opts("auth", session(Some("a"), None));
+        redacted.include_redacted = Some(true);
+        let mut limited = opts("auth", session(Some("a"), None));
+        limited.max_results = Some(3);
+        limited.exclude_ids = Some(vec!["o3".to_string()]);
+        queries.extend([redacted, limited]);
+
+        let run = |limit: i64, q: &ProviderSearchOptions| -> Vec<(String, f64)> {
+            provider(&store, limit)
+                .search(q, NOW)
+                .unwrap()
+                .into_iter()
+                .map(|r| {
+                    let id = match r.entity {
+                        RetrievedEntity::Observation(o) => o.id,
+                        RetrievedEntity::Summary(s) => s.id,
+                    };
+                    (id, r.score)
+                })
+                .collect()
+        };
+        let mut non_empty = 0;
+        for q in &queries {
+            let bounded = run(10_000, q);
+            non_empty += usize::from(!bounded.is_empty());
+            assert_eq!(bounded, run(0, q), "query {:?} {:?}", q.query, q.scope_ids);
+        }
+        assert!(non_empty >= 5, "fixture must exercise real matches");
+        // Session scope still finds the session's capsule summary.
+        assert!(run(10_000, &queries[0]).iter().any(|(id, _)| id == "sum-a"));
+    }
+
+    /// The span reaches FTS5 as a rowid constraint, so matches outside it are
+    /// never read. (A filter applied after the scan would be correct but no
+    /// faster.)
+    #[test]
+    fn session_span_is_pushed_into_the_fts_scan() {
+        let store = SqliteKindlingStore::open_in_memory().unwrap();
+        let opts = ProviderSearchOptions {
+            query: "auth".to_string(),
+            scope_ids: session(Some("a"), None),
+            max_results: None,
+            exclude_ids: None,
+            include_redacted: None,
+        };
+        let plan = |span: Option<(i64, i64)>| -> String {
+            let (sql, params) =
+                super::candidate_query(super::EntityType::Observation, &opts, NOW, true, span);
+            let mut stmt = store
+                .connection()
+                .prepare(&format!("EXPLAIN QUERY PLAN {sql}"))
+                .unwrap();
+            let rows: Vec<String> = stmt
+                .query_map(rusqlite::params_from_iter(params), |r| {
+                    r.get::<_, String>(3)
+                })
+                .unwrap()
+                .collect::<Result<_, _>>()
+                .unwrap();
+            rows.into_iter()
+                .find(|d| d.contains("observations_fts"))
+                .expect("plan scans observations_fts")
+        };
+        let bounded = plan(Some((10, 20)));
+        let unbounded = plan(None);
+        assert_ne!(
+            bounded, unbounded,
+            "the rowid range must change the FTS5 index plan"
+        );
+        assert!(bounded.contains('<') && bounded.contains('>'), "{bounded}");
+    }
 
     #[test]
     fn unknown_fts_column_is_syntax_error() {

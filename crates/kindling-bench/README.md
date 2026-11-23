@@ -43,8 +43,10 @@ so two builds can be compared for speed and identical results:
 
 ```bash
 cargo build --release -p kindling-bench --bin retrieve_corpus
-target/release/retrieve_corpus <db> <now_ms> <repo|-> <max_candidates> <reps> <query>...
+target/release/retrieve_corpus <db> <now_ms> <scope|-> <max_candidates> <reps> <query>...
 ```
+
+`scope` is `session=<id>`, `repo=<id>`, a bare repo id, or `-` for none.
 
 It opens the database writable, which runs any pending migration, so point it
 at a copy. When comparing two builds, give each its own `CARGO_TARGET_DIR`.
