@@ -29,7 +29,7 @@ The architecture is deliberately layered to separate concerns:
 1. **Local-first** - No external services; embedded SQLite
 2. **Deterministic** - Same query, same context produces same results
 3. **Explainable** - Every result has provenance
-4. **Concurrency-safe** - A single daemon serializes access; concurrent tools share one engine
+4. **Concurrency-safe** - A single daemon owns each database: writes are serialized through one connection, reads run concurrently on WAL snapshots; concurrent tools share one engine
 5. **Infrastructure, not truth** - kindling captures what happened; it does not assert organizational authority
 
 ## System Diagram
@@ -161,6 +161,7 @@ All published crates share the workspace version (see `Cargo.toml`, currently `0
 
 - HTTP/1 over UDS (TCP loopback fallback on Windows, with the ephemeral port published to a port file and a per-daemon bearer token required on every route except `/v1/health`).
 - Per-project routing via the `X-Kindling-Project` header; one service instance cached per project. The header is routing only, never authorization.
+- Per-project concurrency (PERF-002): one read-write connection per project serializes every write (WAL single writer); endpoints that only read (`retrieve`, `observations/list`, `capsules/open`, `context/*`) run on a small pool of read-only connections (at most 4 per project, opened lazily after the writer has created and migrated the database), each inside one read transaction so a request sees a single consistent snapshot. A slow search therefore never blocks capture, and a read sees every write committed before it started. All database work runs on tokio's blocking pool, never on the async runtime thread (`kindling serve` uses a current-thread runtime), and a request stays counted as in flight until its database work finishes.
 - Single-owner OS file lock (`kindling.lock`, released by the OS if the daemon dies) with the PID in `kindling.pid` for display, socket mode `0600`, idle shutdown (default 30 minutes), cancellation-safe activity tracking.
 - Formats injection-context markdown (`inject.rs`) byte-for-byte compatible with the original Node hooks.
 
