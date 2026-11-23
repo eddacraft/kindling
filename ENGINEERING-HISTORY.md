@@ -101,6 +101,35 @@ at each release; older distribution approaches may now be superseded.
 
 ### Fixed
 
+- **Benchmark resource sampling accuracy (#178).** Three fixes in
+  `kindling-bench`'s `/proc` sampler (`crates/kindling-bench/src/resources.rs`):
+  - **CPU normalisation.** `cpuCores` divided process jiffies by the host-wide
+    `/proc/stat` totals but scaled by `available_parallelism()`, which follows
+    the affinity mask or CPU quota. The CPU count now comes from the `cpuN`
+    lines of the same `/proc/stat` read. **Earlier `cpuCores` results from
+    affinity-restricted or quota-limited containers understated CPU use**, by
+    the ratio of usable to online CPUs. For example, a process saturating 2 of
+    8 CPUs reported 0.5 cores instead of 2.0. Unrestricted hosts were
+    unaffected.
+  - **Logical reads exclude the sampler.** Each poll read four `/proc` files,
+    and every `read()` advanced the process's `rchar`, so `logicalReadBytes`
+    included the sampler's own traffic: about 650 KB in an idle 200 ms window
+    at a 1 ms interval, and around 690 KiB/s at the bench's 2 ms interval. The
+    poll now reads only `/proc/self/status` and counts `/proc/self/fd`, which
+    uses `getdents64` and is not counted in `rchar`. Every `/proc` read counts
+    the bytes `read()` returns, which is exactly what `rchar` counts, and the
+    total is subtracted. The start snapshot reads `/proc/self/io` last and the
+    finish snapshot reads it first. The kernel adds an `io` read's own bytes
+    after the value it reports, so the start snapshot's `io` read length is
+    subtracted too. An idle window now reports exactly 0, and a test pins it.
+    **Earlier `logicalReadBytes` figures are inflated** by that overhead.
+  - **Final-sample peak test.** The worker no longer takes a snapshot when it
+    starts, because that snapshot raced the workload. The test runs with an
+    hour-long interval, so no poll fires, writes every byte of a 16 MiB buffer,
+    and asserts that the peak over start reflects it, which only the finish
+    snapshot can see. A mutation that drops the finish snapshot from the peak
+    fails it.
+
 - **Exact composite ranking in the local FTS provider (#188).**
   `LocalFtsProvider::search` applied `ORDER BY f.rank LIMIT max_results` to
   each entity type before BM25 normalization and the recency blend. A match
@@ -231,7 +260,7 @@ at each release; older distribution approaches may now be superseded.
   invocations, embedded and over the daemon, and the override precedence.
 - **Installer cargo fallback honours a pinned version and the Cargo install path (GH-193).**
   A failed archive download no longer runs unversioned `cargo install
-  eddacraft-kindling` and then a bare `kindling` from PATH. The fallback
+eddacraft-kindling` and then a bare `kindling` from PATH. The fallback
   passes `--version` when `KINDLING_VERSION` is set, refuses a non-default
   `KINDLING_REPO`, and invokes the binary cargo installed (including a
   nonstandard `CARGO_HOME` or `CARGO_INSTALL_ROOT`).

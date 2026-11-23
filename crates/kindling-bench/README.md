@@ -73,13 +73,16 @@ per-workload.
 
 Each group reports:
 
-- average CPU in saturated-core units (`1.0` = one fully used core);
+- average CPU in saturated-core units (`1.0` = one fully used core), normalised
+  by the online CPUs in `/proc/stat`, so it stays correct under an affinity
+  mask or CPU quota;
 - start/end/peak RSS and peak-over-start;
 - threads and file descriptors with peak-over-start deltas;
 - **physical** `read_bytes` / `write_bytes` (kernel disk accounting — often `0`
   on tmpfs or when writeback has not flushed);
 - **logical** `logicalReadBytes` / `logicalWriteBytes` (`rchar` / `wchar`) which
-  still advance when physical counters stay flat.
+  still advance when physical counters stay flat. The sampler's own `/proc`
+  reads are counted and subtracted exactly, so an idle window reports `0`.
 
 If the background resource sampler fails, the benchmark returns an error instead
 of emitting a successful report with fabricated default resource measurements.

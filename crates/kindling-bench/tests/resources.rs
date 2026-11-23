@@ -106,13 +106,29 @@ fn proc_stat_without_per_cpu_lines_is_rejected() {
 
 #[test]
 fn sampled_peak_includes_the_final_snapshot() {
+    const BUFFER_MIB: usize = 16;
     let _window = SAMPLER_WINDOW.lock().unwrap_or_else(|e| e.into_inner());
-    let sampler = ResourceSampler::start(Duration::from_millis(1));
-    let allocation = vec![0_u8; 2 * 1024 * 1024];
-    std::hint::black_box(&allocation);
+    // An hour-long interval means no poll runs inside this window, and the
+    // worker takes no snapshot of its own on start. So the only snapshot that
+    // can see the buffer is the one `finish` takes; #270's interruptible stop
+    // keeps `finish` from waiting out the interval.
+    let sampler = ResourceSampler::start(Duration::from_secs(3_600));
+    // Write every byte: untouched zero pages from calloc are not resident and
+    // would not show up in RSS at all.
+    let buffer = vec![0xA5_u8; BUFFER_MIB * 1024 * 1024];
+    std::hint::black_box(&buffer);
     let summary = sampler.finish().expect("resource sampler should finish");
+    drop(buffer);
 
     if summary.available {
+        let over_start = summary
+            .peak_rss_over_start_mib
+            .expect("peak over start is reported when RSS is available");
+        assert!(
+            over_start >= BUFFER_MIB as f64 * 0.9,
+            "peak RSS over start was {over_start:.2} MiB; the final snapshot should see the \
+             {BUFFER_MIB} MiB buffer"
+        );
         assert!(summary.peak_rss_mib >= summary.rss_start_mib);
         assert!(summary.peak_rss_mib >= summary.rss_end_mib);
         assert_eq!(

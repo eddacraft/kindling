@@ -127,8 +127,10 @@ impl ResourceSampler {
         let (before, start_io_read_bytes) = snapshot(IoRead::Last);
         let (stop, thread_stop) = mpsc::channel();
         let handle = thread::spawn(move || {
+            // No snapshot on start: `before` already covers the start, and a
+            // snapshot here would race the workload, so a test could not tell
+            // whether the final snapshot or this one saw a late allocation.
             let mut polled = Polled::default();
-            polled.peak = poll(&mut polled.read_bytes);
             while let Err(mpsc::RecvTimeoutError::Timeout) = thread_stop.recv_timeout(interval) {
                 let current = poll(&mut polled.read_bytes);
                 polled.peak.rss_kib = option_max(polled.peak.rss_kib, current.rss_kib);
