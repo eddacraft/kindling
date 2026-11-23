@@ -113,8 +113,10 @@ at each release; older distribution approaches may now be superseded.
     unaffected.
   - **Logical reads exclude the sampler.** Each poll read four `/proc` files,
     and every `read()` advanced the process's `rchar`, so `logicalReadBytes`
-    included the sampler's own traffic: about 650 KB in an idle 200 ms window
-    at a 1 ms interval, and around 690 KiB/s at the bench's 2 ms interval. The
+    included the sampler's own traffic. On the test host that was about 650 KB
+    in an idle 200 ms window at a 1 ms interval. The amount per poll depends on
+    the host, since `/proc/stat` grows with the CPU count. Trimming the poll
+    alone would still leave about 690 KiB/s at the bench's 2 ms interval. The
     poll now reads only `/proc/self/status` and counts `/proc/self/fd`, which
     uses `getdents64` and is not counted in `rchar`. Every `/proc` read counts
     the bytes `read()` returns, which is exactly what `rchar` counts, and the
@@ -260,7 +262,7 @@ at each release; older distribution approaches may now be superseded.
   invocations, embedded and over the daemon, and the override precedence.
 - **Installer cargo fallback honours a pinned version and the Cargo install path (GH-193).**
   A failed archive download no longer runs unversioned `cargo install
-eddacraft-kindling` and then a bare `kindling` from PATH. The fallback
+  eddacraft-kindling` and then a bare `kindling` from PATH. The fallback
   passes `--version` when `KINDLING_VERSION` is set, refuses a non-default
   `KINDLING_REPO`, and invokes the binary cargo installed (including a
   nonstandard `CARGO_HOME` or `CARGO_INSTALL_ROOT`).

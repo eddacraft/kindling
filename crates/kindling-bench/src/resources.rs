@@ -155,29 +155,7 @@ impl ResourceSampler {
             read_bytes: poll_read_bytes,
         } = self.stop_and_join()?;
         let (after, _) = snapshot(IoRead::First);
-        // Normalise by the CPU count from the same /proc/stat as the totals
-        // (GH-178), not `available_parallelism`, which follows the affinity
-        // mask or quota while the totals cover every online CPU.
-        let cpu_cores = match (
-            self.before.process_jiffies,
-            after.process_jiffies,
-            self.before.total_jiffies,
-            after.total_jiffies,
-            after.online_cpus.or(self.before.online_cpus),
-        ) {
-            (
-                Some(proc_before),
-                Some(proc_after),
-                Some(total_before),
-                Some(total_after),
-                Some(ncpus),
-            ) => Some(cpu_cores_for_window(
-                proc_after.saturating_sub(proc_before),
-                total_after.saturating_sub(total_before),
-                ncpus,
-            )),
-            _ => None,
-        };
+        let cpu_cores = cpu_cores_between(&self.before, &after);
         let peak_rss_kib = option_max(option_max(peak.rss_kib, self.before.rss_kib), after.rss_kib);
         let peak_threads = option_max(option_max(peak.threads, self.before.threads), after.threads);
         let peak_fds = option_max(option_max(peak.fds, self.before.fds), after.fds);
@@ -296,6 +274,33 @@ mod tests {
     }
 
     #[test]
+    fn finish_normalises_cpu_by_the_snapshot_cpu_count() {
+        // Seven online CPUs, a count no real host running this test is likely
+        // to match, so normalising by the host's `available_parallelism`
+        // instead would give a different answer. The totals advance by
+        // 7 * 1000 jiffies and the process by 3 * 1000: three saturated cores.
+        let before = Snapshot {
+            process_jiffies: Some(500),
+            total_jiffies: Some(70_000),
+            online_cpus: Some(7),
+            ..Snapshot::default()
+        };
+        let after = Snapshot {
+            process_jiffies: Some(3_500),
+            total_jiffies: Some(77_000),
+            online_cpus: Some(7),
+            ..Snapshot::default()
+        };
+
+        assert_eq!(cpu_cores_between(&before, &after), Some(3.0));
+        assert_eq!(
+            cpu_cores_between(&before, &Snapshot::default()),
+            None,
+            "a snapshot without CPU accounting reports no CPU figure"
+        );
+    }
+
+    #[test]
     fn worker_panic_is_reported_instead_of_defaulting_snapshot() {
         let handle = thread::spawn(|| -> Polled { panic!("sampler exploded") });
         let mut sampler = ResourceSampler {
@@ -314,6 +319,20 @@ mod tests {
             SamplerError::WorkerPanicked("sampler exploded".to_owned())
         );
     }
+}
+
+/// Saturated cores used between two full snapshots.
+///
+/// Normalised by the CPU count from the same `/proc/stat` as the totals
+/// (GH-178), not `available_parallelism`, which follows the affinity mask or
+/// quota while the totals cover every online CPU.
+fn cpu_cores_between(before: &Snapshot, after: &Snapshot) -> Option<f64> {
+    let process_delta = after
+        .process_jiffies?
+        .saturating_sub(before.process_jiffies?);
+    let total_delta = after.total_jiffies?.saturating_sub(before.total_jiffies?);
+    let ncpus = after.online_cpus.or(before.online_cpus)?;
+    Some(cpu_cores_for_window(process_delta, total_delta, ncpus))
 }
 
 fn option_max(left: Option<u64>, right: Option<u64>) -> Option<u64> {
