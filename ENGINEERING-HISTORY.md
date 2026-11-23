@@ -112,6 +112,23 @@ at each release; older distribution approaches may now be superseded.
     in 1.1 s and grows the file by 3.6%.
   - **Benchmark harness.** `kindling-bench` gains the `retrieve_corpus`
     binary used for these numbers.
+- **The daemon reads and writes concurrently per project (PERF-002, #316).**
+  Before this change, every handler took the project's single
+  `Mutex<KindlingService>` and ran SQLite work inline on the async runtime.
+  `kindling serve` uses a current-thread runtime, so one broad search stalled
+  every request to the daemon. Now each project keeps one read-write
+  connection, which serializes writes, plus a lazily opened pool of up to 4
+  read-only connections. These serve `retrieve`, `observations/list`,
+  `capsules/open` and `context/*`, each inside one read transaction.
+  Read-only connections open only after the writer has created and migrated
+  the database. All database work runs on tokio's blocking pool, and the
+  activity tracker counts it as in flight until it ends. Responses, status
+  codes, routing, ownership locking and idle shutdown are unchanged.
+  `kindling-bench`'s `daemon_contention` binary measures this:
+  120k observations, 60% containing the common word, 2 broad searches running
+  back to back, and a hook-style append plus a small search every 20 ms. Under
+  that load, append p95 fell from 130.6 ms to 8.4 ms, and small-search p95 fell
+  from 130.7 ms to 3.5 ms.
 
 ### Security
 

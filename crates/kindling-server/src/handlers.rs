@@ -6,10 +6,11 @@
 //! [`KindlingService`](kindling_service::KindlingService) per project. A
 //! missing/empty header on a data endpoint yields `400`.
 //!
-//! All DB work is synchronous. Each handler clones the per-project
-//! `Arc<Mutex<KindlingService>>`, locks it, runs the synchronous service call,
-//! and drops the lock before returning. No lock is ever held across an
-//! `.await`.
+//! All DB work is synchronous and runs on tokio's blocking pool via
+//! [`AppState::write`] (the project's single writer, serialised) or
+//! [`AppState::read`] (a pooled read-only connection, inside one read
+//! snapshot). Only endpoints that never write use `read`. No lock is ever held
+//! across an `.await`.
 
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
@@ -77,11 +78,9 @@ pub async fn open_capsule(
     Json(req): Json<OpenCapsuleRequest>,
 ) -> Result<(StatusCode, Json<Capsule>), ApiError> {
     let root = project_root(&headers)?;
-    let svc = state.service_for(&root)?;
-    let capsule = {
-        let guard = svc.lock().expect("service mutex poisoned");
-        guard.open_capsule(req.into())?
-    };
+    let capsule = state
+        .write(root, move |svc| svc.open_capsule(req.into()))
+        .await?;
     Ok((StatusCode::CREATED, Json(capsule)))
 }
 
@@ -94,11 +93,9 @@ pub async fn close_capsule(
 ) -> Result<Json<Capsule>, ApiError> {
     let root = project_root(&headers)?;
     let req = body.map(|Json(r)| r).unwrap_or_default();
-    let svc = state.service_for(&root)?;
-    let capsule = {
-        let guard = svc.lock().expect("service mutex poisoned");
-        guard.close_capsule(&id, req.into())?
-    };
+    let capsule = state
+        .write(root, move |svc| svc.close_capsule(&id, req.into()))
+        .await?;
     Ok(Json(capsule))
 }
 
@@ -131,11 +128,9 @@ pub async fn get_open_capsule(
                 "missing or empty sessionId (query param or {SESSION_HEADER} header)"
             ))
         })?;
-    let svc = state.service_for(&root)?;
-    let capsule = {
-        let guard = svc.lock().expect("service mutex poisoned");
-        guard.get_open_capsule(&session_id)?
-    };
+    let capsule = state
+        .read(root, move |svc| svc.get_open_capsule(&session_id))
+        .await?;
     Ok(Json(capsule))
 }
 
@@ -155,11 +150,9 @@ pub async fn append_observation(
         capsule_id: req.capsule_id,
         validate: req.validate.unwrap_or(true),
     };
-    let svc = state.service_for(&root)?;
-    let outcome = {
-        let guard = svc.lock().expect("service mutex poisoned");
-        guard.append_observation(req.input, options)?
-    };
+    let outcome = state
+        .write(root, move |svc| svc.append_observation(req.input, options))
+        .await?;
     Ok((StatusCode::CREATED, Json(outcome.into())))
 }
 
@@ -171,11 +164,9 @@ pub async fn list_observations(
     Json(request): Json<ListObservationsRequest>,
 ) -> Result<Json<ListObservationsResult>, ApiError> {
     let root = project_root(&headers)?;
-    let svc = state.service_for(&root)?;
-    let result = {
-        let guard = svc.lock().expect("service mutex poisoned");
-        guard.list_observations(request)?
-    };
+    let result = state
+        .read(root, move |svc| svc.list_observations(request))
+        .await?;
     Ok(Json(result))
 }
 
@@ -186,11 +177,7 @@ pub async fn retrieve(
     Json(options): Json<RetrieveOptions>,
 ) -> Result<Json<RetrieveResult>, ApiError> {
     let root = project_root(&headers)?;
-    let svc = state.service_for(&root)?;
-    let result = {
-        let guard = svc.lock().expect("service mutex poisoned");
-        guard.retrieve(options)?
-    };
+    let result = state.read(root, move |svc| svc.retrieve(options)).await?;
     Ok(Json(result))
 }
 
@@ -201,11 +188,7 @@ pub async fn create_pin(
     Json(req): Json<CreatePinRequest>,
 ) -> Result<(StatusCode, Json<Pin>), ApiError> {
     let root = project_root(&headers)?;
-    let svc = state.service_for(&root)?;
-    let pin = {
-        let guard = svc.lock().expect("service mutex poisoned");
-        guard.pin(req.into())?
-    };
+    let pin = state.write(root, move |svc| svc.pin(req.into())).await?;
     Ok((StatusCode::CREATED, Json(pin)))
 }
 
@@ -216,11 +199,7 @@ pub async fn unpin(
     Path(id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
     let root = project_root(&headers)?;
-    let svc = state.service_for(&root)?;
-    {
-        let guard = svc.lock().expect("service mutex poisoned");
-        guard.unpin(&id)?;
-    }
+    state.write(root, move |svc| svc.unpin(&id)).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -247,11 +226,12 @@ pub async fn forget_observation(
     use kindling_store::StoreError;
 
     let root = project_root(&headers)?;
-    let svc = state.service_for(&root)?;
-    let result = {
-        let guard = svc.lock().expect("service mutex poisoned");
-        guard.forget(&id)
-    };
+    // The closure returns the service result as a value (never an error) so
+    // the not-found case can be mapped to 404 here.
+    let forget_id = id.clone();
+    let result = state
+        .write(root, move |svc| Ok(svc.forget(&forget_id)))
+        .await?;
     match result {
         Ok(()) => Ok(StatusCode::NO_CONTENT),
         // A missing observation is a 404, not an internal error.
@@ -274,11 +254,11 @@ pub async fn session_start_context(
     let req = body.map(|Json(r)| r).unwrap_or_default();
     let max_results = req.max_results.unwrap_or(DEFAULT_MAX_RESULTS);
     let now = now_ms();
-    let svc = state.service_for(&root)?;
-    let ctx = {
-        let guard = svc.lock().expect("service mutex poisoned");
-        guard.session_start_context_at(&req.scope_ids, max_results, now)?
-    };
+    let ctx = state
+        .read(root, move |svc| {
+            svc.session_start_context_at(&req.scope_ids, max_results, now)
+        })
+        .await?;
     // Resolve the local offset at each observation's instant so every timestamp
     // renders in the DST offset that was in effect then, not at request time.
     let additional = format_session_start_with(&ctx, local_offset_seconds);
@@ -296,11 +276,11 @@ pub async fn pre_compact_context(
     let root = project_root(&headers)?;
     let req = body.map(|Json(r)| r).unwrap_or_default();
     let now = now_ms();
-    let svc = state.service_for(&root)?;
-    let ctx = {
-        let guard = svc.lock().expect("service mutex poisoned");
-        guard.pre_compact_context_at(&req.scope_ids, now)?
-    };
+    let ctx = state
+        .read(root, move |svc| {
+            svc.pre_compact_context_at(&req.scope_ids, now)
+        })
+        .await?;
     let additional = format_pre_compact(&ctx);
     Ok(Json(json!({ "additionalContext": additional })))
 }
@@ -312,4 +292,145 @@ fn now_ms() -> i64 {
         .duration_since(UNIX_EPOCH)
         .expect("system clock before Unix epoch")
         .as_millis() as i64
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::{mpsc, Arc, Mutex};
+    use std::time::Duration;
+
+    use axum::http::HeaderValue;
+
+    use super::*;
+
+    const ROOT: &str = "/tmp/perf002-project";
+    /// Generous bound: only a write blocked behind the held read would hit it.
+    const BOUND: Duration = Duration::from_secs(10);
+
+    fn headers() -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        headers.insert(PROJECT_HEADER, HeaderValue::from_static(ROOT));
+        headers
+    }
+
+    fn append_body(content: &str) -> Json<AppendObservationRequest> {
+        Json(
+            serde_json::from_value(json!({
+                "kind": "message",
+                "content": content,
+                "scopeIds": { "repoId": "perf002" }
+            }))
+            .unwrap(),
+        )
+    }
+
+    fn retrieve_body(query: &str) -> Json<RetrieveOptions> {
+        Json(
+            serde_json::from_value(json!({
+                "query": query,
+                "scopeIds": { "repoId": "perf002" }
+            }))
+            .unwrap(),
+        )
+    }
+
+    /// A read that is holding its snapshot open must not block a write to the
+    /// same project, even on a current-thread runtime (what `kindling serve`
+    /// runs). The held read keeps its pre-write snapshot; the next read sees
+    /// the committed write.
+    #[tokio::test]
+    async fn write_completes_while_a_read_holds_its_snapshot() {
+        let home = tempfile::tempdir().unwrap();
+        let armed = Arc::new(AtomicBool::new(false));
+        let (entered_tx, mut entered_rx) = tokio::sync::mpsc::unbounded_channel::<()>();
+        let (release_tx, release_rx) = mpsc::channel::<()>();
+        let release_rx = Mutex::new(release_rx);
+        let hook_armed = Arc::clone(&armed);
+        let state = AppState::new(home.path().to_path_buf()).with_read_hook(Arc::new(move || {
+            // Only the first read after arming is held.
+            if hook_armed.swap(false, Ordering::SeqCst) {
+                let _ = entered_tx.send(());
+                let _ = release_rx.lock().unwrap().recv_timeout(BOUND * 3);
+            }
+        }));
+
+        // Create the database (writer first) with one searchable row.
+        let (status, _) =
+            append_observation(State(state.clone()), headers(), append_body("alpha first"))
+                .await
+                .unwrap();
+        assert_eq!(status, StatusCode::CREATED);
+
+        // Start a read and hold it inside its snapshot.
+        armed.store(true, Ordering::SeqCst);
+        let held = tokio::spawn(retrieve(
+            State(state.clone()),
+            headers(),
+            retrieve_body("beta"),
+        ));
+        tokio::time::timeout(BOUND, entered_rx.recv())
+            .await
+            .expect("read never reached its snapshot")
+            .unwrap();
+
+        // The write must complete while the read is still held.
+        let (status, Json(written)) = tokio::time::timeout(
+            BOUND,
+            append_observation(State(state.clone()), headers(), append_body("beta second")),
+        )
+        .await
+        .expect("write blocked behind an in-progress read")
+        .unwrap();
+        assert_eq!(status, StatusCode::CREATED);
+        assert!(!held.is_finished(), "the read must still be held open");
+
+        // Release: the held read answers from its pre-write snapshot.
+        release_tx.send(()).unwrap();
+        let Json(before) = tokio::time::timeout(BOUND, held)
+            .await
+            .expect("held read never finished")
+            .unwrap()
+            .unwrap();
+        assert!(
+            before.candidates.is_empty(),
+            "a read keeps the snapshot it started with"
+        );
+
+        // A new read sees the committed write.
+        let Json(after) = retrieve(State(state.clone()), headers(), retrieve_body("beta"))
+            .await
+            .unwrap();
+        let ids: Vec<_> = after
+            .candidates
+            .iter()
+            .filter_map(|c| match &c.entity {
+                kindling_types::RetrievedEntity::Observation(o) => Some(o.id.clone()),
+                kindling_types::RetrievedEntity::Summary(_) => None,
+            })
+            .collect();
+        let written = serde_json::to_value(&written).unwrap();
+        assert_eq!(ids, vec![written["id"].as_str().unwrap().to_string()]);
+    }
+
+    /// Reads against a project nobody has written to yet still work: the writer
+    /// creates and migrates the fresh database before a read-only connection
+    /// opens it.
+    #[tokio::test]
+    async fn first_request_to_a_fresh_project_can_be_a_read() {
+        let home = tempfile::tempdir().unwrap();
+        let state = AppState::new(home.path().to_path_buf());
+        let Json(result) = retrieve(State(state.clone()), headers(), retrieve_body("anything"))
+            .await
+            .unwrap();
+        assert!(result.candidates.is_empty());
+        let Json(open) = get_open_capsule(
+            State(state),
+            headers(),
+            Query(serde_json::from_value(json!({ "sessionId": "s1" })).unwrap()),
+        )
+        .await
+        .unwrap();
+        assert!(open.is_none());
+    }
 }
