@@ -2,7 +2,28 @@ use kindling_bench::resources::{
     cpu_cores_for_window, parse_cpu_stat, parse_proc_io, parse_proc_stat, parse_proc_status,
     CpuStat, ProcIo, ResourceSampler,
 };
+use std::sync::Mutex;
 use std::time::Duration;
+
+/// `/proc/self/io` and RSS are process-wide, and libtest runs tests on
+/// parallel threads in one process, so tests that measure a sampler window
+/// hold this lock to keep another test's sampler out of their window.
+static SAMPLER_WINDOW: Mutex<()> = Mutex::new(());
+
+#[test]
+fn idle_window_reports_no_logical_reads_despite_polling() {
+    let _window = SAMPLER_WINDOW.lock().unwrap_or_else(|e| e.into_inner());
+    // About 200 polls at a 1 ms interval. Each poll reads /proc/self/status
+    // (about 1.4 KB of rchar), so without exact accounting this window would
+    // report hundreds of KiB of phantom reads.
+    let sampler = ResourceSampler::start(Duration::from_millis(1));
+    std::thread::sleep(Duration::from_millis(200));
+    let summary = sampler.finish().expect("resource sampler should finish");
+
+    if summary.available {
+        assert_eq!(summary.logical_read_bytes, Some(0));
+    }
+}
 
 #[test]
 fn linux_resource_documents_are_parsed() {
@@ -85,6 +106,7 @@ fn proc_stat_without_per_cpu_lines_is_rejected() {
 
 #[test]
 fn sampled_peak_includes_the_final_snapshot() {
+    let _window = SAMPLER_WINDOW.lock().unwrap_or_else(|e| e.into_inner());
     let sampler = ResourceSampler::start(Duration::from_millis(1));
     let allocation = vec![0_u8; 2 * 1024 * 1024];
     std::hint::black_box(&allocation);
