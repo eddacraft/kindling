@@ -247,8 +247,9 @@ Scoring every match is what makes a broad query over a large store expensive.
 So when a query has many matches, the provider ranks only the recent ones:
 
 - **When it applies.** Only when the observations with `ts` at or after
-  `retrieve_at` minus 30 days (future-dated rows included) hold at least `max(1000, max_candidates)` matches that
-  survive scope, redaction and exclude filtering.
+  `retrieve_at` minus 30 days (future-dated rows included) hold at least
+  `max(1000, max_candidates)` matches that survive scope, redaction and
+  exclude filtering.
 - **What it ranks.** Observation candidates are then only those observations.
   BM25 min-max normalisation runs over them plus every matching summary.
   Summaries are never windowed.
@@ -258,10 +259,13 @@ So when a query has many matches, the provider ranks only the recent ones:
 - **What it doesn't change.** A query with fewer matches, or a thin window, is
   ranked exactly as above. Inside the window, results stay deterministic,
   totally ordered, and prefix-stable for any `max_candidates` up to 1,000.
-- **Defined by `ts`, not insertion order.** Imported, backfilled or clock-skewed
-  rows are in the window exactly when their `ts` is.
-- **Speed-only fallback.** When a window's rows sit far out of insertion order,
-  the provider may rank exactly instead. That costs speed, never results.
+- **Membership is defined by `ts`, not insertion order.** Imported,
+  backfilled or clock-skewed rows are in the window exactly when their `ts` is.
+- **Fallback to exact.** When a window's rows sit far out of insertion order,
+  the provider may rank exactly instead. That costs speed but never drops a
+  match the window would have ranked. So whether the window is used can also
+  depend on the order rows were written, not only on `ts`; for one database,
+  results are still deterministic.
 
 On a 220k-observation store, the broadest query (a word in half the rows) goes
 from 102 ms to 41 ms, and its top 10 and top 50 match the exact ranking. See

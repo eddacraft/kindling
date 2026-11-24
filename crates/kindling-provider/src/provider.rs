@@ -59,8 +59,8 @@ const MATCH_CONTEXT_UNITS: usize = 100;
 /// index reads. A larger session searches without a bound, exactly as before.
 const SESSION_SPAN_SCAN_LIMIT: i64 = 10_000;
 
-/// Matching observations (before scope filters) at which a search may use the
-/// recent window. Below it, retrieval is exact.
+/// Matching observations in the recent window, after scope filters, at which a
+/// search uses the window. Below it, retrieval is exact.
 const RECENT_WINDOW_THRESHOLD: i64 = 1_000;
 
 /// Age of the recent window: the same 30 days over which recency decays.
@@ -1180,6 +1180,59 @@ mod tests {
         ));
     }
 
+    /// The window limits observation candidates only. An old summary that
+    /// BM25 ranks above every observation still comes back, and still takes
+    /// part in min-max normalisation, when the window applies.
+    #[test]
+    fn the_window_never_drops_summaries() {
+        let store = window_store(40, 40);
+        store
+            .create_capsule(&Capsule {
+                id: "cap-old".to_string(),
+                kind: CapsuleType::Session,
+                intent: "test".to_string(),
+                status: CapsuleStatus::Closed,
+                opened_at: NOW - 91 * DAY,
+                closed_at: Some(NOW - 90 * DAY),
+                scope_ids: session(None, Some("/r")),
+                observation_ids: Vec::new(),
+                summary_id: None,
+            })
+            .unwrap();
+        store
+            .insert_summary(&Summary {
+                id: "sum-old".to_string(),
+                capsule_id: "cap-old".to_string(),
+                content: "needle needle needle needle".to_string(),
+                confidence: 0.9,
+                created_at: NOW - 90 * DAY,
+                evidence_refs: Vec::new(),
+            })
+            .unwrap();
+
+        let opts = needle(10, ScopeIds::default());
+        let exact = ranked(&window_provider(&store, i64::MAX), &opts);
+        assert_eq!(exact[0].0, "old-best", "exact ranking: {exact:?}");
+        assert_eq!(exact[1].0, "sum-old", "exact ranking: {exact:?}");
+
+        // The window drops the old observation but not the old summary,
+        // which now ranks first.
+        let windowed = ranked(&window_provider(&store, 20), &opts);
+        assert_eq!(windowed.len(), 10);
+        assert_eq!(windowed[0].0, "sum-old", "windowed ranking: {windowed:?}");
+        assert!(
+            windowed[1..].iter().all(|(id, _)| id.starts_with("new-")),
+            "observations still come only from the window: {windowed:?}"
+        );
+
+        // Repo scope reaches the summary through its capsule.
+        let scoped = ranked(
+            &window_provider(&store, 20),
+            &needle(10, session(None, Some("/r"))),
+        );
+        assert_eq!(scoped, windowed);
+    }
+
     #[test]
     fn below_the_threshold_search_is_exact() {
         let store = window_store(90, 40);
@@ -1280,7 +1333,8 @@ mod tests {
 
     /// When the window's earliest rows sit after most of its matches, the
     /// cheap check can't see enough matches and the search stays exact. That
-    /// costs speed, never results.
+    /// costs speed and returns the exact ranking, so it never drops a match
+    /// the window would have ranked.
     #[test]
     fn a_window_out_of_rowid_order_falls_back_to_exact() {
         let store = SqliteKindlingStore::open_in_memory().unwrap();
