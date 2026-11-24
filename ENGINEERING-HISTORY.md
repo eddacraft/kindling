@@ -222,6 +222,20 @@ at each release; older distribution approaches may now be superseded.
     The synthetic corpus spans only 90 days, so the window is a third of it.
     On longer-lived stores, the window is a smaller share and the gain is
     larger.
+  - **Scoped searches with a thin window pay a fixed cost.** The cheap checks
+    count store-wide, so a repo with few recent matches in a busy store passes
+    them, scans the window, and then ranks exactly. That fallback reuses the
+    window's scan and reads only the rowid range below the window, since every
+    row there is older than the cutoff, so no match is read twice. It still
+    pays the checks and the window bound. On a copy of the corpus with a
+    4,000-row repo (1,334 recent rows; best of 4 rounds, results identical to
+    exact):
+
+    | Query in the small repo | Exact | This change | Reading the window twice |
+    | --- | --- | --- | --- |
+    | Word in 50% of rows (661 recent matches) | 31.3 ms | 42.1 ms (1.35×) | 49.7 ms |
+    | Word in 10% of rows (130 recent matches) | 8.4 ms | 13.8 ms (1.64×) | 16.1 ms |
+    | Word in 1% of rows (stops at the cheap checks) | 1.15 ms | 1.60 ms | 1.57 ms |
   - **Tests.** These cover the threshold boundary (unit tests, and an
     integration test at the real 1,000); the fallbacks for a window thin
     against the threshold, `max_results` or the scope; rows out of time order
