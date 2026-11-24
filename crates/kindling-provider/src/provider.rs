@@ -212,6 +212,7 @@ impl<'conn> LocalFtsProvider<'conn> {
 
     /// Run one candidate scan. `min_ts` keeps only observations with
     /// `ts >= min_ts`.
+    #[allow(clippy::too_many_arguments)] // every input of one scan
     fn run_candidates(
         &self,
         entity_type: EntityType,
@@ -844,8 +845,8 @@ fn decode_stored_scope_ids(raw: &str) -> serde_json::Result<ScopeIds> {
 #[cfg(test)]
 mod tests {
     use super::{
-        compile_literal_query, is_fts_syntax_error_message, LocalFtsProvider, RetrievalProvider,
-        SessionSpan,
+        compile_literal_query, is_fts_syntax_error_message, LocalFtsProvider, ProviderError,
+        QueryMode, RetrievalProvider, SessionSpan,
     };
     use kindling_store::SqliteKindlingStore;
     use kindling_types::{
@@ -1139,6 +1140,44 @@ mod tests {
             &needle(20, ScopeIds::default()),
         );
         assert_eq!(windowed[..], wider[..10]);
+    }
+
+    /// The window's match counts use the same compiled FTS5 expression as the
+    /// candidate scan. `needle.` is plain text (one word, `needle`); read as
+    /// raw FTS5 syntax it does not parse.
+    #[test]
+    fn the_window_counts_matches_with_the_compiled_query() {
+        let store = window_store(40, 40);
+        let mut plain = needle(10, ScopeIds::default());
+        plain.query = "needle.".to_string();
+
+        let exact = ranked(&window_provider(&store, i64::MAX), &plain);
+        assert_eq!(exact[0].0, "old-best");
+        let windowed = ranked(&window_provider(&store, 20), &plain);
+        assert_eq!(windowed.len(), 10);
+        assert!(
+            windowed.iter().all(|(id, _)| id.starts_with("new-")),
+            "a plain-text query above the threshold uses the window: {windowed:?}"
+        );
+        assert_eq!(
+            windowed,
+            ranked(
+                &window_provider(&store, 20),
+                &needle(10, ScopeIds::default())
+            )
+        );
+
+        // Advanced mode passes FTS5 syntax through, to the counts as well.
+        let mut advanced = needle(10, ScopeIds::default());
+        advanced.query = "needle OR nomatch".to_string();
+        advanced.query_mode = Some(QueryMode::Advanced);
+        assert_eq!(ranked(&window_provider(&store, 20), &advanced), windowed);
+
+        advanced.query = "needle AND".to_string();
+        assert!(matches!(
+            window_provider(&store, 20).search(&advanced, NOW),
+            Err(ProviderError::InvalidQuery(_))
+        ));
     }
 
     #[test]
