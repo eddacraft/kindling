@@ -7,7 +7,7 @@
 | Status  | In Progress |
 | Owner   | @aneki      |
 | Created | 2026-03-14  |
-| Updated | 2026-11-13  |
+| Updated | 2026-11-23  |
 
 ## Current truth
 
@@ -19,7 +19,7 @@ and the old TypeScript engine are retired by D-010.
 
 [completed.aps.md](./completed.aps.md) indexes 44 completed items and the archived
 task detail. Fourteen superseded items are historical, not completed deliveries.
-Thirty-four items remain active across five modules. See the
+Thirty-eight items remain active across six modules. See the
 [full reconciliation](./reconciliation/2026-11-13-aps-cleanup.md) for all 87 dispositions.
 
 ## Success criteria
@@ -44,6 +44,7 @@ Thirty-four items remain active across five modules. See the
 | [07-intent-capture-events](./modules/07-intent-capture-events.aps.md)                         | Resolve current ownership/availability after TS retirement (GH-215) | Blocked     | 6            | Historical TS implementation removed; current Rust equivalent absent |
 | [08-conversion-surface](./modules/08-conversion-surface.aps.md)                               | Release acceptance, CLI depth, distribution and docs                | In Progress | 12           | Rust runtime and C1/C3/C4 delivered                                  |
 | [09-public-direction-and-contribution](./modules/09-public-direction-and-contribution.aps.md) | Roadmap, contributor opportunities and one-way projection           | In Progress | 5            | PUBDIR-001/002 live                                                  |
+| [10-retrieval-performance](./modules/10-retrieval-performance.aps.md)                         | Retrieval cost scales with scope, not store size (#316)             | Ready       | 4            | #306 exact ranking; #311 literal queries                             |
 
 ## Next decisions and acceptance
 
@@ -63,6 +64,9 @@ Thirty-four items remain active across five modules. See the
   Historical merges do not establish the feature in the supported Rust release.
 - PORT-020 preserves the deferred 1.0.0 decision. Current deprecation notices are
   verified; optional notice repointing and the anvil bridge follow-up remain.
+- PERF-001..004 are Ready (#316, agreed 2026-11-23). PERF-001 (narrow metadata
+  table) and PERF-002 (daemon read/write split) are independent. PERF-003 waits
+  on PERF-001, and PERF-004, the only ranking change, waits on both.
 - PUBDIR-003..007 and C5..C11/C13/C14 remain Draft. Delivered dependencies do not
   automatically authorise their implementation.
 
