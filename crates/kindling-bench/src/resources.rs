@@ -15,6 +15,8 @@ struct Snapshot {
     fds: Option<u64>,
     process_jiffies: Option<u64>,
     total_jiffies: Option<u64>,
+    /// CPUs covered by `total_jiffies` (`cpuN` lines in the same `/proc/stat`).
+    online_cpus: Option<usize>,
     /// Physical disk I/O from `/proc/.../io` (`read_bytes` / `write_bytes`).
     /// Often stays 0 when the page cache absorbs writes and no writeback
     /// has flushed yet (common on tmpfs and heavily cached local disks).
@@ -81,9 +83,31 @@ impl std::error::Error for SamplerError {}
 /// fields are reported as unavailable without failing the benchmark.
 pub struct ResourceSampler {
     before: Snapshot,
+    /// Bytes the start snapshot's own `/proc/self/io` read adds to `rchar`.
+    /// The kernel counts a read after it returns, so they land just after the
+    /// `rchar` value that read reports, inside the window.
+    start_io_read_bytes: u64,
     stop: Option<Sender<()>>,
-    handle: Option<JoinHandle<Snapshot>>,
+    handle: Option<JoinHandle<Polled>>,
     measurement_scope: &'static str,
+}
+
+/// What the polling worker hands back when it stops.
+#[derive(Debug, Clone, Copy, Default)]
+struct Polled {
+    /// Peak RSS, thread and FD counts seen by the polls.
+    peak: Snapshot,
+    /// Bytes the polls read, which `rchar` counts exactly (GH-178).
+    read_bytes: u64,
+}
+
+/// Where a full snapshot reads `/proc/self/io` relative to its other reads.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum IoRead {
+    /// Start of a window: the snapshot's other reads land before the counters.
+    Last,
+    /// End of a window: the snapshot's other reads land after the counters.
+    First,
 }
 
 impl ResourceSampler {
@@ -100,20 +124,24 @@ impl ResourceSampler {
     }
 
     fn start_self(interval: Duration, measurement_scope: &'static str) -> Self {
-        let before = snapshot();
+        let (before, start_io_read_bytes) = snapshot(IoRead::Last);
         let (stop, thread_stop) = mpsc::channel();
         let handle = thread::spawn(move || {
-            let mut peak = snapshot();
+            // No snapshot on start: `before` already covers the start, and a
+            // snapshot here would race the workload, so a test could not tell
+            // whether the final snapshot or this one saw a late allocation.
+            let mut polled = Polled::default();
             while let Err(mpsc::RecvTimeoutError::Timeout) = thread_stop.recv_timeout(interval) {
-                let current = snapshot();
-                peak.rss_kib = option_max(peak.rss_kib, current.rss_kib);
-                peak.threads = option_max(peak.threads, current.threads);
-                peak.fds = option_max(peak.fds, current.fds);
+                let current = poll(&mut polled.read_bytes);
+                polled.peak.rss_kib = option_max(polled.peak.rss_kib, current.rss_kib);
+                polled.peak.threads = option_max(polled.peak.threads, current.threads);
+                polled.peak.fds = option_max(polled.peak.fds, current.fds);
             }
-            peak
+            polled
         });
         Self {
             before,
+            start_io_read_bytes,
             stop: Some(stop),
             handle: Some(handle),
             measurement_scope,
@@ -122,24 +150,12 @@ impl ResourceSampler {
 
     #[must_use = "finish the sampler and handle measurement failure"]
     pub fn finish(mut self) -> Result<ResourceSummary, SamplerError> {
-        let peak = self.stop_and_join()?;
-        let after = snapshot();
-        let ncpus = thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get);
-        let cpu_cores = match (
-            self.before.process_jiffies,
-            after.process_jiffies,
-            self.before.total_jiffies,
-            after.total_jiffies,
-        ) {
-            (Some(proc_before), Some(proc_after), Some(total_before), Some(total_after)) => {
-                Some(cpu_cores_for_window(
-                    proc_after.saturating_sub(proc_before),
-                    total_after.saturating_sub(total_before),
-                    ncpus,
-                ))
-            }
-            _ => None,
-        };
+        let Polled {
+            peak,
+            read_bytes: poll_read_bytes,
+        } = self.stop_and_join()?;
+        let (after, _) = snapshot(IoRead::First);
+        let cpu_cores = cpu_cores_between(&self.before, &after);
         let peak_rss_kib = option_max(option_max(peak.rss_kib, self.before.rss_kib), after.rss_kib);
         let peak_threads = option_max(option_max(peak.threads, self.before.threads), after.threads);
         let peak_fds = option_max(option_max(peak.fds, self.before.fds), after.fds);
@@ -173,12 +189,18 @@ impl ResourceSampler {
             cpu_cores,
             read_bytes: delta(self.before.read_bytes, after.read_bytes),
             write_bytes: delta(self.before.write_bytes, after.write_bytes),
-            logical_read_bytes: delta(self.before.rchar, after.rchar),
+            // rchar counts exactly the bytes read() returns, so the sampler's
+            // own reads inside the window are subtracted exactly (GH-178).
+            logical_read_bytes: delta(self.before.rchar, after.rchar).map(|bytes| {
+                bytes
+                    .saturating_sub(poll_read_bytes)
+                    .saturating_sub(self.start_io_read_bytes)
+            }),
             logical_write_bytes: delta(self.before.wchar, after.wchar),
         })
     }
 
-    fn stop_and_join(&mut self) -> Result<Snapshot, SamplerError> {
+    fn stop_and_join(&mut self) -> Result<Polled, SamplerError> {
         self.stop.take();
         self.handle
             .take()
@@ -187,7 +209,7 @@ impl ResourceSampler {
                     .join()
                     .map_err(|payload| SamplerError::WorkerPanicked(panic_message(payload)))
             })
-            .unwrap_or_else(|| Ok(Snapshot::default()))
+            .unwrap_or_else(|| Ok(Polled::default()))
     }
 }
 
@@ -233,10 +255,11 @@ mod tests {
             );
             thread::sleep(Duration::from_millis(100));
             worker_exited.store(signalled, Ordering::SeqCst);
-            Snapshot::default()
+            Polled::default()
         });
         let sampler = ResourceSampler {
             before: Snapshot::default(),
+            start_io_read_bytes: 0,
             stop: Some(stop),
             handle: Some(handle),
             measurement_scope: "in-process",
@@ -251,10 +274,47 @@ mod tests {
     }
 
     #[test]
+    fn cpu_cores_are_normalised_by_the_snapshot_cpu_count() {
+        // Seven online CPUs, a count no real host running this test is likely
+        // to match, so normalising by the host's `available_parallelism`
+        // instead would give a different answer. The totals advance by
+        // 7 * 1000 jiffies and the process by 3 * 1000: three saturated cores.
+        let before = Snapshot {
+            process_jiffies: Some(500),
+            total_jiffies: Some(70_000),
+            online_cpus: Some(7),
+            ..Snapshot::default()
+        };
+        let after = Snapshot {
+            process_jiffies: Some(3_500),
+            total_jiffies: Some(77_000),
+            online_cpus: Some(7),
+            ..Snapshot::default()
+        };
+
+        assert_eq!(cpu_cores_between(&before, &after), Some(3.0));
+        let after_without_count = Snapshot {
+            online_cpus: None,
+            ..after
+        };
+        assert_eq!(
+            cpu_cores_between(&before, &after_without_count),
+            Some(3.0),
+            "falls back to the start snapshot's CPU count"
+        );
+        assert_eq!(
+            cpu_cores_between(&before, &Snapshot::default()),
+            None,
+            "a snapshot without CPU accounting reports no CPU figure"
+        );
+    }
+
+    #[test]
     fn worker_panic_is_reported_instead_of_defaulting_snapshot() {
-        let handle = thread::spawn(|| -> Snapshot { panic!("sampler exploded") });
+        let handle = thread::spawn(|| -> Polled { panic!("sampler exploded") });
         let mut sampler = ResourceSampler {
             before: Snapshot::default(),
+            start_io_read_bytes: 0,
             stop: None,
             handle: Some(handle),
             measurement_scope: "in-process",
@@ -268,6 +328,20 @@ mod tests {
             SamplerError::WorkerPanicked("sampler exploded".to_owned())
         );
     }
+}
+
+/// Saturated cores used between two full snapshots.
+///
+/// Normalised by the CPU count from the same `/proc/stat` as the totals
+/// (GH-178), not `available_parallelism`, which follows the affinity mask or
+/// quota while the totals cover every online CPU.
+fn cpu_cores_between(before: &Snapshot, after: &Snapshot) -> Option<f64> {
+    let process_delta = after
+        .process_jiffies?
+        .saturating_sub(before.process_jiffies?);
+    let total_delta = after.total_jiffies?.saturating_sub(before.total_jiffies?);
+    let ncpus = after.online_cpus.or(before.online_cpus)?;
+    Some(cpu_cores_for_window(process_delta, total_delta, ncpus))
 }
 
 fn option_max(left: Option<u64>, right: Option<u64>) -> Option<u64> {
@@ -356,47 +430,137 @@ pub fn parse_proc_io(io: &str) -> Option<ProcIo> {
     (saw_physical || saw_logical).then_some(counters)
 }
 
+/// Read a `/proc` file, adding every byte `read()` returns to `counted`.
+///
+/// `rchar` counts exactly the bytes `read()` returns, so a reader that counts
+/// the same bytes can be subtracted from it exactly, even when a read fails
+/// part-way through.
 #[cfg(target_os = "linux")]
-fn snapshot() -> Snapshot {
-    let (rss_kib, threads) = std::fs::read_to_string("/proc/self/status")
-        .ok()
+fn read_counted(path: &str, counted: &mut u64) -> Option<String> {
+    use std::io::Read;
+
+    let mut file = std::fs::File::open(path).ok()?;
+    let mut contents = Vec::new();
+    let mut chunk = [0_u8; 4096];
+    loop {
+        match file.read(&mut chunk) {
+            Ok(0) => break,
+            Ok(read) => {
+                *counted += read as u64;
+                contents.extend_from_slice(&chunk[..read]);
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
+            Err(_) => return None,
+        }
+    }
+    String::from_utf8(contents).ok()
+}
+
+/// The cheap per-interval poll: RSS and threads from `/proc/self/status`, and
+/// the FD count. Listing `/proc/self/fd` uses `getdents64`, which `rchar` does
+/// not count, so only the status read is added to `counted`.
+#[cfg(target_os = "linux")]
+fn poll(counted: &mut u64) -> Snapshot {
+    let (rss_kib, threads) = read_counted("/proc/self/status", counted)
         .and_then(|value| parse_proc_status(&value))
         .map_or((None, None), |(rss, threads)| (Some(rss), Some(threads)));
-    let process_jiffies = std::fs::read_to_string("/proc/self/stat")
-        .ok()
-        .and_then(|value| parse_proc_stat(&value));
-    let total_jiffies = std::fs::read_to_string("/proc/stat")
-        .ok()
-        .and_then(|value| parse_total_cpu_jiffies(&value));
-    let io = std::fs::read_to_string("/proc/self/io")
-        .ok()
-        .and_then(|value| parse_proc_io(&value));
-    let fds = std::fs::read_dir("/proc/self/fd")
-        .ok()
-        .map(|entries| entries.filter_map(Result::ok).count() as u64);
     Snapshot {
+        rss_kib,
+        threads,
+        fds: fd_count(),
+        ..Snapshot::default()
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn fd_count() -> Option<u64> {
+    std::fs::read_dir("/proc/self/fd")
+        .ok()
+        .map(|entries| entries.filter_map(Result::ok).count() as u64)
+}
+
+/// A full snapshot for the edge of a window. Returns the snapshot and the
+/// bytes its own `/proc/self/io` read adds to `rchar`, which the kernel counts
+/// after that read reports its value.
+#[cfg(target_os = "linux")]
+fn snapshot(io_read: IoRead) -> (Snapshot, u64) {
+    let mut io_read_bytes = 0;
+    let mut read_io = || {
+        read_counted("/proc/self/io", &mut io_read_bytes).and_then(|value| parse_proc_io(&value))
+    };
+    let io_first = (io_read == IoRead::First).then(&mut read_io).flatten();
+    let mut other_reads = 0;
+    let (rss_kib, threads) = read_counted("/proc/self/status", &mut other_reads)
+        .and_then(|value| parse_proc_status(&value))
+        .map_or((None, None), |(rss, threads)| (Some(rss), Some(threads)));
+    let process_jiffies =
+        read_counted("/proc/self/stat", &mut other_reads).and_then(|value| parse_proc_stat(&value));
+    let cpu = read_counted("/proc/stat", &mut other_reads).and_then(|value| parse_cpu_stat(&value));
+    let fds = fd_count();
+    let io = match io_read {
+        IoRead::First => io_first,
+        IoRead::Last => read_io(),
+    };
+    let snapshot = Snapshot {
         rss_kib,
         threads,
         fds,
         process_jiffies,
-        total_jiffies,
+        total_jiffies: cpu.map(|c| c.total_jiffies),
+        online_cpus: cpu.map(|c| c.online_cpus),
         read_bytes: io.map(|c| c.read_bytes),
         write_bytes: io.map(|c| c.write_bytes),
         rchar: io.map(|c| c.rchar),
         wchar: io.map(|c| c.wchar),
-    }
+    };
+    (snapshot, io_read_bytes)
 }
 
 #[cfg(not(target_os = "linux"))]
-fn snapshot() -> Snapshot {
+fn poll(_counted: &mut u64) -> Snapshot {
     Snapshot::default()
 }
 
-fn parse_total_cpu_jiffies(stat: &str) -> Option<u64> {
-    let mut fields = stat.lines().next()?.split_whitespace();
+#[cfg(not(target_os = "linux"))]
+fn snapshot(_io_read: IoRead) -> (Snapshot, u64) {
+    (Snapshot::default(), 0)
+}
+
+/// Host CPU accounting parsed from one read of `/proc/stat`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CpuStat {
+    /// Sum of the first eight fields of the aggregate `cpu` line (user, nice,
+    /// system, idle, iowait, irq, softirq, steal) across every online CPU.
+    pub total_jiffies: u64,
+    /// Number of `cpuN` lines: the CPUs `total_jiffies` covers.
+    pub online_cpus: usize,
+}
+
+/// Parse the aggregate jiffies and the online CPU count from `/proc/stat`.
+///
+/// The CPU count comes from the same document as the totals, so dividing a
+/// process's jiffies by `total_jiffies` and scaling by `online_cpus` gives
+/// saturated cores even when the process is restricted to fewer CPUs by an
+/// affinity mask or quota (where `available_parallelism` would disagree with
+/// the host-wide totals).
+#[must_use]
+pub fn parse_cpu_stat(stat: &str) -> Option<CpuStat> {
+    let mut lines = stat.lines();
+    let mut fields = lines.next()?.split_whitespace();
     (fields.next()? == "cpu").then_some(())?;
-    fields
+    let total_jiffies = fields
         .take(8)
         .map(str::parse::<u64>)
-        .try_fold(0u64, |total, value| Some(total.saturating_add(value.ok()?)))
+        .try_fold(0u64, |total, value| Some(total.saturating_add(value.ok()?)))?;
+    let online_cpus = lines
+        .filter(|line| {
+            line.strip_prefix("cpu")
+                .and_then(|rest| rest.split_whitespace().next())
+                .is_some_and(|id| !id.is_empty() && id.bytes().all(|b| b.is_ascii_digit()))
+        })
+        .count();
+    (online_cpus > 0).then_some(CpuStat {
+        total_jiffies,
+        online_cpus,
+    })
 }
