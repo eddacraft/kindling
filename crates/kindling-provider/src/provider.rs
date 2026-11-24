@@ -1348,16 +1348,9 @@ mod tests {
                 ts,
             );
         }
-        for i in 0..40 {
-            let ts = NOW - 20 * DAY + i * DAY / 4;
-            insert(
-                &store,
-                &format!("b-new-{i}"),
-                &format!("needle b new {i}"),
-                session(None, Some("/b")),
-                ts,
-            );
-        }
+        // In scope and the window's first rowid: the split falls right
+        // before it, so an off-by-one at the boundary drops or repeats a row
+        // that the scoped search returns.
         for i in 0..5 {
             let ts = NOW - 5 * DAY + i * DAY;
             insert(
@@ -1365,6 +1358,16 @@ mod tests {
                 &format!("a-new-{i}"),
                 &format!("needle a new {i}"),
                 session(None, Some("/a")),
+                ts,
+            );
+        }
+        for i in 0..40 {
+            let ts = NOW - 20 * DAY + i * DAY / 4;
+            insert(
+                &store,
+                &format!("b-new-{i}"),
+                &format!("needle b new {i}"),
+                session(None, Some("/b")),
                 ts,
             );
         }
@@ -1376,18 +1379,22 @@ mod tests {
             NOW - 90 * DAY,
         );
 
-        let opts = needle(10, session(None, Some("/a")));
+        // Every in-scope match, so a lost or repeated row anywhere shows.
+        let opts = needle(100, session(None, Some("/a")));
         let exact = ranked(&window_provider(&store, i64::MAX), &opts);
+        assert_eq!(exact.len(), 46, "exact ranking: {exact:?}");
         assert_eq!(exact[0].0, "a-late-old", "exact ranking: {exact:?}");
         // 86 matches store-wide and 46 from the anchor pass the cheap checks
         // at 20; 5 in-scope window matches do not.
         assert_eq!(ranked(&window_provider(&store, 20), &opts), exact);
 
-        // Unscoped, the same store uses the window, without the late old row.
+        // Unscoped, the same store uses the window (45 matches, at least
+        // max(20, 40)), without the late old row.
         let windowed = ranked(
             &window_provider(&store, 20),
-            &needle(10, ScopeIds::default()),
+            &needle(40, ScopeIds::default()),
         );
+        assert_eq!(windowed.len(), 40, "{windowed:?}");
         assert!(
             windowed.iter().all(|(id, _)| id.contains("-new-")),
             "{windowed:?}"
