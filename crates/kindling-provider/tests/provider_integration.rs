@@ -1233,3 +1233,43 @@ fn search_without_observation_meta_matches_the_narrow_join() {
         .collect();
     assert_eq!(wide, narrow);
 }
+
+// ===== Recent window above the match threshold (PERF-004) =====
+
+/// At the default threshold of 1,000: with 999 matches in the last 30 days the
+/// search is exact, so an old best match still wins; with 1,000 it searches
+/// only the last 30 days, and the old match drops out.
+#[test]
+fn the_recent_window_starts_at_one_thousand_matches() {
+    for (recent, windowed) in [(999, false), (1_000, true)] {
+        let store = SqliteKindlingStore::open_in_memory().unwrap();
+        store
+            .insert_observation(&observation(
+                "old-best",
+                "needle needle needle",
+                ScopeIds::default(),
+                NOW - 90 * DAY_MS,
+            ))
+            .unwrap();
+        for i in 0..recent {
+            store
+                .insert_observation(&observation(
+                    &format!("new-{i:04}"),
+                    &format!("needle recent {i}"),
+                    ScopeIds::default(),
+                    // Appended in time order across the last 29 days.
+                    NOW - 29 * DAY_MS + i as i64 * 29 * DAY_MS / recent as i64,
+                ))
+                .unwrap();
+        }
+        let mut opts = options("needle", ScopeIds::default());
+        opts.max_results = Some(10);
+        let results = search(&store, &opts);
+        assert_eq!(results.len(), 10);
+        assert_eq!(
+            entity_id(&results[0]) != "old-best",
+            windowed,
+            "{recent} recent matches"
+        );
+    }
+}

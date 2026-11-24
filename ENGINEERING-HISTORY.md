@@ -186,6 +186,62 @@ at each release; older distribution approaches may now be superseded.
     Repo and unscoped queries are unchanged. Result ids matched in all 40
     comparisons: two sessions, a missing session, one repo and no scope, with
     `max_candidates` 10 and 1,000.
+- **Very broad searches rank only the last 30 days (PERF-004, #316).** This
+  relaxes #306's exact ranking above a threshold, as agreed with the
+  maintainer. Observation candidates come from observations with `ts` in the
+  last 30 days, only when that window alone holds at least
+  `max(1000, max_results)` in-scope matches. Otherwise the search is exact.
+  - **Exact about time.** The FTS scan is bounded from the lowest rowid of any
+    row in the window, found with a covering scan of `idx_observations_ts`
+    (forced with `INDEXED BY`; the planner otherwise walks the table in rowid
+    order, 83 ms against 4.8 ms for 73k recent rows). Rows are then filtered on
+    `ts`, so rows out of time order are windowed by `ts`, never by position.
+    The experiment's prototype took the earliest row by `ts` instead, which
+    could drop low-rowid recent rows.
+  - **Cheap checks first.** That bound costs one index entry per recent row,
+    so it runs only after two checks that can only choose the exact path:
+    - an FTS-only match count capped at the threshold;
+    - the same count from an anchor, the lowest rowid among the window's 256
+      earliest rows by `ts`.
+
+    Without them, queries with 1,000–3,000 matches paid the bound and then
+    fell back, 3–5× slower (1.5 → 6 ms). With them, the overhead on queries
+    that stay exact is 0.06–0.4 ms.
+  - **Measured.** On the 220k-row synthetic corpus spanning 90 days, with
+    `retrieve_corpus`, best of 3 rounds, against PERF-001 and PERF-003 alone:
+
+    | Query | Scope | Exact | Window | Top 10 / top 50 vs exact |
+    | --- | --- | --- | --- | --- |
+    | Word in 50% of rows | All rows | 102 ms | 41 ms (2.5×) | 10/10, 50/50 |
+    | Word in 10% of rows | All rows | 22.7 ms | 12.1 ms (1.9×) | 10/10, 50/50 |
+    | Word in 50% of rows | One repo | 46 ms | 22 ms (2.1×) | 10/10, 50/50 |
+    | Word in 10% of rows | One repo | 11.5 ms | 8.2 ms (1.4×) | 10/10, 49/50 |
+    | 1,100–2,700 matches | All rows or one repo | 0.9–3.6 ms | +0.2–0.4 ms | identical |
+    | Fewer than 1,000 matches, or one session | Any | 0.2–4.5 ms | +0.06–0.1 ms | identical |
+
+    The synthetic corpus spans only 90 days, so the window is a third of it.
+    On longer-lived stores, the window is a smaller share and the gain is
+    larger.
+  - **Scoped searches with a thin window pay a fixed cost.** The cheap checks
+    count store-wide, so a repo with few recent matches in a busy store passes
+    them, scans the window, and then ranks exactly. That fallback reuses the
+    window's scan and reads only the rowid range below the window, since every
+    row there is older than the cutoff, so no match is read twice. It still
+    pays the checks and the window bound. On a copy of the corpus with a
+    4,000-row repo (1,334 recent rows; best of 4 rounds, results identical to
+    exact):
+
+    | Query in the small repo | Exact | This change | Reading the window twice |
+    | --- | --- | --- | --- |
+    | Word in 50% of rows (661 recent matches) | 31.3 ms | 42.1 ms (1.35×) | 49.7 ms |
+    | Word in 10% of rows (130 recent matches) | 8.4 ms | 13.8 ms (1.64×) | 16.1 ms |
+    | Word in 1% of rows (stops at the cheap checks) | 1.15 ms | 1.60 ms | 1.57 ms |
+  - **Tests.** These cover the threshold boundary (unit tests, and an
+    integration test at the real 1,000); the fallbacks for a window thin
+    against the threshold, `max_results` or the scope; rows out of time order
+    in both directions; a disordered window falling back to exact; the session
+    span combined with the window; and prefix stability inside the window. The
+    #306 ranking-contract tests pass unchanged.
 
 ### Security
 
