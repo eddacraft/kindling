@@ -392,6 +392,7 @@ fn query(text: &str) -> RetrieveOptions {
         token_budget: None,
         max_candidates: Some(20),
         include_redacted: Some(false),
+        query_mode: None,
     }
 }
 

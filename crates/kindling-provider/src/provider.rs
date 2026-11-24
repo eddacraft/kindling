@@ -845,11 +845,14 @@ mod tests {
             max_results: None,
             exclude_ids: None,
             include_redacted: None,
+            query_mode: None,
         };
         let mut queries = vec![
             opts("auth", session(Some("a"), None)),
             opts("token", session(Some("a"), None)),
             opts("auth cache", session(Some("a"), Some("/r"))),
+            // Plain-text mode quotes this; as FTS5 syntax it would not parse.
+            opts("auth-cache", session(Some("a"), None)),
             opts("auth", session(Some("b"), None)),
             opts("auth", session(Some("missing"), None)),
         ];
@@ -897,10 +900,17 @@ mod tests {
             max_results: None,
             exclude_ids: None,
             include_redacted: None,
+            query_mode: None,
         };
         let plan = |span: Option<(i64, i64)>| -> String {
-            let (sql, params) =
-                super::candidate_query(super::EntityType::Observation, &opts, NOW, true, span);
+            let (sql, params) = super::candidate_query(
+                super::EntityType::Observation,
+                "auth",
+                &opts,
+                NOW,
+                true,
+                span,
+            );
             let mut stmt = store
                 .connection()
                 .prepare(&format!("EXPLAIN QUERY PLAN {sql}"))
