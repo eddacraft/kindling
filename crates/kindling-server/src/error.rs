@@ -3,7 +3,7 @@
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
-use kindling_service::ServiceError;
+use kindling_service::{ProviderError, ServiceError};
 use serde_json::json;
 
 /// Top-level daemon error.
@@ -38,7 +38,8 @@ fn display_pid(pid: &Option<i32>) -> String {
 /// Per-request error mapped to an HTTP status + JSON body `{ "error": "…" }`.
 #[derive(Debug)]
 pub enum ApiError {
-    /// 400 — malformed request, missing project header, or validation failure.
+    /// 400 — malformed request, missing project header, validation failure,
+    /// or an advanced search query that is not valid FTS5 syntax.
     BadRequest(String),
     /// 404 — referenced entity does not exist.
     NotFound(String),
@@ -62,7 +63,10 @@ impl ApiError {
 impl From<ServiceError> for ApiError {
     fn from(err: ServiceError) -> Self {
         match err {
-            ServiceError::Validation(_) => ApiError::BadRequest(err.to_string()),
+            ServiceError::Validation(_)
+            | ServiceError::Provider(ProviderError::InvalidQuery(_)) => {
+                ApiError::BadRequest(err.to_string())
+            }
             ServiceError::NotFound(_) => ApiError::NotFound(err.to_string()),
             ServiceError::Conflict(_) | ServiceError::AlreadyClosed(_) => {
                 ApiError::Conflict(err.to_string())

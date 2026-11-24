@@ -11,6 +11,12 @@
 //! (PORT-005), so these are frozen golden fixtures that still guard ranking
 //! parity (regenerating them would require the retired TS packages).
 //!
+//! Search cases replay in advanced query mode, because the TS provider passed
+//! the query to FTS5 unchanged. Plain one-word cases are also replayed in the
+//! default literal mode. The one deliberate divergence is the malformed-query
+//! case: TS returned an empty result, and Rust now reports
+//! `ProviderError::InvalidQuery` (GH-311).
+//!
 //! If ranking changes on purpose, hand-edit the affected expected entries in
 //! `ts-parity.json` in the same PR, explain the diff in the PR description, and
 //! record it in ENGINEERING-HISTORY. Ranking changes are discuss-first (see
@@ -18,9 +24,9 @@
 
 use std::path::PathBuf;
 
-use kindling_provider::{retrieve_at, LocalFtsProvider, RetrievalProvider};
+use kindling_provider::{retrieve_at, LocalFtsProvider, ProviderError, RetrievalProvider};
 use kindling_store::{SqliteKindlingStore, StoreOptions};
-use kindling_types::{ProviderSearchOptions, RetrieveOptions, Timestamp};
+use kindling_types::{ProviderSearchOptions, QueryMode, RetrieveOptions, Timestamp};
 use serde_json::Value;
 
 fn fixture_path(name: &str) -> PathBuf {
@@ -54,8 +60,33 @@ fn search_results_match_ts_provider() {
     );
     for case in cases {
         let name = case["name"].as_str().unwrap_or("?");
-        let options: ProviderSearchOptions =
+        let fixture_options: ProviderSearchOptions =
             serde_json::from_value(case["options"].clone()).expect("case options should parse");
+        assert_eq!(
+            fixture_options.query_mode, None,
+            "fixtures predate query modes"
+        );
+
+        // The TS provider passed the query to FTS5 unchanged, which is
+        // advanced mode now (GH-311).
+        let options = ProviderSearchOptions {
+            query_mode: Some(QueryMode::Advanced),
+            ..fixture_options.clone()
+        };
+
+        // Deliberate divergence (GH-311): TS swallowed FTS5 syntax errors into
+        // an empty result; a malformed advanced query is now an error.
+        if name == "malformed query" {
+            let err = provider
+                .search(&options, now)
+                .expect_err("a malformed advanced query must be rejected");
+            assert!(
+                matches!(err, ProviderError::InvalidQuery(_)),
+                "expected InvalidQuery, got {err:?}"
+            );
+            assert_eq!(case["expected"], Value::Array(Vec::new()));
+            continue;
+        }
 
         let results = provider
             .search(&options, now)
@@ -69,6 +100,19 @@ fn search_results_match_ts_provider() {
             serde_json::to_string_pretty(&actual).unwrap(),
             serde_json::to_string_pretty(&case["expected"]).unwrap(),
         );
+
+        // A single plain word means the same in both modes, so the default
+        // (literal) mode must reproduce these cases too.
+        if fixture_options.query.chars().all(char::is_alphanumeric) {
+            let literal = provider
+                .search(&fixture_options, now)
+                .unwrap_or_else(|err| panic!("literal search case {name:?} failed: {err}"));
+            assert_eq!(
+                serde_json::to_value(&literal).expect("results should serialize"),
+                case["expected"],
+                "literal search case {name:?} diverged from the TS provider",
+            );
+        }
     }
 }
 

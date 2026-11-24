@@ -24,6 +24,11 @@
 //! Only the returned rows are read in full; the candidate scan and that read
 //! share one read snapshot.
 //!
+//! The query is interpreted per [`QueryMode`]. Literal mode (the default)
+//! compiles plain text into an FTS5 query (see [`compile_literal_query`]);
+//! advanced mode passes FTS5 syntax through. An FTS5 syntax error is
+//! reported as [`ProviderError::InvalidQuery`], never as an empty result.
+//!
 //! The one deliberate API deviation from TypeScript: the TS provider reads
 //! `Date.now()` internally, while [`RetrievalProvider::search`] takes `now`
 //! explicitly so retrieval is deterministic and testable.
@@ -35,8 +40,8 @@ use rusqlite::{params_from_iter, Connection, OptionalExtension};
 
 use kindling_store::SqliteKindlingStore;
 use kindling_types::{
-    Id, Observation, ObservationKind, ProviderSearchOptions, ProviderSearchResult, RetrievedEntity,
-    ScopeIds, Summary, Timestamp,
+    Id, Observation, ObservationKind, ProviderSearchOptions, ProviderSearchResult, QueryMode,
+    RetrievedEntity, ScopeIds, Summary, Timestamp,
 };
 
 use crate::error::{ProviderError, ProviderResult};
@@ -136,11 +141,13 @@ impl<'conn> LocalFtsProvider<'conn> {
         Self::new(store.connection())
     }
 
-    /// Every filtered match of one entity type, unscored. FTS syntax errors
-    /// yield no candidates (malformed user queries are not provider failures).
+    /// Every filtered match of one entity type for the FTS5 expression
+    /// `fts_query`, unscored. An FTS5 syntax error is
+    /// [`ProviderError::InvalidQuery`].
     fn candidates(
         &self,
         entity_type: EntityType,
+        fts_query: &str,
         options: &ProviderSearchOptions,
         now: Timestamp,
     ) -> ProviderResult<Vec<Candidate>> {
@@ -162,7 +169,8 @@ impl<'conn> LocalFtsProvider<'conn> {
                 _ => None,
             };
             let narrow = observations && self.has_observation_meta()?;
-            let (sql, params) = candidate_query(entity_type, options, now, narrow, rowid_span);
+            let (sql, params) =
+                candidate_query(entity_type, fts_query, options, now, narrow, rowid_span);
             let mut stmt = self.conn.prepare(&sql)?;
             let rows = stmt.query_map(params_from_iter(params), |row| {
                 Ok(Candidate {
@@ -179,7 +187,9 @@ impl<'conn> LocalFtsProvider<'conn> {
 
         match result {
             Ok(rows) => Ok(rows),
-            Err(err) if is_fts_syntax_error(&err) => Ok(Vec::new()),
+            Err(err) if is_fts_syntax_error(&err) => {
+                Err(ProviderError::InvalidQuery(err.to_string()))
+            }
             Err(err) => Err(err.into()),
         }
     }
@@ -315,6 +325,9 @@ impl RetrievalProvider for LocalFtsProvider<'_> {
         if max_results == 0 {
             return Ok(Vec::new());
         }
+        let Some(fts_query) = fts_query(options) else {
+            return Ok(Vec::new());
+        };
 
         // One read snapshot for the candidate scan and hydration, so a row
         // cannot be redacted, removed or renumbered between the two. A caller
@@ -327,8 +340,8 @@ impl RetrievalProvider for LocalFtsProvider<'_> {
             None
         };
 
-        let mut candidates = self.candidates(EntityType::Observation, options, now)?;
-        candidates.extend(self.candidates(EntityType::Summary, options, now)?);
+        let mut candidates = self.candidates(EntityType::Observation, &fts_query, options, now)?;
+        candidates.extend(self.candidates(EntityType::Summary, &fts_query, options, now)?);
 
         // Normalize BM25 ranks across the full filtered match set of BOTH
         // entity types, so scores are comparable and independent of
@@ -407,6 +420,7 @@ impl RetrievalProvider for LocalFtsProvider<'_> {
 /// contain every rowid the scope filter can accept.
 fn candidate_query(
     entity_type: EntityType,
+    fts_query: &str,
     options: &ProviderSearchOptions,
     now: Timestamp,
     has_observation_meta: bool,
@@ -477,7 +491,7 @@ fn candidate_query(
         }
     };
 
-    let mut params: Vec<SqlValue> = vec![SqlValue::Text(options.query.clone())];
+    let mut params: Vec<SqlValue> = vec![SqlValue::Text(fts_query.to_string())];
     if let (EntityType::Observation, Some((first, last))) = (entity_type, rowid_span) {
         params.push(SqlValue::Integer(first));
         params.push(SqlValue::Integer(last));
@@ -487,6 +501,36 @@ fn candidate_query(
     params.extend(scope_params);
     params.extend(exclude_ids.iter().map(|id| SqlValue::Text(id.clone())));
     (sql, params)
+}
+
+/// The FTS5 `MATCH` expression for `options`, or `None` when the query has
+/// no terms (empty or whitespace only), which matches nothing.
+fn fts_query(options: &ProviderSearchOptions) -> Option<String> {
+    match options.query_mode.unwrap_or_default() {
+        QueryMode::Literal => compile_literal_query(&options.query),
+        QueryMode::Advanced => (!options.query.trim().is_empty()).then(|| options.query.clone()),
+    }
+}
+
+/// Compile plain text into an FTS5 query that is valid for every input.
+///
+/// The text is split on whitespace and on NUL (FTS5 reads the query as a C
+/// string, so a NUL inside a term would cut its closing quote off). Each term becomes an FTS5 string: any `"`
+/// inside it is doubled and the term is wrapped in `"…"`. FTS5 tokenizes a
+/// string into a phrase, so `src/cache.rs` matches as the token sequence
+/// `src cache rs` and its punctuation is never read as syntax. Terms are
+/// joined with spaces, FTS5's implicit AND, so every term must match.
+/// Operators and wildcards (`NOT`, `OR`, `*`) are searched for as text.
+///
+/// A term with no indexable characters (such as `++`) is an empty phrase,
+/// which matches nothing on its own and does not constrain other terms.
+fn compile_literal_query(query: &str) -> Option<String> {
+    let terms: Vec<String> = query
+        .split(|c: char| c.is_whitespace() || c == '\0')
+        .filter(|term| !term.is_empty())
+        .map(|term| format!("\"{}\"", term.replace('"', "\"\"")))
+        .collect();
+    (!terms.is_empty()).then(|| terms.join(" "))
 }
 
 /// `AND a AND b …` for `clauses`, or empty.
@@ -564,9 +608,10 @@ fn exclude_id_filter(prefix: &str, exclude_ids: &[Id]) -> String {
     format!("AND {prefix}.id NOT IN ({placeholders})")
 }
 
-/// True for FTS5 query-syntax errors, which are swallowed into empty results
-/// (malformed user queries are not provider failures). Mirrors
-/// `isFtsSyntaxError` in the TS provider.
+/// True for FTS5 query-syntax errors, which become
+/// [`ProviderError::InvalidQuery`]. Every other SQLite error is a backend or
+/// schema failure and propagates unchanged. The signatures mirror
+/// `isFtsSyntaxError` in the retired TS provider.
 ///
 /// FTS5 column filters such as `missing:term` surface as SQLite
 /// `no such column: missing` with a bare identifier. Provider SQL always
@@ -584,6 +629,8 @@ fn is_fts_syntax_error_message(message: &str) -> bool {
         || msg.contains("fts syntax")
         || msg.contains("unterminated string")
         || msg.contains("unknown special query")
+        // `NEAR(a b, x)`: a NEAR distance that is not an integer.
+        || msg.contains("expected integer, got")
         || is_fts_unknown_column_error(&msg)
 }
 
@@ -638,7 +685,10 @@ fn decode_stored_scope_ids(raw: &str) -> serde_json::Result<ScopeIds> {
 
 #[cfg(test)]
 mod tests {
-    use super::{is_fts_syntax_error_message, LocalFtsProvider, RetrievalProvider, SessionSpan};
+    use super::{
+        compile_literal_query, is_fts_syntax_error_message, LocalFtsProvider, RetrievalProvider,
+        SessionSpan,
+    };
     use kindling_store::SqliteKindlingStore;
     use kindling_types::{
         Capsule, CapsuleStatus, CapsuleType, Observation, ObservationKind, ProviderSearchOptions,
@@ -795,11 +845,14 @@ mod tests {
             max_results: None,
             exclude_ids: None,
             include_redacted: None,
+            query_mode: None,
         };
         let mut queries = vec![
             opts("auth", session(Some("a"), None)),
             opts("token", session(Some("a"), None)),
             opts("auth cache", session(Some("a"), Some("/r"))),
+            // Plain-text mode quotes this; as FTS5 syntax it would not parse.
+            opts("auth-cache", session(Some("a"), None)),
             opts("auth", session(Some("b"), None)),
             opts("auth", session(Some("missing"), None)),
         ];
@@ -847,10 +900,17 @@ mod tests {
             max_results: None,
             exclude_ids: None,
             include_redacted: None,
+            query_mode: None,
         };
         let plan = |span: Option<(i64, i64)>| -> String {
-            let (sql, params) =
-                super::candidate_query(super::EntityType::Observation, &opts, NOW, true, span);
+            let (sql, params) = super::candidate_query(
+                super::EntityType::Observation,
+                "auth",
+                &opts,
+                NOW,
+                true,
+                span,
+            );
             let mut stmt = store
                 .connection()
                 .prepare(&format!("EXPLAIN QUERY PLAN {sql}"))
@@ -873,6 +933,28 @@ mod tests {
             "the rowid range must change the FTS5 index plan"
         );
         assert!(bounded.contains('<') && bounded.contains('>'), "{bounded}");
+    }
+
+    #[test]
+    fn literal_query_quotes_each_whitespace_separated_term() {
+        for (input, expected) in [
+            ("cache.rs", Some(r#""cache.rs""#)),
+            ("  fix:   cache\t", Some(r#""fix:" "cache""#)),
+            ("what NOT cached", Some(r#""what" "NOT" "cached""#)),
+            ("auth*", Some(r#""auth*""#)),
+            (r#"say "hi""#, Some(r#""say" """hi""""#)),
+            (r#"""#, Some(r#""""""#)),
+            ("", None),
+            (" \t\n ", None),
+            ("a\0b", Some(r#""a" "b""#)),
+            ("\0", None),
+        ] {
+            assert_eq!(
+                compile_literal_query(input).as_deref(),
+                expected,
+                "input {input:?}"
+            );
+        }
     }
 
     #[test]
@@ -915,6 +997,7 @@ mod tests {
             "fts5: syntax error near \"AND\"",
             "unterminated string",
             "unknown special query: ",
+            "expected integer, got \"x\"",
         ] {
             assert!(
                 is_fts_syntax_error_message(msg),

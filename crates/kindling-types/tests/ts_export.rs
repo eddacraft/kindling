@@ -36,6 +36,7 @@ fn export_all_types_to_bindings_dir() {
         Pin::export_all(&cfg),
         PinInput::export_all(&cfg),
         RetrieveOptions::export_all(&cfg),
+        QueryMode::export_all(&cfg),
         RetrieveResult::export_all(&cfg),
         RetrieveProvenance::export_all(&cfg),
         PinResult::export_all(&cfg),

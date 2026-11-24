@@ -216,8 +216,14 @@ pub struct StatusArgs {
 
 #[derive(Debug, Args)]
 pub struct SearchArgs {
-    /// Query string.
+    /// Query text. Every whitespace-separated word must match, and words are
+    /// matched as typed, so `src/cache.rs`, `kindling-server` and `fix:` work.
     pub query: String,
+
+    /// Treat the query as SQLite FTS5 syntax: prefix (`auth*`), `OR`, `NOT`,
+    /// "quoted phrases". A malformed query is an error.
+    #[arg(long)]
+    pub advanced: bool,
 
     /// Filter by session ID.
     #[arg(long, value_name = "id")]

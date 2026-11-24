@@ -287,6 +287,7 @@ fn append_observation_happy_path_is_retrievable() {
             token_budget: None,
             max_candidates: None,
             include_redacted: None,
+            query_mode: None,
         })
         .expect("retrieve");
     assert!(result.candidates.iter().any(|c| matches!(
@@ -807,6 +808,7 @@ fn retrieve_surfaces_pinned_observation() {
                 token_budget: None,
                 max_candidates: None,
                 include_redacted: None,
+                query_mode: None,
             },
             2_000,
         )

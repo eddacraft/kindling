@@ -252,6 +252,7 @@ async fn spooled_append_round_trip() {
             token_budget: None,
             max_candidates: None,
             include_redacted: None,
+            query_mode: None,
         })
         .await
         .expect("retrieve");
@@ -348,6 +349,7 @@ async fn spool_buffers_while_offline_then_drains_on_flush() {
             token_budget: None,
             max_candidates: None,
             include_redacted: None,
+            query_mode: None,
         })
         .await
         .expect("retrieve after drain");

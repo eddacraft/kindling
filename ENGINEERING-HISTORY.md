@@ -45,6 +45,33 @@ at each release; older distribution approaches may now be superseded.
 
 ### Changed
 
+- **Literal query compiler and an explicit advanced mode (#311).**
+  `kindling-types` adds `QueryMode { Literal, Advanced }` (wire values
+  `"literal"` and `"advanced"`, ts-rs binding `QueryMode.ts`) and an optional
+  `query_mode` field on `RetrieveOptions` and `ProviderSearchOptions`. When it
+  is absent, it means `Literal`. Adding a public field breaks Rust callers that
+  build these structs with a literal; they add `query_mode: None`.
+  - **The compiler.** `LocalFtsProvider` builds the FTS5 `MATCH` expression in
+    one place (`compile_literal_query`). Literal mode splits on whitespace,
+    doubles embedded `"` and quotes each term, joined by FTS5's implicit AND.
+    NUL also separates terms, because FTS5 reads the query as a C string.
+    Every input compiles to valid FTS5, so file names, paths and operator-like
+    words are searched for as text. Advanced mode passes the query through.
+    Empty and whitespace-only queries return nothing without running `MATCH`.
+  - **Errors.** FTS5 syntax errors were swallowed into an empty result. They
+    are now `ProviderError::InvalidQuery`. The classifier also recognises
+    `expected integer, got` (a non-integer `NEAR` distance). `kindling-service` re-exports
+    `ProviderError` so the daemon maps it to HTTP 400 without depending on the
+    provider crate. The CLI gains `kindling search --advanced`.
+  - **TS parity fixtures.** These replay in advanced mode, which is what the
+    TS provider did; plain one-word cases also replay in literal mode. The
+    `malformed query` case (`AND OR`) intentionally diverges: TS returned
+    `[]`, and Rust now returns `InvalidQuery`. The fixture JSON is unchanged.
+  - **Known limit.** Matching still runs on `porter unicode61` tokens, so
+    punctuation is not significant (`C++` matches `C`, and `cache.rs` matches
+    every `*/cache.rs`). Exact identifier lookup is a follow-up, per the
+    design on #311.
+
 - **Rust client honours `KINDLING_BIN` when auto-spawning the daemon (GH-184, PR #272).**
   `Spawner::Command` execs `$KINDLING_BIN` when it is set and non-empty, and
   `kindling` on `PATH` otherwise, matching the TypeScript client's

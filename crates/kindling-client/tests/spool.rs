@@ -54,6 +54,7 @@ fn retrieve_opts(query: &str) -> RetrieveOptions {
         token_budget: None,
         max_candidates: None,
         include_redacted: None,
+        query_mode: None,
     }
 }
 

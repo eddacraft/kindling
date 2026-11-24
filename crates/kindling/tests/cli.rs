@@ -288,6 +288,105 @@ fn search_finds_logged_observation() {
     assert_eq!(v["provenance"]["query"], json!("brown fox"));
 }
 
+/// GH-311: queries are literal text by default, so file names, paths,
+/// hyphenated words and `prefix:` text match as typed.
+#[test]
+fn search_matches_identifiers_literally_by_default() {
+    let env = CliEnv::new();
+    assert_success(&env.run_db(&[
+        "log",
+        "edited src/provider.rs and cache.rs in kindling-server to fix: cache invalidation",
+    ]));
+    assert_success(&env.run_db(&["log", "unrelated weather note"]));
+
+    for query in [
+        "cache.rs",
+        "src/provider.rs",
+        "kindling-server",
+        "fix: cache",
+        "what NOT kindling-server",
+    ] {
+        let search = env.run_db(&["search", query, "--json"]);
+        assert_success(&search);
+        let v = json_stdout(&search);
+        let contents = candidate_contents(&v);
+        let expected = usize::from(!query.starts_with("what"));
+        assert_eq!(
+            contents.len(),
+            expected,
+            "literal query {query:?} returned {contents:?}"
+        );
+        assert_eq!(v["provenance"]["query"], json!(query));
+    }
+}
+
+/// The rest of the #311 examples at CLI level: punctuation-only words, embedded
+/// quotes, and literal versus advanced `NOT`.
+#[test]
+fn search_literal_punctuation_quotes_and_not() {
+    let env = CliEnv::new();
+    assert_success(&env.run_db(&["log", "built the C++ bindings for user@host"]));
+    assert_success(&env.run_db(&["log", "the tool said \"hello\" twice"]));
+    assert_success(&env.run_db(&["log", "what is not cached"]));
+    assert_success(&env.run_db(&["log", "what is cached"]));
+
+    let count = |args: &[&str]| {
+        let out = env.run_db(args);
+        assert_success(&out);
+        candidate_contents(&json_stdout(&out))
+    };
+
+    for (query, expected) in [
+        ("C++", "built the C++ bindings for user@host"),
+        ("user@host", "built the C++ bindings for user@host"),
+        ("said \"hello", "the tool said \"hello\" twice"),
+        ("what NOT cached", "what is not cached"),
+    ] {
+        assert_eq!(
+            count(&["search", query, "--json"]),
+            [expected],
+            "literal {query:?}"
+        );
+    }
+
+    assert_eq!(
+        count(&["search", "what NOT not", "--advanced", "--json"]),
+        ["what is cached"],
+        "advanced NOT is an operator"
+    );
+}
+
+/// `--advanced` keeps FTS5 syntax; a malformed advanced query fails loudly
+/// instead of looking like "no results".
+#[test]
+fn search_advanced_keeps_fts5_syntax_and_rejects_malformed_queries() {
+    let env = CliEnv::new();
+    assert_success(&env.run_db(&["log", "database migration completed"]));
+
+    let prefix = env.run_db(&["search", "datab*", "--advanced", "--json"]);
+    assert_success(&prefix);
+    assert_eq!(candidate_contents(&json_stdout(&prefix)).len(), 1);
+
+    let literal = env.run_db(&["search", "datab*", "--json"]);
+    assert_success(&literal);
+    assert!(candidate_contents(&json_stdout(&literal)).is_empty());
+
+    let bad = env.run_db(&["search", "AND OR", "--advanced", "--json"]);
+    assert!(!bad.status.success(), "malformed advanced query must fail");
+    let err: serde_json::Value = serde_json::from_str(support::stderr(&bad).trim()).unwrap();
+    assert!(
+        err["error"]
+            .as_str()
+            .unwrap()
+            .contains("invalid search query"),
+        "error should name the problem: {err}"
+    );
+
+    let bad = env.run_db(&["search", "\"unclosed", "--advanced"]);
+    assert!(!bad.status.success(), "malformed advanced query must fail");
+    assert!(support::stderr(&bad).contains("invalid search query"));
+}
+
 #[test]
 fn export_then_import_dry_run_then_import_roundtrip() {
     let src = CliEnv::new();

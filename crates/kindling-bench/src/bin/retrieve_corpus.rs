@@ -65,6 +65,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             token_budget: None,
             max_candidates: Some(max),
             include_redacted: Some(false),
+            query_mode: None,
         };
         let mut ids = Vec::new();
         let mut times = Vec::with_capacity(reps);

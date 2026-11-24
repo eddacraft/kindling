@@ -29,6 +29,7 @@ export type * from './PinResult.js';
 export type * from './PinTargetType.js';
 export type * from './ProviderSearchOptions.js';
 export type * from './ProviderSearchResult.js';
+export type * from './QueryMode.js';
 export type * from './RedactionEvidence.js';
 export type * from './RejectReason.js';
 export type * from './RetrieveOptions.js';
